@@ -844,6 +844,9 @@ static uint64_t ssd_write(struct ssd *ssd, NvmeRequest *req, FemuCtrl *n)
     uint64_t curlat = 0, maxlat = 0;
     int r;
 
+    uint64_t bytes_written_by_host = len * spp->secsz;
+    n->bytes_written_host += bytes_written_by_host;
+
     if (end_lpn >= spp->tt_pgs)
     {
         ftl_err("start_lpn=%" PRIu64 ",tt_pgs=%d\n", start_lpn, ssd->sp.tt_pgs);
