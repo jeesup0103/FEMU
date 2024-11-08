@@ -910,8 +910,9 @@ static uint16_t nvme_cmd_effects(FemuCtrl *n, NvmeCmd *cmd, uint8_t csi, uint32_
 
 static uint16_t nvme_write_amplification(FemuCtrl *n, NvmeCmd *cmd)
 {
+    uint64_t prp1 = le64_to_cpu(cmd->dptr.prp1);
+    uint64_t prp2 = le64_to_cpu(cmd->dptr.prp2);
     uint64_t waf;
-
     if (n->bytes_written_host == 0)
     {
         waf = 0; // Avoid division by zero
