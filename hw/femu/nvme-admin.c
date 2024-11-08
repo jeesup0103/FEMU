@@ -966,7 +966,7 @@ static uint16_t nvme_get_log(FemuCtrl *n, NvmeCmd *cmd)
         return nvme_fw_log_info(n, cmd, len);
     case NVME_LOG_CMD_EFFECTS:
         return nvme_cmd_effects(n, cmd, csi, len, off);
-    case NVME_LOG_WRITE_AMPLIFICATION: // Add new log case
+    case NVME_LOG_WRITE_AMPLIFICATION: // Add new log case waf
         return nvme_write_amplification(n, cmd);
     default:
         if (n->ext_ops.get_log)
