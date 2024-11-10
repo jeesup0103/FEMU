@@ -546,9 +546,6 @@ static void femu_realize(PCIDevice *pci_dev, Error **errp)
     init_dram_backend(&n->mbe, bs_size);
     n->mbe->femu_mode = n->femu_mode;
 
-    n->bytes_written_host = 0; // Initialize for WAF calculation
-    n->bytes_written_gc = 0;   // Initialize for WAF calculation
-
     n->completed = 0;
     n->start_time = time(NULL);
     n->reg_size = pow2ceil(0x1004 + 2 * (n->nr_io_queues + 1) * 4);
@@ -567,6 +564,9 @@ static void femu_realize(PCIDevice *pci_dev, Error **errp)
     nvme_init_namespaces(n, errp);
 
     nvme_register_extensions(n);
+
+    n->bytes_written_host = 0;
+    n->bytes_written_gc = 0;
 
     if (n->ext_ops.init) {
         n->ext_ops.init(n, errp);

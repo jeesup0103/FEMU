@@ -693,8 +693,9 @@ static void clean_one_block(struct ssd *ssd, struct ppa *ppa, FemuCtrl *n)
     struct ssdparams *spp = &ssd->sp;
     struct nand_page *pg_iter = NULL;
     int cnt = 0;
-    uint64_t page_size = spp->secs_per_pg * spp->secsz;
 
+    // waf
+    uint64_t page_size = spp->secs_per_pg * spp->secsz;
 
     for (int pg = 0; pg < spp->pgs_per_blk; pg++) {
         ppa->g.pg = pg;
@@ -706,7 +707,7 @@ static void clean_one_block(struct ssd *ssd, struct ppa *ppa, FemuCtrl *n)
             /* delay the maptbl update until "write" happens */
             gc_write_page(ssd, ppa);
             cnt++;
-            n->bytes_written_gc += page_size;
+	    n->bytes_written_gc += page_size;
         }
     }
 
@@ -818,12 +819,13 @@ static uint64_t ssd_write(struct ssd *ssd, NvmeRequest *req, FemuCtrl *n)
     uint64_t curlat = 0, maxlat = 0;
     int r;
 
-    uint64_t bytes_written_by_host = len * spp->secsz;
-    n->bytes_written_host += bytes_written_by_host;
-
     if (end_lpn >= spp->tt_pgs) {
         ftl_err("start_lpn=%"PRIu64",tt_pgs=%d\n", start_lpn, ssd->sp.tt_pgs);
     }
+
+
+    // waf 
+    n->bytes_written_host += len * spp->secsz;
 
     while (should_gc_high(ssd)) {
         /* perform GC here until !should_gc(ssd) */

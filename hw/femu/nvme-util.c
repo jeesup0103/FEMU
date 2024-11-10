@@ -306,3 +306,4 @@ void nvme_set_ctrl_name(FemuCtrl *n, const char *mn, const char *sn, int *dev_id
     subnqn = g_strdup_printf("nqn.2021-05.org.femu:%s", serial);
     strpadcpy((char *)id->subnqn, sizeof(id->subnqn), subnqn, '\0');
 }
+

@@ -1198,9 +1198,6 @@ typedef struct FemuExtCtrlOps {
 } FemuExtCtrlOps;
 
 typedef struct FemuCtrl {
-    // WAF variables
-    uint64_t bytes_written_host;
-    uint64_t bytes_written_gc;
 
     PCIDevice       parent_obj;
     MemoryRegion    iomem;
@@ -1364,6 +1361,11 @@ typedef struct FemuCtrl {
 
     /* Nand Flash Type: SLC/MLC/TLC/QLC/PLC */
     uint8_t         flash_type;
+
+
+    /* Write amplification waf  */
+    uint64_t bytes_written_host;
+    uint64_t bytes_written_gc;
 } FemuCtrl;
 
 typedef struct NvmePollerThreadArgument {
