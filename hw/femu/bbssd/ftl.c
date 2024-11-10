@@ -688,11 +688,14 @@ static struct line *select_victim_line(struct ssd *ssd, bool force)
 }
 
 /* here ppa identifies the block we want to clean */
-static void clean_one_block(struct ssd *ssd, struct ppa *ppa)
+static void clean_one_block(struct ssd *ssd, struct ppa *ppa, FemuCtrl *n)
 {
     struct ssdparams *spp = &ssd->sp;
     struct nand_page *pg_iter = NULL;
     int cnt = 0;
+
+    // waf
+    uint64_t page_size = spp->secs_per_pg * spp->secsz;
 
     for (int pg = 0; pg < spp->pgs_per_blk; pg++) {
         ppa->g.pg = pg;
@@ -704,6 +707,7 @@ static void clean_one_block(struct ssd *ssd, struct ppa *ppa)
             /* delay the maptbl update until "write" happens */
             gc_write_page(ssd, ppa);
             cnt++;
+	    n->bytes_written_gc += page_size;
         }
     }
 
@@ -721,7 +725,7 @@ static void mark_line_free(struct ssd *ssd, struct ppa *ppa)
     lm->free_line_cnt++;
 }
 
-static int do_gc(struct ssd *ssd, bool force)
+static int do_gc(struct ssd *ssd, bool force, FemuCtrl *n)
 {
     struct line *victim_line = NULL;
     struct ssdparams *spp = &ssd->sp;
@@ -746,7 +750,7 @@ static int do_gc(struct ssd *ssd, bool force)
             ppa.g.lun = lun;
             ppa.g.pl = 0;
             lunp = get_lun(ssd, &ppa);
-            clean_one_block(ssd, &ppa);
+            clean_one_block(ssd, &ppa, n);
             mark_block_free(ssd, &ppa);
 
             if (spp->enable_gc_delay) {
@@ -803,7 +807,7 @@ static uint64_t ssd_read(struct ssd *ssd, NvmeRequest *req)
     return maxlat;
 }
 
-static uint64_t ssd_write(struct ssd *ssd, NvmeRequest *req)
+static uint64_t ssd_write(struct ssd *ssd, NvmeRequest *req, FemuCtrl *n)
 {
     uint64_t lba = req->slba;
     struct ssdparams *spp = &ssd->sp;
@@ -819,9 +823,13 @@ static uint64_t ssd_write(struct ssd *ssd, NvmeRequest *req)
         ftl_err("start_lpn=%"PRIu64",tt_pgs=%d\n", start_lpn, ssd->sp.tt_pgs);
     }
 
+
+    // waf 
+    n->bytes_written_host += len * spp->secsz;
+
     while (should_gc_high(ssd)) {
         /* perform GC here until !should_gc(ssd) */
-        r = do_gc(ssd, true);
+        r = do_gc(ssd, true, n);
         if (r == -1)
             break;
     }
@@ -888,7 +896,7 @@ static void *ftl_thread(void *arg)
             ftl_assert(req);
             switch (req->cmd.opcode) {
             case NVME_CMD_WRITE:
-                lat = ssd_write(ssd, req);
+                lat = ssd_write(ssd, req, n);
                 break;
             case NVME_CMD_READ:
                 lat = ssd_read(ssd, req);
@@ -911,7 +919,7 @@ static void *ftl_thread(void *arg)
 
             /* clean one line if needed (in the background) */
             if (should_gc(ssd)) {
-                do_gc(ssd, false);
+                do_gc(ssd, false, n);
             }
         }
     }

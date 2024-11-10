@@ -856,6 +856,24 @@ static uint16_t nvme_cmd_effects(FemuCtrl *n, NvmeCmd *cmd, uint8_t csi,
     return dma_read_prp(n, ((uint8_t *)&log) + off, trans_len, prp1, prp2);
 }
 
+static uint16_t nvme_write_amplification(FemuCtrl *n, NvmeCmd *cmd){
+    uint64_t prp1 = le64_to_cpu(cmd->dptr.prp1);
+    uint64_t prp2 = le64_to_cpu(cmd->dptr.prp2);
+
+    uint64_t waf;
+    if(n->bytes_written_host == 0){
+        waf = 0;
+    }
+    else {
+        waf = (100 * (n->bytes_written_host + n->bytes_written_gc)) / n->bytes_written_host;
+    }
+
+
+   
+    return dma_read_prp(n, (uint8_t *)&waf, sizeof(waf), prp1, prp2);
+}
+
+
 static uint16_t nvme_get_log(FemuCtrl *n, NvmeCmd *cmd)
 {
     uint32_t dw10 = le32_to_cpu(cmd->cdw10);
@@ -895,6 +913,8 @@ static uint16_t nvme_get_log(FemuCtrl *n, NvmeCmd *cmd)
         return nvme_fw_log_info(n, cmd, len);
     case NVME_LOG_CMD_EFFECTS:
         return nvme_cmd_effects(n, cmd, csi, len, off);
+    case NVME_LOG_WRITE_AMPLIFICATION:
+	return nvme_write_amplification(n, cmd);
     default:
         if (n->ext_ops.get_log) {
             return n->ext_ops.get_log(n, cmd);
