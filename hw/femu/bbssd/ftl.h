@@ -161,7 +161,7 @@ struct ssdparams {
     int gtd_size;     /* size of the GTD (max translation virtual pages) */
 
     int cmt_bucket_size; /* Hash bucket size of CMT */
-    int cpt_bucket_size; /* Hast bucket size of CTP */
+    int ctp_bucket_size; /* Hast bucket size of CTP */
 
 };
 
@@ -217,7 +217,7 @@ struct gtd_entry{
 
 struct cmt_entry{
     struct data{
-        uint64_t int dlpn;  
+        uint64_t dlpn;  
         struct ppa dppn;
         bool dirty;
     } data;

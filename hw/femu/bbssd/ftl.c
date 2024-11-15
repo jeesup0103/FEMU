@@ -16,7 +16,7 @@ static inline bool should_gc_high(struct ssd *ssd)
 
 static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
 {
-    // return ssd->maptbl[lpn];
+    return ssd->maptbl[lpn];
 
 }
 
@@ -383,33 +383,33 @@ static void ssd_init_cdftl(struct ssd *ssd, struct ssdparams *spp)
 
     /*  CMT  */
     ssd->cmt = g_malloc0(sizeof(struct cmt));
-    ssd->cmt.max_entries = spp->cmt_size;
-    ssd->cmt.current_size = 0;
-    ssd->cmt.lru_head = NULL;
-    ssd->cmt.lru_tail = NULL;
+    ssd->cmt->max_entries = spp->cmt_size;
+    ssd->cmt->current_size = 0;
+    ssd->cmt->lru_head = NULL;
+    ssd->cmt->lru_tail = NULL;
 
-    ssd->cmt.hash_table_size = spp->cmt_bucket_size;
-    ssd->cmt.hash_table = g_malloc0(sizeof(struct cmt_hash) * ssd->cmt.hash_table_size);
-    for (int i = 0; i < ssd->cmt.hash_table_size; i++) {
-        ssd->cmt.hash_table[i].hash_value = i;
-        ssd->cmt.hash_table[i].cmt_entries = NULL;
-        ssd->cmt.hash_table[i].hash_next = NULL;
+    ssd->cmt->hash_table_size = spp->cmt_bucket_size;
+    ssd->cmt->hash_table = g_malloc0(sizeof(struct cmt_hash) * ssd->cmt->hash_table_size);
+    for (int i = 0; i < ssd->cmt->hash_table_size; i++) {
+        ssd->cmt->hash_table[i].hash_value = i;
+        ssd->cmt->hash_table[i].cmt_entries = NULL;
+        ssd->cmt->hash_table[i].hash_next = NULL;
     }
 
 
     /*  CTP   */
     ssd->ctp = g_malloc0(sizeof(struct ctp));
-    ssd->ctp.max_entries = spp->ctp_size;
-    ssd->ctp.current_size = 0;
-    ssd->ctp.lru_head = NULL;
-    ssd->ctp.lru_tail = NULL;
+    ssd->ctp->max_entries = spp->ctp_size;
+    ssd->ctp->current_size = 0;
+    ssd->ctp->lru_head = NULL;
+    ssd->ctp->lru_tail = NULL;
 
-    ssd->ctp.hash_table_size = spp->ctp_bucket_size;
-    ssd->ctp.hash_table = g_malloc0(sizeof(struct ctp_hash) * ssd->ctp.hash_table_size);
-    for (int i = 0; i < ssd->ctp.hash_table_size; i++) {
-        ssd->ctp.hash_table[i].hash_value = i;
-        ssd->ctp.hash_table[i].ctp_entries = NULL;
-        ssd->ctp.hash_table[i].hash_next = NULL;
+    ssd->ctp->hash_table_size = spp->ctp_bucket_size;
+    ssd->ctp->hash_table = g_malloc0(sizeof(struct ctp_hash) * ssd->ctp->hash_table_size);
+    for (int i = 0; i < ssd->ctp->hash_table_size; i++) {
+        ssd->ctp->hash_table[i].hash_value = i;
+        ssd->ctp->hash_table[i].ctp_entries = NULL;
+        ssd->ctp->hash_table[i].hash_next = NULL;
     }
 }
 
