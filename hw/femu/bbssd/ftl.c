@@ -16,7 +16,8 @@ static inline bool should_gc_high(struct ssd *ssd)
 
 static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
 {
-    return ssd->maptbl[lpn];
+    // return ssd->maptbl[lpn];
+
 }
 
 static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *ppa)
@@ -282,6 +283,14 @@ static void ssd_init_params(struct ssdparams *spp, FemuCtrl *n)
     spp->gc_thres_lines_high = (int)((1 - spp->gc_thres_pcent_high) * spp->tt_lines);
     spp->enable_gc_delay = true;
 
+    /* CDFTL Number of entries*/
+    spp->gtd_size = 3072; 
+    spp->cmt_size = 1024; // lpn
+    spp->ctp_size = 32;   // page
+
+    spp->cmt_bucket_size = 10;
+    spp->ctp_bucket_size = 5;
+
 
     check_params(spp);
 }
@@ -360,6 +369,50 @@ static void ssd_init_rmap(struct ssd *ssd)
     }
 }
 
+static void ssd_init_cdftl(struct ssd *ssd, struct ssdparams *spp)
+{
+
+    /*  GTD  */
+    ssd->gtd = g_malloc0(sizeof(struct gtd_entry) * spp->gtd_size);
+    for (int i = 0; i < spp->gtd_size; i++) {
+        ssd->gtd[i].tppn.ppa = UNMAPPED_PPA;
+        ssd->gtd[i].location = 1;   // Initially, all translation pages on flash
+        ssd->gtd[i].dirty = 0;
+    }
+
+
+    /*  CMT  */
+    ssd->cmt = g_malloc0(sizeof(struct cmt));
+    ssd->cmt.max_entries = spp->cmt_size;
+    ssd->cmt.current_size = 0;
+    ssd->cmt.lru_head = NULL;
+    ssd->cmt.lru_tail = NULL;
+
+    ssd->cmt.hash_table_size = spp->cmt_bucket_size;
+    ssd->cmt.hash_table = g_malloc0(sizeof(struct cmt_hash) * ssd->cmt.hash_table_size);
+    for (int i = 0; i < ssd->cmt.hash_table_size; i++) {
+        ssd->cmt.hash_table[i].hash_value = i;
+        ssd->cmt.hash_table[i].cmt_entries = NULL;
+        ssd->cmt.hash_table[i].hash_next = NULL;
+    }
+
+
+    /*  CTP   */
+    ssd->ctp = g_malloc0(sizeof(struct ctp));
+    ssd->ctp.max_entries = spp->ctp_size;
+    ssd->ctp.current_size = 0;
+    ssd->ctp.lru_head = NULL;
+    ssd->ctp.lru_tail = NULL;
+
+    ssd->ctp.hash_table_size = spp->ctp_bucket_size;
+    ssd->ctp.hash_table = g_malloc0(sizeof(struct ctp_hash) * ssd->ctp.hash_table_size);
+    for (int i = 0; i < ssd->ctp.hash_table_size; i++) {
+        ssd->ctp.hash_table[i].hash_value = i;
+        ssd->ctp.hash_table[i].ctp_entries = NULL;
+        ssd->ctp.hash_table[i].hash_next = NULL;
+    }
+}
+
 void ssd_init(FemuCtrl *n)
 {
     struct ssd *ssd = n->ssd;
@@ -386,6 +439,9 @@ void ssd_init(FemuCtrl *n)
 
     /* initialize write pointer, this is how we allocate new pages for writes */
     ssd_init_write_pointer(ssd);
+
+    /* Iniitalize CDFTL data structures*/
+    ssd_init_cdftl(ssd, spp);
 
     qemu_thread_create(&ssd->ftl_thread, "FEMU-FTL-Thread", ftl_thread, n,
                        QEMU_THREAD_JOINABLE);
