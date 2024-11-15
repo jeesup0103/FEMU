@@ -16,14 +16,25 @@ static inline bool should_gc_high(struct ssd *ssd)
 
 static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
 {
-    return ssd->maptbl[lpn];
+    // return ssd->maptbl[lpn];
 
+    struct cmt_entry *entry = find_cmt_entry(ssd->cmt, lpn);
+    if (entry)
+    {
+        move_cmt_entry_to_tail(ssd->cmt, entry);
+        return entry->data.dppn;
+    }
+    // If not found in CMT, we retrieve from the actual mapping table
+    // This may also involve fetching the translation page from flash or CTP
+    // ...
+    // For simplicity, return from direct mapping table:
 }
 
 static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *ppa)
 {
     ftl_assert(lpn < ssd->sp.tt_pgs);
     ssd->maptbl[lpn] = *ppa;
+    insert_cmt_entry(ssd, lpn, *ppa, true);
 }
 
 static uint64_t ppa2pgidx(struct ssd *ssd, struct ppa *ppa)
@@ -383,33 +394,33 @@ static void ssd_init_cdftl(struct ssd *ssd, struct ssdparams *spp)
 
     /*  CMT  */
     ssd->cmt = g_malloc0(sizeof(struct cmt));
-    ssd->cmt->max_entries = spp->cmt_size;
-    ssd->cmt->current_size = 0;
-    ssd->cmt->lru_head = NULL;
-    ssd->cmt->lru_tail = NULL;
+    ssd->cmt.max_entries = spp->cmt_size;
+    ssd->cmt.current_size = 0;
+    ssd->cmt.lru_head = NULL;
+    ssd->cmt.lru_tail = NULL;
 
-    ssd->cmt->hash_table_size = spp->cmt_bucket_size;
-    ssd->cmt->hash_table = g_malloc0(sizeof(struct cmt_hash) * ssd->cmt->hash_table_size);
-    for (int i = 0; i < ssd->cmt->hash_table_size; i++) {
-        ssd->cmt->hash_table[i].hash_value = i;
-        ssd->cmt->hash_table[i].cmt_entries = NULL;
-        ssd->cmt->hash_table[i].hash_next = NULL;
+    ssd->cmt.hash_table_size = spp->cmt_bucket_size;
+    ssd->cmt.hash_table = g_malloc0(sizeof(struct cmt_hash) * ssd->cmt.hash_table_size);
+    for (int i = 0; i < ssd->cmt.hash_table_size; i++) {
+        ssd->cmt.hash_table[i].hash_value = i;
+        ssd->cmt.hash_table[i].cmt_entries = NULL;
+        ssd->cmt.hash_table[i].hash_next = NULL;
     }
 
 
     /*  CTP   */
     ssd->ctp = g_malloc0(sizeof(struct ctp));
-    ssd->ctp->max_entries = spp->ctp_size;
-    ssd->ctp->current_size = 0;
-    ssd->ctp->lru_head = NULL;
-    ssd->ctp->lru_tail = NULL;
+    ssd->ctp.max_entries = spp->ctp_size;
+    ssd->ctp.current_size = 0;
+    ssd->ctp.lru_head = NULL;
+    ssd->ctp.lru_tail = NULL;
 
-    ssd->ctp->hash_table_size = spp->ctp_bucket_size;
-    ssd->ctp->hash_table = g_malloc0(sizeof(struct ctp_hash) * ssd->ctp->hash_table_size);
-    for (int i = 0; i < ssd->ctp->hash_table_size; i++) {
-        ssd->ctp->hash_table[i].hash_value = i;
-        ssd->ctp->hash_table[i].ctp_entries = NULL;
-        ssd->ctp->hash_table[i].hash_next = NULL;
+    ssd->ctp.hash_table_size = spp->ctp_bucket_size;
+    ssd->ctp.hash_table = g_malloc0(sizeof(struct ctp_hash) * ssd->ctp.hash_table_size);
+    for (int i = 0; i < ssd->ctp.hash_table_size; i++) {
+        ssd->ctp.hash_table[i].hash_value = i;
+        ssd->ctp.hash_table[i].ctp_entries = NULL;
+        ssd->ctp.hash_table[i].hash_next = NULL;
     }
 }
 
@@ -445,6 +456,161 @@ void ssd_init(FemuCtrl *n)
 
     qemu_thread_create(&ssd->ftl_thread, "FEMU-FTL-Thread", ftl_thread, n,
                        QEMU_THREAD_JOINABLE);
+}
+
+/* Calculate hash bucket */
+static inline int cmt_hash_func(struct cmt *cmt_struct, uint64_t dlpn) {
+    return (int)(dlpn % cmt_struct->cmt_bucket_size);
+}
+
+static inline int ctp_hash_func(struct ctp *ctp_struct, uint64_t dlpn) {
+    return (int)(dlpn % ctp_struct->ctp_bucket_size);
+}
+
+/* Find cmt entry in cmt_hash_table */
+static struct cmt_entry *find_cmt_entry(struct cmt *cmt_struct, uint64_t dlpn) {
+    int index = cmt_hash_func(cmt_struct, dlpn);
+    struct cmt_entry *entry = cmt_struct->hash_table[index].cmt_entries;
+
+    while (entry) {
+        if (entry->data.dlpn == dlpn) {
+            return entry;
+        }
+        entry = entry->next;
+    }
+    return NULL;
+}
+
+/* Node is accessed -> move to tail  */
+static void move_cmt_entry_to_tail(struct cmt *cmt_struct, struct cmt_entry *entry) {
+    // Already in tail
+    if (!entry || entry == cmt_struct->lru_tail) {
+        return;
+    }
+
+    // prev is old, next is new
+
+    // Remove the entry from its current position in LRU list
+    if (entry->lru_prev) {
+        entry->lru_prev->lru_next = entry->lru_next;
+    } 
+    else {
+        cmt_struct->lru_head = entry->lru_next;
+    }
+    if (entry->lru_next) {
+        entry->lru_next->lru_prev = entry->lru_prev;
+    } 
+    else {
+        cmt_struct->lru_tail = entry->lru_prev;
+    }
+
+    // Place it at the tail
+    entry->lru_prev = cmt_struct->lru_tail;
+    entry->lru_next = NULL;
+    if (cmt_struct->lru_tail) {
+        cmt_struct->lru_tail->lru_next = entry;
+    } 
+    else {
+        cmt_struct->lru_head = entry;
+    }
+    cmt_struct->lru_tail = entry;
+}
+
+static void evict_cmt_entry(struct ssd *ssd) {
+    struct cmt *cmt_struct = ssd->cmt;
+    struct cmt_entry *victim = cmt_struct->lru_head;
+    if (!victim) {
+        return;  
+    }
+
+    // Remove from the LRU list
+    cmt_struct->lru_head = victim->lru_next;
+    if (cmt_struct->lru_head) {
+        cmt_struct->lru_head->lru_prev = NULL;
+    } 
+    else {
+        cmt_struct->lru_tail = NULL;
+    }
+
+    // Remove from the hash table
+    int index = cmt_hash_func(cmt_struct, victim->data.dlpn);
+    struct cmt_entry **bucket_entry = &cmt_struct->hash_table[index].cmt_entries;
+    while (*bucket_entry && (*bucket_entry)->data.dlpn != victim->data.dlpn) {
+        bucket_entry = &(*bucket_entry)->next;
+    }
+    if (*bucket_entry) {
+        *bucket_entry = (*bucket_entry)->next;
+    }
+
+    // If victim is dirty, flush the mapping to the translation page in CTP
+    if (victim->data.dirty) {
+        // Implementation: Update the relevant translation page in memory or flash TODO
+        // ...
+    }
+
+    g_free(victim);
+    cmt_struct->current_size--;
+}
+
+static void insert_cmt_entry(struct ssd *ssd, uint64_t dlpn, struct ppa dppn, bool dirty)
+{
+    struct cmt *cmt_struct = ssd->cmt;
+    struct cmt_entry *entry = find_cmt_entry(cmt_struct, dlpn);
+    if (entry)
+    {
+        // Update existing entry
+        entry->data.dppn = dppn;
+        entry->data.dirty = dirty;
+        move_cmt_entry_to_tail(cmt_struct, entry);
+        return;
+    }
+
+    // If capacity is exceeded, evict the least recently used item
+    if (cmt_struct->current_size >= cmt_struct->max_entries)
+    {
+        evict_cmt_entry(ssd);
+    }
+
+    // Create a new entry
+    entry = g_malloc0(sizeof(struct cmt_entry));
+    entry->data.dlpn = dlpn;
+    entry->data.dppn = dppn;
+    entry->data.dirty = dirty;
+
+    // Insert into the hash table
+    int index = cmt_hash_func(cmt_struct, dlpn);
+    entry->next = cmt_struct->hash_table[index].cmt_entries;
+    if (entry->next)
+    {
+        entry->next->prev = entry;
+    }
+    cmt_struct->hash_table[index].cmt_entries = entry;
+
+    // Insert into LRU list at the tail
+    entry->lru_prev = cmt_struct->lru_tail;
+    entry->lru_next = NULL;
+    if (cmt_struct->lru_tail)
+    {
+        cmt_struct->lru_tail->lru_next = entry;
+    }
+    else
+    {
+        cmt_struct->lru_head = entry;
+    }
+    cmt_struct->lru_tail = entry;
+
+    cmt_struct->current_size++;
+}
+
+static void update_cmt_entry(struct ssd *ssd, uint64_t dlpn, bool dirty)
+{
+    struct cmt *cmt_struct = ssd->cmt;
+    struct cmt_entry *entry = find_cmt_entry(cmt_struct, dlpn);
+    if (!entry)
+        return;
+
+    entry->data.dirty = dirty;
+    move_cmt_entry_to_tail(cmt_struct, entry);
 }
 
 static inline bool valid_ppa(struct ssd *ssd, struct ppa *ppa)
