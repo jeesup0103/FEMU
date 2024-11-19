@@ -4,6 +4,41 @@
 
 static void *ftl_thread(void *arg);
 
+/* Garbage Collection Functions */
+static inline bool should_gc(struct ssd *ssd);
+static inline bool should_gc_high(struct ssd *ssd);
+static bool should_gc_translation(struct ssd *ssd);
+static int translation_gc(struct ssd *ssd);
+
+/* Hash Functions */
+static inline int cmt_hash_func(struct cmt *cmt_struct, uint64_t dlpn);
+static inline int ctp_hash_func(struct ctp *ctp_struct, uint64_t dlpn);
+
+/* CMT (Cached Mapping Table) Functions */
+static struct cmt_entry *find_cmt_entry(struct cmt *cmt_struct, uint64_t dlpn);
+static void move_cmt_entry_to_tail(struct cmt *cmt_struct, struct cmt_entry *entry);
+static void evict_cmt_entry(struct ssd *ssd);
+static void insert_cmt_entry(struct ssd *ssd, uint64_t dlpn, struct ppa dppn, bool dirty);
+static void remove_cmt_entry(struct ssd *ssd, struct cmt_entry *entry);
+
+/* Translation Page Allocation Function */
+static struct ppa get_new_translation_page(struct ssd *ssd);
+
+/* CTP (Cached Translation Page) Functions */
+static void evict_ctp_entry(struct ssd *ssd);
+static void insert_ctp_entry(struct ctp *ctp_struct, struct ctp_entry *entry);
+static struct ctp_entry *find_ctp_entry(struct ctp *ctp_struct, uint64_t tvpn);
+static void move_ctp_entry_to_tail(struct ctp *ctp_struct, struct ctp_entry *entry);
+
+/* Translation Page Read/Write Functions */
+static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map_page *mp);
+static struct map_page *read_translation_page(struct ssd *ssd, struct ppa *tppa);
+static struct ctp_entry *load_translation_page_from_flash(struct ssd *ssd, uint64_t tvpn, struct ppa tppn);
+static struct ppa allocate_new_translation_page(struct ssd *ssd);
+
+/* Fetch and Replace Function */
+static void fetch_and_replace(struct ssd *ssd, uint64_t lpn, struct ppa new_ppa);
+
 static inline bool should_gc(struct ssd *ssd)
 {
     return (ssd->lm.free_line_cnt <= ssd->sp.gc_thres_lines);
@@ -429,6 +464,44 @@ static struct ctp_entry *find_ctp_entry(struct ctp *ctp_struct, uint64_t tvpn)
         entry = entry->next;
     }
     return NULL;
+}
+
+static struct ppa allocate_new_translation_page(struct ssd *ssd)
+{
+    struct write_pointer *twp = &ssd->trans_wp;
+    struct ssdparams *spp = &ssd->sp;
+
+    // Check if garbage collection is needed for translation blocks
+    if (should_gc_translation(ssd))
+    {
+        translation_gc(ssd);
+    }
+
+    // Allocate new PPA using the translation write pointer
+    struct ppa new_tppa;
+    new_tppa.g.ch = twp->ch;
+    new_tppa.g.lun = twp->lun;
+    new_tppa.g.pl = twp->pl;
+    new_tppa.g.blk = twp->blk;
+    new_tppa.g.pg = twp->pg;
+    new_tppa.g.sec = 0; // Assuming sector-level granularity is not needed for translation pages
+    new_tppa.g.rsv = 0; // Reserved bits, set to 0
+
+    // Advance the translation write pointer
+    twp->pg++;
+    if (twp->pg >= spp->pgs_per_blk)
+    {
+        twp->pg = 0;
+        twp->blk++;
+        if (twp->blk >= spp->blks_per_pl)
+        {
+            twp->blk = 0;
+            // Optionally, advance plane, lun, or channel as needed
+            // For simplicity, we'll keep using the same plane, lun, and channel
+        }
+    }
+
+    return new_tppa;
 }
 
 // Translation page를 flash에 쓰기
