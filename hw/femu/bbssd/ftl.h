@@ -284,11 +284,16 @@ struct ssd
     struct cmt *cmt;       // Cached Mapping Table structure
     struct ctp *ctp;       // Cached Translation Page structure
 
+    // Translation blocks
+    struct ppa *trans_maptbl;      // translation block mapping table
+    struct write_pointer trans_wp; // translation block write pointer
+
     /* lockless ring for communication with NVMe IO thread */
     struct rte_ring **to_ftl;
     struct rte_ring **to_poller;
     bool *dataplane_started_ptr;
     QemuThread ftl_thread;
+
 };
 
 void ssd_init(FemuCtrl *n);
