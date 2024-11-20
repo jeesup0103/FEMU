@@ -55,6 +55,7 @@ static int translation_gc(struct ssd *ssd)
 {
     struct ssdparams *spp = &ssd->sp;
     struct write_pointer *twp = &ssd->trans_wp;
+    struct gtd_entry *gtd = ssd->gtd;
     int valid_pages = 0;
 
     // Identify the victim block for GC
@@ -76,11 +77,11 @@ static int translation_gc(struct ssd *ssd)
         {
             for (int j = 0; j < 3072; j++)
             {
-                if (gtd[j].tppn.ppa == old_ppa.ppa)
+                if (gtd[j].tppn.ppa == old_tppa.ppa)
                 {
                     // 새로운 위치에 복사
                     struct ppa new_ppa = get_new_page(ssd);
-                    struct map_page *mp = read_translation_page(ssd, &old_ppa);
+                    struct map_page *mp = read_translation_page(ssd, &old_tppa);
                     write_translation_page(ssd, &new_ppa, mp);
                     gtd[j].tppn = new_ppa;
                     valid_pages++;
@@ -103,6 +104,54 @@ static int translation_gc(struct ssd *ssd)
     // Reset the write pointer
     twp->pg = 0;
     twp->blk = (victim_blk + 1) % spp->blks_per_pl;
+
+    return valid_pages;
+}
+
+static int translation_gc(struct ssd *ssd)
+{
+    struct ssdparams *spp = &ssd->sp;
+    struct write_pointer *twp = &ssd->trans_wp;
+    struct ppa old_ppa;
+    struct gtd_entry *gtd = ssd->gtd;
+    int valid_pages = 0;
+
+    // 현재 translation block의 유효한 페이지들을 새로운 위치로 복사
+    for (int i = 0; i < spp->pgs_per_blk; i++)
+    {
+        old_ppa = twp->curline->blk[twp->blk].pg[i].ppa;
+        if (old_ppa.ppa != UNMAPPED_PPA)
+        {
+            // 유효한 translation page 찾기
+            for (int j = 0; j < 3072; j++)
+            {
+                if (gtd[j].tppn.ppa == old_ppa.ppa)
+                {
+                    // 새로운 위치에 복사
+                    struct ppa new_ppa = get_new_page(ssd);
+                    struct map_page *mp = read_translation_page(ssd, &old_ppa);
+                    write_translation_page(ssd, &new_ppa, mp);
+                    gtd[j].tppn = new_ppa;
+                    valid_pages++;
+                    g_free(mp->dppn);
+                    g_free(mp);
+                    break;
+                }
+            }
+        }
+    }
+
+    // Translation block 삭제
+    struct nand_cmd gce;
+    gce.type = GC_IO;
+    gce.cmd = NAND_ERASE;
+    gce.stime = 0;
+    old_ppa.g.blk = twp->blk;
+    ssd_advance_status(ssd, &old_ppa, &gce);
+
+    // Write pointer 업데이트
+    twp->pg = 0;
+    twp->blk = (twp->blk + 1) % spp->blks_per_pl;
 
     return valid_pages;
 }
@@ -607,7 +656,7 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
         if (cmt_ent)
         {
             // Replace ppn in CMT
-            cmt_ent->data.dppn = new_ppa.ppa;
+            cmt_ent->data.dppn = new_ppa->ppa;
             cmt_ent->data.dirty = true;
             move_cmt_entry_to_tail(ssd->cmt, cmt_ent);
 
