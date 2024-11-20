@@ -55,17 +55,25 @@ static int translation_gc(struct ssd *ssd)
 {
     struct ssdparams *spp = &ssd->sp;
     struct write_pointer *twp = &ssd->trans_wp;
-    struct ppa old_ppa;
-    struct gtd_entry *gtd = ssd->gtd;
     int valid_pages = 0;
 
-    // 현재 translation block의 유효한 페이지들을 새로운 위치로 복사
-    for (int i = 0; i < spp->pgs_per_blk; i++)
+    // Identify the victim block for GC
+    int victim_blk = twp->blk;
+
+    // Collect valid translation pages from the victim block
+    for (int pg = 0; pg < spp->pgs_per_blk; pg++)
     {
-        old_ppa = twp->curline->blk[twp->blk].pg[i].ppa;
-        if (old_ppa.ppa != UNMAPPED_PPA)
+        struct ppa old_tppa;
+        old_tppa.g.ch = twp->ch;
+        old_tppa.g.lun = twp->lun;
+        old_tppa.g.pl = twp->pl;
+        old_tppa.g.blk = victim_blk;
+        old_tppa.g.pg = pg;
+        old_tppa.g.sec = 0;
+
+        // Check if the page is valid
+        if (old_tppa.ppa != UNMAPPED_PPA)
         {
-            // 유효한 translation page 찾기
             for (int j = 0; j < 3072; j++)
             {
                 if (gtd[j].tppn.ppa == old_ppa.ppa)
@@ -84,17 +92,17 @@ static int translation_gc(struct ssd *ssd)
         }
     }
 
-    // Translation block 삭제
+    // Erase the victim block
     struct nand_cmd gce;
     gce.type = GC_IO;
     gce.cmd = NAND_ERASE;
     gce.stime = 0;
-    old_ppa.g.blk = twp->blk;
-    ssd_advance_status(ssd, old_ppa, &gce);
+    struct ppa erase_ppa = {.g = {.ch = twp->ch, .lun = twp->lun, .pl = twp->pl, .blk = victim_blk, .pg = 0, .sec = 0}};
+    ssd_advance_status(ssd, &erase_ppa, &gce);
 
-    // Write pointer 업데이트
+    // Reset the write pointer
     twp->pg = 0;
-    twp->blk = (twp->blk + 1) % spp->blks_per_pl;
+    twp->blk = (victim_blk + 1) % spp->blks_per_pl;
 
     return valid_pages;
 }
@@ -348,14 +356,18 @@ static void evict_ctp_entry(struct ctp *ctp_struct, struct ssd *ssd)
     // Flush to translation block if dirty
     if (victim->dirty)
     {
+        if (should_gc_translation(ssd))
+        {
+            translation_gc(ssd);
+        }
         // Write the translation page to flash
-        write_translation_page(ssd, &victim.tppn, victim->mp);
+        write_translation_page(ssd, &victim->tppn, victim->mp);
 
         // Update translation mapping table
-        ssd->trans_maptbl[victim->tvpn] = victim.tppn;
+        ssd->trans_maptbl[victim->tvpn] = victim->tppn;
 
         // Update GTD
-        ssd->gtd[victim->tvpn].tppn = victim.tppn;
+        ssd->gtd[victim->tvpn].tppn = victim->tppn;
         ssd->gtd[victim->tvpn].location = 1;  // Now on flash
         ssd->gtd[victim->tvpn].dirty = false; // Clean after flush
     }
@@ -375,7 +387,7 @@ static void insert_ctp_entry(struct ctp *ctp_struct, struct ctp_entry *entry, st
 {
     if (ctp_struct->current_size >= ctp_struct->max_entries)
     {
-        evict_ctp_entry(ctp_structm, ssd);
+        evict_ctp_entry(ctp_struct, ssd);
     }
 
     int index = ctp_hash_func(entry->tvpn);
@@ -541,8 +553,8 @@ static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
         // Load translation page from flash
         struct ctp_entry *ctp_ent = g_malloc0(sizeof(struct ctp_entry));
         ctp_ent->tvpn = tvpn;
-        ctp_ent->tppn = gtd_ent->tppn;
-        ctp_ent->mp = read_translation_page(ssd, &gtd_ent->tppn);
+        ctp_ent->tppn = gtd_entry->tppn;
+        ctp_ent->mp = read_translation_page(ssd, &gtd_entry->tppn);
         ctp_ent->dirty = false;
         insert_ctp_entry(ssd->ctp, ctp_ent, ssd);
 
@@ -595,7 +607,7 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
         if (cmt_ent)
         {
             // Replace ppn in CMT
-            cmt_ent->data.dppn = &new_ppa;
+            cmt_ent->data.dppn = new_ppa.ppa;
             cmt_ent->data.dirty = true;
             move_cmt_entry_to_tail(ssd->cmt, cmt_ent);
 
@@ -1008,8 +1020,8 @@ static void ssd_init_cdftl(struct ssd *ssd, struct ssdparams *spp)
 
     /*  CMT  */
     ssd->cmt = g_malloc0(sizeof(struct cmt));
-    ssd->cmt.max_entries = spp->cmt_size;
-    ssd->cmt.current_size = 0;
+    ssd->cmt->max_entries = spp->cmt_size;
+    ssd->cmt->current_size = 0;
     ssd->cmt->lru_head = NULL;
     ssd->cmt->lru_tail = NULL;
 
