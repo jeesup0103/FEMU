@@ -237,10 +237,10 @@ struct ctp_entry{
     uint64_t tvpn;
     struct map_page *mp;
     struct ppa tppn;
-    struct cmt_entry *prev;
-    struct cmt_entry *next;
-    struct cmt_entry *lru_prev;
-    struct cmt_entry *lru_next;
+    struct ctp_entry *prev;
+    struct ctp_entry *next;
+    struct ctp_entry *lru_prev;
+    struct ctp_entry *lru_next;
 };
 
 struct ctp_hash {
