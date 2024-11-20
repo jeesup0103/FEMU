@@ -32,7 +32,7 @@ static void move_ctp_entry_to_tail(struct ctp *ctp_struct, struct ctp_entry *ent
 
 /* Translation Page Read/Write Functions */
 static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map_page *mp);
-static struct map_page *read_translation_page(struct ssd *ssd, struct ppa *tppa)
+static struct map_page *read_translation_page(struct ssd *ssd, struct ppa *tppa);
 
 static inline bool should_gc(struct ssd *ssd)
 {
