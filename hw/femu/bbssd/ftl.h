@@ -241,6 +241,7 @@ struct ctp_entry{
     struct ctp_entry *next;
     struct ctp_entry *lru_prev;
     struct ctp_entry *lru_next;
+    bool dirty;
 };
 
 struct ctp_hash {

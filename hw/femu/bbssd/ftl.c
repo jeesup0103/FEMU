@@ -25,7 +25,7 @@ static void remove_cmt_entry(struct ssd *ssd, struct cmt_entry *entry);
 static struct ppa get_new_translation_page(struct ssd *ssd);
 
 /* CTP (Cached Translation Page) Functions */
-static void evict_ctp_entry(struct ssd *ssd);
+static void evict_ctp_entry(struct ctp *ctp_struct);
 static void insert_ctp_entry(struct ctp *ctp_struct, struct ctp_entry *entry);
 static struct ctp_entry *find_ctp_entry(struct ctp *ctp_struct, uint64_t tvpn);
 static void move_ctp_entry_to_tail(struct ctp *ctp_struct, struct ctp_entry *entry);
@@ -95,7 +95,7 @@ static int translation_gc(struct ssd *ssd)
     gce.cmd = NAND_ERASE;
     gce.stime = 0;
     old_ppa.g.blk = twp->blk;
-    ssd_advance_status(ssd, &old_ppa, &gce);
+    ssd_advance_status(ssd, old_ppa, &gce);
 
     // Write pointer 업데이트
     twp->pg = 0;
@@ -207,24 +207,12 @@ static void evict_cmt_entry(struct ssd *ssd)
         *bucket_entry = (*bucket_entry)->next;
     }
 
-    // If victim is dirty, flush the mapping to the translation page in CTP
+    // If victim is dirty, flush the mapping
     if (victim->data.dirty)
     {
-        // Implementation: Update the relevant translation page in flash
-
-        // Allocate new physical page in translation block
-        struct ppa new_tppn = get_new_translation_page(ssd);
-
-        // Write the translation page to flash
-        write_translation_page(ssd, &new_tppn, victim->mp);
-
-        // Update translation mapping table
+        // Flush the translation mapping table
         ssd->trans_maptbl[victim->tvpn] = new_tppn;
-
-        // Update GTD
-        ssd->gtd[victim->data.dlpn].tppn = new_tppn;
-        ssd->gtd[victim->data.dlpn].location = 1; // Now on flash
-        ssd->gtd[victim->data.dlpn].dirty = false; // Clean after flush
+        victim->data.dirty = false;
     }
 
     g_free(victim);
@@ -293,7 +281,7 @@ static void remove_cmt_entry(struct ssd *ssd, struct cmt_entry *entry)
     }
     else
     {
-        ssd->cmt_head = entry->lru_next;
+        ssd->cmt->lru_head = entry->lru_next;
     }
     if (entry->lru_next)
     {
@@ -301,12 +289,12 @@ static void remove_cmt_entry(struct ssd *ssd, struct cmt_entry *entry)
     }
     else
     {
-        ssd->cmt_tail = entry->lru_prev;
+        ssd->cmt->lru_tail = entry->lru_prev;
     }
 
     // Remove from hash table
     uint64_t index = cmt_hash_func(entry->data.dlpn);
-    struct cmt_entry **bucket_entry = &ssd->cmt_hash_table[index].cmt_entries;
+    struct cmt_entry **bucket_entry = &ssd->cmt->hash_table[index].cmt_entries;
     while (*bucket_entry && (*bucket_entry)->data.dlpn != entry->data.dlpn)
     {
         bucket_entry = (struct cmt_entry **)&(*bucket_entry)->next;
@@ -317,7 +305,7 @@ static void remove_cmt_entry(struct ssd *ssd, struct cmt_entry *entry)
     }
 
     g_free(entry);
-    ssd->cmt_size--;
+    ssd->cmt->current_size--;
 }
 
 static struct ppa get_new_translation_page(struct ssd *ssd)
@@ -394,9 +382,6 @@ static void evict_ctp_entry(struct ctp *ctp_struct)
     // Flush to translation block if dirty
     if (victim->dirty)
     {
-        // Allocate new physical page in translation block
-        struct ppa new_tppn = get_new_translation_page(ssd);
-
         // Write the translation page to flash
         write_translation_page(ssd, &new_tppn, victim->mp);
 
@@ -548,7 +533,8 @@ static struct ctp_entry *load_translation_page_from_flash(struct ssd *ssd, uint6
     struct ctp_entry *ctp_ent = g_malloc0(sizeof(struct ctp_entry));
     ctp_ent->tvpn = tvpn;
     ctp_ent->tppn = tppn;
-    ctp_ent->mp = read_translation_page(ssd, tppn);
+    ctp_ent->mp = read_translation_page(ssd, &tppn);
+    ctp_ent->dirty = false;
    
     return ctp_ent;
 }
@@ -590,70 +576,6 @@ static void move_ctp_entry_to_tail(struct ctp *ctp_struct, struct ctp_entry *ent
     }
     ctp_struct->lru_tail = entry;
 }
-void fetch_and_replace(struct ssd *ssd, uint64_t lpn, struct ppa new_ppa)
-{
-    uint64_t tvpn = lpn / 512;
-    uint64_t offset = lpn % 512;
-
-    // Fetch the translation page into CTP if not present
-    struct ctp_entry *ctp_ent = find_ctp_entry(ssd->ctp, tvpn);
-    if (!ctp_ent)
-    {
-        struct gtd_entry *gtd_ent = &ssd->gtd[tvpn];
-        if (gtd_ent->tppn.ppa != UNMAPPED_PPA)
-        {
-            // Load translation page from flash
-            ctp_ent = load_translation_page_from_flash(ssd, tvpn, gtd_ent->tppn);
-            insert_ctp_entry(ssd->ctp, ctp_ent);
-        }
-        else
-        {
-            // Allocate new translation page
-            ctp_ent = g_malloc0(sizeof(struct ctp_entry));
-            ctp_ent->tvpn = tvpn;
-            ctp_ent->tppn = allocate_new_translation_page(ssd);
-            ctp_ent->dirty = true;
-            ctp_ent->mp = g_malloc0(sizeof(struct map_page));
-            ctp_ent->mp->dppn = g_malloc0(sizeof(struct ppa) * 512);
-            for (int i = 0; i < 512; i++)
-            {
-                ctp_ent->mp->dppn[i].ppa = UNMAPPED_PPA;
-            }
-            insert_ctp_entry(ssd->ctp, ctp_ent);
-
-            // Update GTD
-            gtd_ent->tppn = ctp_ent->tppn;
-            gtd_ent->location = 0;
-            gtd_ent->dirty = true;
-        }
-    }
-    else
-    {
-        // Move to tail of LRU
-        move_ctp_entry_to_tail(ssd->ctp, ctp_ent);
-    }
-
-    // Update the mapping in CTP
-    ctp_ent->mp->dppn[offset] = new_ppa;
-    ctp_ent->dirty = true;
-
-    // Update the mapping in CMT
-    struct cmt_entry *cmt_ent = find_cmt_entry(ssd->cmt, lpn);
-    if (cmt_ent)
-    {
-        cmt_ent->data.dppn = new_ppa;
-        cmt_ent->data.dirty = true;
-        move_cmt_entry_to_tail(ssd->cmt, cmt_ent);
-    }
-    else
-    {
-        insert_cmt_entry(ssd, lpn, new_ppa, true);
-    }
-
-    // Update GTD
-    struct gtd_entry *gtd_ent = &ssd->gtd[tvpn];
-    gtd_ent->dirty = true;
-}
 
 static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
 {
@@ -669,12 +591,12 @@ static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
         return entry->data.dppn;
     }
 
-    uint64_t tvpn = lpn / ssd->512;
+    uint64_t tvpn = lpn / 512;
 
 
     struct gtd_entry *gtd_entry = &ssd->gtd[tvpn];
     // unmapped ppn
-    if (gtd_ent->tppn.ppa == UNMAPPED_PPA)
+    if (gtd_entry->tppn.ppa == UNMAPPED_PPA)
     {
         // not found anywhere
         ppa.ppa = UNMAPPED_PPA;
@@ -706,7 +628,7 @@ static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
 
         ssd->gtd[tvpn].location = 0;
 
-        ppa = ctp_entry->mp->dppn[lpn % 512];
+        ppa = ctp_ent->mp->dppn[lpn % 512];
         insert_cmt_entry(ssd, lpn, ppa, false);
     
     }
@@ -719,23 +641,22 @@ static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
 static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new_ppa)
 {
     ftl_assert(lpn < ssd->sp.tt_pgs);
-    ssd->maptbl[lpn] = *ppa;
+    ssd->maptbl[lpn] = *new_ppa;
 
 
     uint64_t tvpn = lpn / 512;
-    uint64_t offset = lpn % 512;
 
     struct ctp_entry *ctp_ent = find_ctp_entry(ssd->ctp, tvpn);
     if (ctp_ent)
     {
         // Tdemand is in CTP
         // Replace RDppn with RD'_ppn in CTP
-        ctp_ent->mp->dppn[offset] = new_ppa;
+        ctp_ent->mp->dppn = new_ppa;
         ctp_ent->dirty = true; // Mark the translation page as dirty
         move_ctp_entry_to_tail(ssd->ctp, ctp_ent);
 
         // Check if (RDlpn, RDppn) is in CMT
-        struct cmt_entry *cmt_ent = find_cmt_entry(ssd->cmt, RDlpn);
+        struct cmt_entry *cmt_ent = find_cmt_entry(ssd->cmt, lpn);
         if (cmt_ent)
         {
             // Erase (RDlpn, RDppn) from CMT
@@ -749,7 +670,8 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
         // Tdemand is not in CTP
         // CTP miss
         // Check if (RDlpn, RDppn) is in CMT
-        struct cmt_entry *cmt_ent = find_cmt_entry(ssd->cmt, RDlpn);
+        struct cmt_entry *cmt_ent = find_cmt_entry(ssd->cmt, lpn);
+        struct gtd_entry *gtd_ent = &ssd->gtd[tvpn];
         if (cmt_ent)
         {
             // Replace ppn in CMT
@@ -762,7 +684,6 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
         else
         {
             // Fetch Tdemand into CTP
-            struct gtd_entry *gtd_ent = &ssd->gtd[tvpn];
             if (gtd_ent->tppn.ppa != UNMAPPED_PPA)
             {
                 // Load translation page from flash
@@ -770,7 +691,7 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
                 if (tppn.ppa == UNMAPPED_PPA)
                 {
                     // Translation page does not exist
-                    return NULL;
+                    return;
                 }
 
                 ctp_ent = g_malloc0(sizeof(struct ctp_entry));
@@ -798,7 +719,7 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
             insert_ctp_entry(ssd->ctp, ctp_ent);
 
             // Replace ppn in CTP
-            ctp_ent->mp->dppn[offset] = new_ppa;
+            ctp_ent->mp->dppn= new_ppa;
             move_ctp_entry_to_tail(ssd->ctp, ctp_ent);
         }
     }
@@ -1169,15 +1090,15 @@ static void ssd_init_cdftl(struct ssd *ssd, struct ssdparams *spp)
     ssd->cmt = g_malloc0(sizeof(struct cmt));
     ssd->cmt.max_entries = spp->cmt_size;
     ssd->cmt.current_size = 0;
-    ssd->cmt.lru_head = NULL;
-    ssd->cmt.lru_tail = NULL;
+    ssd->cmt->lru_head = NULL;
+    ssd->cmt->lru_tail = NULL;
 
-    ssd->cmt.hash_table_size = spp->cmt_bucket_size;
-    ssd->cmt.hash_table = g_malloc0(sizeof(struct cmt_hash) * ssd->cmt.hash_table_size);
-    for (int i = 0; i < ssd->cmt.hash_table_size; i++) {
-        ssd->cmt.hash_table[i].hash_value = i;
-        ssd->cmt.hash_table[i].cmt_entries = NULL;
-        ssd->cmt.hash_table[i].hash_next = NULL;
+    ssd->cmt->hash_table_size = spp->cmt_bucket_size;
+    ssd->cmt->hash_table = g_malloc0(sizeof(struct cmt_hash) * ssd->cmt.hash_table_size);
+    for (int i = 0; i < ssd->cmt->hash_table_size; i++) {
+        ssd->cmt->hash_table[i].hash_value = i;
+        ssd->cmt->hash_table[i]->cmt_entries = NULL;
+        ssd->cmt->hash_table[i]->hash_next = NULL;
     }
 
 
@@ -1185,15 +1106,15 @@ static void ssd_init_cdftl(struct ssd *ssd, struct ssdparams *spp)
     ssd->ctp = g_malloc0(sizeof(struct ctp));
     ssd->ctp.max_entries = spp->ctp_size;
     ssd->ctp.current_size = 0;
-    ssd->ctp.lru_head = NULL;
-    ssd->ctp.lru_tail = NULL;
+    ssd->ctp->lru_head = NULL;
+    ssd->ctp->lru_tail = NULL;
 
     ssd->ctp.hash_table_size = spp->ctp_bucket_size;
-    ssd->ctp.hash_table = g_malloc0(sizeof(struct ctp_hash) * ssd->ctp.hash_table_size);
+    ssd->ctp->hash_table = g_malloc0(sizeof(struct ctp_hash) * ssd->ctp.hash_table_size);
     for (int i = 0; i < ssd->ctp.hash_table_size; i++) {
-        ssd->ctp.hash_table[i].hash_value = i;
-        ssd->ctp.hash_table[i].ctp_entries = NULL;
-        ssd->ctp.hash_table[i].hash_next = NULL;
+        ssd->ctp->hash_table[i].hash_value = i;
+        ssd->ctp->hash_table[i]->ctp_entries = NULL;
+        ssd->ctp->hash_table[i]->hash_next = NULL;
     }
 
     /* Initialize Translation block */
