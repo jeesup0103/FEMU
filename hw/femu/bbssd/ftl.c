@@ -522,6 +522,10 @@ static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
     if (entry)
     {
         move_cmt_entry_to_tail(ssd->cmt, entry);
+        // if (entry->data.dppn != ssd->maptbl[lpn]){
+        //     fprintf(stderr, "Error: CMT mismatch! entry->data.dppn.ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n",
+        //             entry->data.dppn.ppa, ssd->maptbl[lpn].ppa);
+        // }
         return entry->data.dppn;
     }
 
@@ -609,7 +613,7 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
         if (cmt_ent)
         {
             // Replace ppn in CMT
-            cmt_ent->data.dppn = new_ppa.ppa;
+            cmt_ent->data.dppn = *new_ppa;
             cmt_ent->data.dirty = true;
             move_cmt_entry_to_tail(ssd->cmt, cmt_ent);
 
