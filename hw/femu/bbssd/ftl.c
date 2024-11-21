@@ -522,15 +522,14 @@ static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
     if (entry)
     {
         move_cmt_entry_to_tail(ssd->cmt, entry);
-        // if (entry->data.dppn != ssd->maptbl[lpn]){
-        //     fprintf(stderr, "Error: CMT mismatch! entry->data.dppn.ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n",
-        //             entry->data.dppn.ppa, ssd->maptbl[lpn].ppa);
-        // }
+        if (entry->data.dppn != ssd->maptbl[lpn].ppa){
+            fprintf(stderr, "Error: CMT mismatch! entry->data.dppn.ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n",
+                    entry->data.dppn.ppa, ssd->maptbl[lpn].ppa);
+        }
         return entry->data.dppn;
     }
 
     uint64_t tvpn = lpn / 512;
-
 
     struct gtd_entry *gtd_entry = &ssd->gtd[tvpn];
     // unmapped ppn
@@ -550,6 +549,14 @@ static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
             move_ctp_entry_to_tail(ssd->ctp, ctp_entry);
             uint64_t offset = lpn % 512;
             ppa = ctp_entry->mp->dppn[offset];
+
+            if (ppa.ppa != ssd->maptbl[lpn].ppa)
+            {
+                fprintf(stderr, "Error: CTP mismatch! ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n",
+                        ppa.ppa, ssd->maptbl[lpn].ppa);
+            }
+
+
             insert_cmt_entry(ssd, lpn, ppa, false);
             return ppa;
         }
@@ -567,6 +574,13 @@ static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
         ssd->gtd[tvpn].location = 0;
 
         ppa = ctp_ent->mp->dppn[lpn % 512];
+
+        if (ppa.ppa != ssd->maptbl[lpn].ppa)
+        {
+            fprintf(stderr, "Error: FLASH mismatch! ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n", ppa.ppa,
+                    ssd->maptbl[lpn].ppa);
+        }
+
         insert_cmt_entry(ssd, lpn, ppa, false);
     
     }
