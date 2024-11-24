@@ -1,6 +1,6 @@
 #include "ftl.h"
 
-// #define FEMU_DEBUG_FTL
+#define FEMU_DEBUG_FTL
 
 static void *ftl_thread(void *arg);
 
@@ -84,6 +84,10 @@ static int translation_gc(struct ssd *ssd)
                     // 새로운 위치에 복사
                     struct ppa new_ppa = get_new_page(ssd);
                     struct map_page *mp = read_translation_page(ssd, &old_tppa);
+                    if (should_gc_translation(ssd))
+                    {
+                        translation_gc(ssd);
+                    }
                     write_translation_page(ssd, &new_ppa, mp);
                     gtd[j].tppn = new_ppa;
                     valid_pages++;
@@ -606,7 +610,7 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
     {
         // Tdemand is in CTP
         // Replace RDppn with RD'_ppn in CTP
-        ctp_ent->mp->dppn[lpn % 512] = new_ppa;
+        ctp_ent->mp->dppn[lpn % 512] = *new_ppa;
         ctp_ent->dirty = true; // Mark the translation page as dirty
         move_ctp_entry_to_tail(ssd->ctp, ctp_ent);
 
