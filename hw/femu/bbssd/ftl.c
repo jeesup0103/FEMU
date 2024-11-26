@@ -64,6 +64,7 @@ static void translation_gc(struct ssd *ssd)
     if (victim_blk_idx == -1)
     {
         printf( "No victim block found for translation GC.\n");
+        exit(1);
         return;
     }
 
@@ -549,6 +550,7 @@ static void evict_ctp_entry(struct ctp *ctp_struct, struct ssd *ssd)
     // Flush to translation block if dirty
     if (victim->dirty)
     {
+        printf("Writing to flash %lu !\n", victim->tvpn);
         // Write the translation page to flash
         write_translation_page(ssd, &victim->tppn, victim->mp, victim->tvpn);
 
@@ -1242,12 +1244,17 @@ static void ssd_init_cdftl(struct ssd *ssd, struct ssdparams *spp)
         for (int j = 0; j < 256; j++)
         {
             struct translation_page *page = &ssd->translation_blocks[i].pages[j];
-            page->mp = malloc(sizeof(struct map_page));
-            page->mp->dppn = malloc(sizeof(struct ppa) * 512);
-            for (int k = 0; k < 512; k++)
-            {
-                page->mp->dppn[k].ppa = UNMAPPED_PPA;
-            }
+
+            page->mp = NULL;               // Set mp to NULL to indicate free page
+            page->tppn.ppa = UNMAPPED_PPA; // Initialize tppn
+
+
+            // page->mp = malloc(sizeof(struct map_page));
+            // page->mp->dppn = malloc(sizeof(struct ppa) * 512);
+            // for (int k = 0; k < 512; k++)
+            // {
+            //     page->mp->dppn[k].ppa = UNMAPPED_PPA;
+            // }
             // page->dirty = false;
         }
     }
