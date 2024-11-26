@@ -672,8 +672,8 @@ static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
                     entry->data.dppn.ppa, ssd->maptbl[lpn].ppa);
         }
         else{
-            printf("GOOD: CMT match! entry->data.dppn.ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n",
-                      entry->data.dppn.ppa, ssd->maptbl[lpn].ppa);
+            // printf("GOOD: CMT match! entry->data.dppn.ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n",
+            //           entry->data.dppn.ppa, ssd->maptbl[lpn].ppa);
         }
         // return entry->data.dppn;
         return ssd->maptbl[lpn];
@@ -787,7 +787,7 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
             move_cmt_entry_to_tail(ssd->cmt, cmt_ent);
 
             // CTP miss and CMT hit
-            printf("not in ctp and in cmt\n");
+            // printf("not in ctp and in cmt\n");
         }
         else
         {
@@ -817,7 +817,7 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
                 }
             }
 
-            printf("not in ctp and not in cmt, current ctp size = %d\n", ssd->ctp->current_size);
+            // printf("not in ctp and not in cmt, current ctp size = %d\n", ssd->ctp->current_size);
 
             ctp_ent->tppn = gtd_ent->tppn;
             ctp_ent->dirty = true;
