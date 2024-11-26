@@ -574,6 +574,7 @@ static void insert_ctp_entry(struct ctp *ctp_struct, struct ctp_entry *entry, st
     if (ctp_struct->current_size >= ctp_struct->max_entries)
     {
         evict_ctp_entry(ctp_struct, ssd);
+        printf("Eviction needed in ctp\n");
     }
 
     int index = ctp_hash_func(entry->tvpn);
