@@ -799,6 +799,7 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
                 ctp_ent->tppn = tppn;
                 ctp_ent->dirty = false;
                 ctp_ent->mp = read_translation_page(ssd, &tppn);
+                printf("Reading translation page\n");
             }
             else
             {
@@ -828,7 +829,7 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
 
     // Update GTD
     struct gtd_entry *gtd_ent = &ssd->gtd[tvpn];
-    gtd_ent->tppn = page->tppn;
+    // gtd_ent->tppn = page->tppn;
     gtd_ent->dirty = false;
     gtd_ent->location = 1;
 }
