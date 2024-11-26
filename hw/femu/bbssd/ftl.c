@@ -286,6 +286,7 @@ static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map
 
     // Assign tvpn
     page->tvpn = tvpn;
+    page->is_valid = true;
 
     // Update tppa (output parameter)
     tppa->ppa = page->tppn.ppa;
