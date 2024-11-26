@@ -550,7 +550,7 @@ static void evict_ctp_entry(struct ctp *ctp_struct, struct ssd *ssd)
     // Flush to translation block if dirty
     if (victim->dirty)
     {
-        printf("Writing to flash %lu !\n", victim->tvpn);
+        // printf("Writing to flash %lu !\n", victim->tvpn);
         // Write the translation page to flash
         write_translation_page(ssd, &victim->tppn, victim->mp, victim->tvpn);
 
@@ -576,7 +576,7 @@ static void insert_ctp_entry(struct ctp *ctp_struct, struct ctp_entry *entry, st
     if (ctp_struct->current_size >= ctp_struct->max_entries)
     {
         evict_ctp_entry(ctp_struct, ssd);
-        printf("Eviction needed in ctp\n");
+        // printf("Eviction needed in ctp\n");
     }
 
     int index = ctp_hash_func(entry->tvpn);
@@ -1653,8 +1653,8 @@ static int do_gc(struct ssd *ssd, bool force, FemuCtrl *n)
     }
 
     ppa.g.blk = victim_line->id;
-    printf("GC-ing line:%d,ipc=%d,victim=%d,full=%d,free=%d\n", ppa.g.blk, victim_line->ipc, ssd->lm.victim_line_cnt,
-              ssd->lm.full_line_cnt, ssd->lm.free_line_cnt);
+    // printf("GC-ing line:%d,ipc=%d,victim=%d,full=%d,free=%d\n", ppa.g.blk, victim_line->ipc, ssd->lm.victim_line_cnt,
+    //           ssd->lm.full_line_cnt, ssd->lm.free_line_cnt);
 
     /* copy back valid data */
     for (ch = 0; ch < spp->nchs; ch++)
