@@ -180,6 +180,7 @@ static void translation_gc(struct ssd *ssd)
         }
         page->tppn.ppa = UNMAPPED_PPA;
         page->tvpn = INVALID_LPN;
+        page->is_valid = false;
     }
 }
 
@@ -746,6 +747,9 @@ static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
         ctp_ent->tvpn = tvpn;
         ctp_ent->tppn = gtd_entry->tppn;
         ctp_ent->mp = read_translation_page(ssd, &gtd_entry->tppn);
+
+        if(ctp_ent->mp == NULL) exit(1);
+
         ctp_ent->dirty = false;
         insert_ctp_entry(ssd->ctp, ctp_ent, ssd);
 
@@ -843,7 +847,7 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
                 }
             }
 
-            printf("nin ctp&cmt, ctp sz=%d\n", ssd->ctp->current_size);
+            // printf("nin ctp&cmt, ctp sz=%d\n", ssd->ctp->current_size);
 
             ctp_ent->tppn = gtd_ent->tppn;
             ctp_ent->dirty = true;
