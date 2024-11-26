@@ -310,7 +310,7 @@ static inline int cmt_hash_func(uint64_t dlpn)
 
 static inline int ctp_hash_func(uint64_t dlpn)
 {
-    return (int)(dlpn % 32);
+    return (int)(dlpn % 5);
 }
 
 /* Find cmt entry in cmt_hash_table */
@@ -815,7 +815,7 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
                 }
             }
 
-            printf("not in ctp and not in cmt\n");
+            printf("not in ctp and not in cmt, current ctp size = %d\n", ssd->ctp->current_size);
 
             ctp_ent->tppn = gtd_ent->tppn;
             ctp_ent->dirty = true;
