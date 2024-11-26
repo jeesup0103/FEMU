@@ -1,6 +1,6 @@
 #include "ftl.h"
 
-#define FEMU_DEBUG_FTL
+#define FEMU_DEBUG_FTL 1
 
 static void *ftl_thread(void *arg);
 
@@ -45,12 +45,6 @@ static inline bool should_gc_high(struct ssd *ssd)
     return (ssd->lm.free_line_cnt <= ssd->sp.gc_thres_lines_high);
 }
 
-// static bool should_gc_translation(struct ssd *ssd)
-// {
-//     struct write_pointer *twp = &ssd->trans_wp;
-//     // Translation block이 거의 다 찼을 때 GC 시작
-//     return (twp->pg >= ssd->sp.pgs_per_blk - 1);
-// }
 static void translation_gc(struct ssd *ssd)
 {
     // Select victim block (e.g., the block with the least valid pages)
@@ -69,7 +63,7 @@ static void translation_gc(struct ssd *ssd)
 
     if (victim_blk_idx == -1)
     {
-        ftl_debug(stderr, "No victim block found for translation GC.\n");
+        ftl_debug( "No victim block found for translation GC.\n");
         return;
     }
 
@@ -89,7 +83,7 @@ static void translation_gc(struct ssd *ssd)
 
     if (free_blk_idx == -1)
     {
-        ftl_debug(stderr, "No free translation blocks available for GC.\n");
+        ftl_debug( "No free translation blocks available for GC.\n");
         return;
     }
 
@@ -185,6 +179,128 @@ static void translation_gc(struct ssd *ssd)
         page->tvpn = INVALID_LPN;
     }
 }
+
+// Translation page를 flash에 쓰기
+static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map_page *mp, uint64_t tvpn)
+{
+    // Check if current translation block is full
+    int block_idx = 0;
+    while (ssd->translation_blocks[block_idx].is_full)
+    {
+        // Advance to the next block
+        block_idx = (block_idx + 1) % 16;
+
+        // If all blocks are full, perform garbage collection
+        if (ssd->free_translation_blocks == 0)
+        {
+            translation_gc(ssd);
+        }
+    }
+
+    struct translation_block *curr_blk = &ssd->translation_blocks[block_idx];
+
+    // Find the next free page in the current block
+    int page_idx = -1;
+    for (int i = 0; i < 256; i++)
+    {
+        if (curr_blk->pages[i].mp == NULL || curr_blk->pages[i].mp->dppn == NULL)
+        {
+            page_idx = i;
+            break;
+        }
+    }
+
+    if (page_idx == -1)
+    {
+        // Current block is full, mark it and retry
+        curr_blk->is_full = true;
+        ssd->free_translation_blocks--;
+        write_translation_page(ssd, tppa, mp, tvpn);
+        return;
+    }
+
+    struct translation_page *page = &curr_blk->pages[page_idx];
+
+    // Free existing mp if any
+    if (page->mp != NULL)
+    {
+        if (page->mp->dppn != NULL)
+        {
+            free(page->mp->dppn);
+        }
+        free(page->mp);
+    }
+
+    // Assign the new map_page
+    page->mp = malloc(sizeof(struct map_page));
+    if (!page->mp)
+    {
+        ftl_debug( "Failed to allocate memory for map_page.\n");
+        // // exit(EXIT_FAILURE);
+    }
+
+    page->mp->dppn = malloc(sizeof(struct ppa) * 512);
+    if (!page->mp->dppn)
+    {
+        ftl_debug( "Failed to allocate memory for dppn array.\n");
+        // // exit(EXIT_FAILURE);
+    }
+
+    // Copy the mappings
+    memcpy(page->mp->dppn, mp->dppn, sizeof(struct ppa) * 512);
+
+    // Assign tppn
+    page->tppn.ppa = block_idx * 256 + page_idx;
+
+    // Assign tvpn
+    page->tvpn = tvpn;
+
+    // Update tppa (output parameter)
+    tppa->ppa = page->tppn.ppa;
+
+    // Update GTD
+    ssd->gtd[tvpn].tppn = page->tppn;
+    ssd->gtd[tvpn].dirty = false;
+
+    // Update block metadata
+    curr_blk->valid_pages++;
+    if (curr_blk->valid_pages == 256)
+    {
+        curr_blk->is_full = true;
+        ssd->free_translation_blocks--;
+    }
+
+    // Mark the page as valid
+    // page->dirty = false;
+}
+
+// Translation page를 flash에서 읽기
+static struct map_page *read_translation_page(struct ssd *ssd, struct ppa *tppa)
+{
+    uint64_t tppn = tppa->ppa;
+    int blk_idx = tppn / 256;
+    int page_idx = tppn % 256;
+
+    if (blk_idx < 0 || blk_idx >= 16 || page_idx < 0 || page_idx >= 256)
+    {
+        ftl_debug( "Invalid tppn: blk_idx=%d, page_idx=%d\n", blk_idx, page_idx);
+        return NULL;
+    }
+
+    struct translation_block *blk = &ssd->translation_blocks[blk_idx];
+    struct translation_page *page = &blk->pages[page_idx];
+
+    if (page->mp == NULL || page->mp->dppn == NULL)
+    {
+        ftl_debug( "Translation page not found at tppn=%lu\n", tppn);
+        return NULL;
+    }
+
+    return page->mp;
+}
+
+
+
 /* Calculate hash bucket */
 static inline int cmt_hash_func(uint64_t dlpn)
 {
@@ -498,125 +614,6 @@ static struct ctp_entry *find_ctp_entry(struct ctp *ctp_struct, uint64_t tvpn)
     return NULL;
 }
 
-// Translation page를 flash에 쓰기
-static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map_page *mp, uint64_t tvpn)
-{
-    // Check if current translation block is full
-    int block_idx = 0;
-    while (ssd->translation_blocks[block_idx].is_full)
-    {
-        // Advance to the next block
-        block_idx = (block_idx + 1) % 16;
-
-        // If all blocks are full, perform garbage collection
-        if (ssd->free_translation_blocks == 0)
-        {
-            translation_gc(ssd);
-        }
-    }
-
-    struct translation_block *curr_blk = &ssd->translation_blocks[block_idx];
-
-    // Find the next free page in the current block
-    int page_idx = -1;
-    for (int i = 0; i < 256; i++)
-    {
-        if (curr_blk->pages[i].mp == NULL || curr_blk->pages[i].mp->dppn == NULL)
-        {
-            page_idx = i;
-            break;
-        }
-    }
-
-    if (page_idx == -1)
-    {
-        // Current block is full, mark it and retry
-        curr_blk->is_full = true;
-        ssd->free_translation_blocks--;
-        write_translation_page(ssd, tppa, mp, tvpn);
-        return;
-    }
-
-    struct translation_page *page = &curr_blk->pages[page_idx];
-
-    // Free existing mp if any
-    if (page->mp != NULL)
-    {
-        if (page->mp->dppn != NULL)
-        {
-            free(page->mp->dppn);
-        }
-        free(page->mp);
-    }
-
-    // Assign the new map_page
-    page->mp = malloc(sizeof(struct map_page));
-    if (!page->mp)
-    {
-        ftl_debug(stderr, "Failed to allocate memory for map_page.\n");
-        // // exit(EXIT_FAILURE);
-    }
-
-    page->mp->dppn = malloc(sizeof(struct ppa) * 512);
-    if (!page->mp->dppn)
-    {
-        ftl_debug(stderr, "Failed to allocate memory for dppn array.\n");
-        // // exit(EXIT_FAILURE);
-    }
-
-    // Copy the mappings
-    memcpy(page->mp->dppn, mp->dppn, sizeof(struct ppa) * 512);
-
-    // Assign tppn
-    page->tppn.ppa = block_idx * 256 + page_idx;
-
-    // Assign tvpn
-    page->tvpn = tvpn;
-
-    // Update tppa (output parameter)
-    tppa->ppa = page->tppn.ppa;
-
-    // Update GTD
-    ssd->gtd[tvpn].tppn = page->tppn;
-    ssd->gtd[tvpn].dirty = false;
-
-    // Update block metadata
-    curr_blk->valid_pages++;
-    if (curr_blk->valid_pages == 256)
-    {
-        curr_blk->is_full = true;
-        ssd->free_translation_blocks--;
-    }
-
-    // Mark the page as valid
-    // page->dirty = false;
-}
-
-// Translation page를 flash에서 읽기
-static struct map_page *read_translation_page(struct ssd *ssd, struct ppa *tppa)
-{
-    uint64_t tppn = tppa->ppa;
-    int blk_idx = tppn / 256;
-    int page_idx = tppn % 256;
-
-    if (blk_idx < 0 || blk_idx >= 16 || page_idx < 0 || page_idx >= 256)
-    {
-        ftl_debug(stderr, "Invalid tppn: blk_idx=%d, page_idx=%d\n", blk_idx, page_idx);
-        return NULL;
-    }
-
-    struct translation_block *blk = &ssd->translation_blocks[blk_idx];
-    struct translation_page *page = &blk->pages[page_idx];
-
-    if (page->mp == NULL || page->mp->dppn == NULL)
-    {
-        ftl_debug(stderr, "Translation page not found at tppn=%lu\n", tppn);
-        return NULL;
-    }
-
-    return page->mp;
-}
-
 static void move_ctp_entry_to_tail(struct ctp *ctp_struct, struct ctp_entry *entry)
 {
     if (!entry || entry == ctp_struct->lru_tail)
@@ -667,8 +664,12 @@ static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
         move_cmt_entry_to_tail(ssd->cmt, entry);
         if (entry->data.dppn.ppa != ssd->maptbl[lpn].ppa)
         {
-            ftl_debug(stderr, "Error: CMT mismatch! entry->data.dppn.ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n",
+            ftl_debug( "Error: CMT mismatch! entry->data.dppn.ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n",
                     entry->data.dppn.ppa, ssd->maptbl[lpn].ppa);
+        }
+        else{
+            ftl_debug("GOOD: CMT match! entry->data.dppn.ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n",
+                      entry->data.dppn.ppa, ssd->maptbl[lpn].ppa);
         }
         // return entry->data.dppn;
         return ssd->maptbl[lpn];
@@ -698,7 +699,7 @@ static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
 
             if (ppa.ppa != ssd->maptbl[lpn].ppa)
             {
-                ftl_debug(stderr, "Error: CTP mismatch! ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n", ppa.ppa,
+                ftl_debug( "Error: CTP mismatch! ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n", ppa.ppa,
                         ssd->maptbl[lpn].ppa);
             }
 
@@ -723,7 +724,7 @@ static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
 
         if (ppa.ppa != ssd->maptbl[lpn].ppa)
         {
-            ftl_debug(stderr, "Error: FLASH mismatch! ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n", ppa.ppa,
+            ftl_debug( "Error: FLASH mismatch! ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n", ppa.ppa,
                     ssd->maptbl[lpn].ppa);
         }
 
@@ -815,6 +816,7 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
             // Replace ppn in CTP
             ctp_ent->mp->dppn = new_ppa;
             move_ctp_entry_to_tail(ssd->ctp, ctp_ent);
+            ftl_debug("")
         }
     }
 
