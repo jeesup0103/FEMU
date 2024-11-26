@@ -13,7 +13,7 @@ static void ssd_advance_write_pointer(struct ssd *ssd);
 static inline bool should_gc(struct ssd *ssd);
 static inline bool should_gc_high(struct ssd *ssd);
 static bool should_gc_translation(struct ssd *ssd);
-static int translation_gc(struct ssd *ssd);
+static void translation_gc(struct ssd *ssd);
 
 /* Hash Functions */
 static inline int cmt_hash_func(uint64_t dlpn);
@@ -33,7 +33,7 @@ static struct ctp_entry *find_ctp_entry(struct ctp *ctp_struct, uint64_t tvpn);
 static void move_ctp_entry_to_tail(struct ctp *ctp_struct, struct ctp_entry *entry);
 
 /* Translation Page Read/Write Functions */
-static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map_page *mp);
+static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map_page *mp, uint64_t tvpn);
 static struct map_page *read_translation_page(struct ssd *ssd, struct ppa *tppa);
 
 static inline bool should_gc(struct ssd *ssd)
@@ -46,12 +46,12 @@ static inline bool should_gc_high(struct ssd *ssd)
     return (ssd->lm.free_line_cnt <= ssd->sp.gc_thres_lines_high);
 }
 
-static bool should_gc_translation(struct ssd *ssd)
-{
-    struct write_pointer *twp = &ssd->trans_wp;
-    // Translation block이 거의 다 찼을 때 GC 시작
-    return (twp->pg >= ssd->sp.pgs_per_blk - 1);
-}
+// static bool should_gc_translation(struct ssd *ssd)
+// {
+//     struct write_pointer *twp = &ssd->trans_wp;
+//     // Translation block이 거의 다 찼을 때 GC 시작
+//     return (twp->pg >= ssd->sp.pgs_per_blk - 1);
+// }
 static void translation_gc(struct ssd *ssd)
 {
     // Select victim block (e.g., the block with the least valid pages)
@@ -150,7 +150,7 @@ static void translation_gc(struct ssd *ssd)
             free(victim_page->mp);
             victim_page->mp = NULL;
             victim_page->tppn.ppa = UNMAPPED_PPA;
-            victim_page->tvpn = INVALID_TVPN;
+            victim_page->tvpn = 0;
 
             // Update valid_pages counts
             victim_blk->valid_pages--;
@@ -292,8 +292,6 @@ static void evict_cmt_entry(struct ssd *ssd)
     // If victim is dirty, flush the mapping
     if (victim->data.dirty)
     {
-        // Flush the translation mapping table
-        ssd->trans_maptbl[victim->data.dlpn] = victim->data.dppn;
         victim->data.dirty = false;
     }
 
@@ -438,9 +436,6 @@ static void evict_ctp_entry(struct ctp *ctp_struct, struct ssd *ssd)
         // Write the translation page to flash
         write_translation_page(ssd, &victim->tppn, victim->mp);
 
-        // Update translation mapping table
-        ssd->trans_maptbl[victim->tvpn] = victim->tppn;
-
         // Update GTD
         ssd->gtd[victim->tvpn].tppn = victim->tppn;
         ssd->gtd[victim->tvpn].location = 1;  // Now on flash
@@ -508,10 +503,11 @@ static struct ctp_entry *find_ctp_entry(struct ctp *ctp_struct, uint64_t tvpn)
 static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map_page *mp, uint64_t tvpn)
 {
     // Check if current translation block is full
-    while (ssd->translation_blocks[ssd->current_translation_block].is_full)
+    int block_idx = 0;
+    while (ssd->translation_blocks[block_idx].is_full)
     {
         // Advance to the next block
-        ssd->current_translation_block = (ssd->current_translation_block + 1) % 16;
+        block_idx = (block_idx + 1) % 16;
 
         // If all blocks are full, perform garbage collection
         if (ssd->free_translation_blocks == 0)
@@ -520,7 +516,7 @@ static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map
         }
     }
 
-    struct translation_block *curr_blk = &ssd->translation_blocks[ssd->current_translation_block];
+    struct translation_block *curr_blk = &ssd->translation_blocks[block_idx];
 
     // Find the next free page in the current block
     int page_idx = -1;
@@ -573,7 +569,7 @@ static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map
     memcpy(page->mp->dppn, mp->dppn, sizeof(struct ppa) * 512);
 
     // Assign tppn
-    page->tppn.ppa = ssd->current_translation_block * 256 + page_idx;
+    page->tppn.ppa = block_idx * 256 + page_idx;
 
     // Assign tvpn
     page->tvpn = tvpn;
@@ -594,7 +590,7 @@ static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map
     }
 
     // Mark the page as valid
-    page->dirty = false;
+    // page->dirty = false;
 }
 
 // Translation page를 flash에서 읽기

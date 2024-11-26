@@ -272,6 +272,7 @@ struct translation_page
 {
     struct map_page *mp;
     struct ppa tppn;
+    uint64_t tvpn;
 };
 
 struct translation_block
