@@ -829,9 +829,9 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
 
     // Update GTD
     struct gtd_entry *gtd_ent = &ssd->gtd[tvpn];
-    // gtd_ent->tppn = page->tppn;
-    gtd_ent->dirty = false;
-    gtd_ent->location = 1;
+    // gtd_ent->tppn = ctp_ent->tppn;
+    gtd_ent->dirty = true;
+    gtd_ent->location = 0;
 }
 
 static uint64_t ppa2pgidx(struct ssd *ssd, struct ppa *ppa)
