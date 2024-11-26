@@ -764,7 +764,9 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
             remove_cmt_entry(ssd, cmt_ent);
 
             // CTP hit and CMT hit
+            // printf("In ctp and in cmt\n");
         }
+        // printf("In ctp not in cmt\n");
     }
     else
     {
@@ -781,6 +783,7 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
             move_cmt_entry_to_tail(ssd->cmt, cmt_ent);
 
             // CTP miss and CMT hit
+            printf("not in ctp and in cmt\n");
         }
         else
         {
@@ -809,14 +812,16 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
                 }
             }
 
+            printf("not in ctp and not in cmt\n");
+
             ctp_ent->tppn = gtd_ent->tppn;
             ctp_ent->dirty = true;
             insert_ctp_entry(ssd->ctp, ctp_ent, ssd);
 
             // Replace ppn in CTP
-            ctp_ent->mp->dppn = new_ppa;
+            ctp_ent->mp->dppn[lpn % 512] = *new_ppa;
+
             move_ctp_entry_to_tail(ssd->ctp, ctp_ent);
-            ftl_debug("")
         }
     }
 
