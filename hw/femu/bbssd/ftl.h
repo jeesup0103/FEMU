@@ -267,8 +267,19 @@ struct cmt {
     int max_entries;                  // Maximum capacity of CMT
     int current_size;                 // Current number of entries in CMT
 };
-// Evict if max entries == currnet size
 
+struct translation_page
+{
+    struct map_page *mp;
+    struct ppa tppn;
+};
+
+struct translation_block
+{
+    struct translation_page pages[256];
+    int valid_pages; // Number of valid pages in the block
+    bool is_full;    // Indicates if the block is full
+};
 
 struct ssd
 {
@@ -286,8 +297,8 @@ struct ssd
     struct ctp *ctp;       // Cached Translation Page structure
 
     // Translation blocks
-    struct ppa *trans_maptbl;      // translation block mapping table
-    struct write_pointer trans_wp; // translation block write pointer
+    struct translation_block translation_blocks[16];
+    int free_translation_blocks;
 
     /* lockless ring for communication with NVMe IO thread */
     struct rte_ring **to_ftl;

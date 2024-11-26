@@ -52,66 +52,139 @@ static bool should_gc_translation(struct ssd *ssd)
     // Translation block이 거의 다 찼을 때 GC 시작
     return (twp->pg >= ssd->sp.pgs_per_blk - 1);
 }
-
-static int translation_gc(struct ssd *ssd)
+static void translation_gc(struct ssd *ssd)
 {
-    struct ssdparams *spp = &ssd->sp;
-    struct write_pointer *twp = &ssd->trans_wp;
-    struct gtd_entry *gtd = ssd->gtd;
-    int valid_pages = 0;
+    // Select victim block (e.g., the block with the least valid pages)
+    int victim_blk_idx = -1;
+    int min_valid_pages = 257; // More than the max valid pages
 
-    // Identify the victim block for GC
-    int victim_blk = twp->blk;
-
-    // Collect valid translation pages from the victim block
-    for (int pg = 0; pg < spp->pgs_per_blk; pg++)
+    for (int i = 0; i < 16; i++)
     {
-        struct ppa old_tppa;
-        old_tppa.g.ch = twp->ch;
-        old_tppa.g.lun = twp->lun;
-        old_tppa.g.pl = twp->pl;
-        old_tppa.g.blk = victim_blk;
-        old_tppa.g.pg = pg;
-        old_tppa.g.sec = 0;
-
-        // Check if the page is valid
-        if (old_tppa.ppa != UNMAPPED_PPA)
+        struct translation_block *blk = &ssd->translation_blocks[i];
+        if (blk->valid_pages > 0 && blk->valid_pages < min_valid_pages)
         {
-            for (int j = 0; j < 3072; j++)
+            victim_blk_idx = i;
+            min_valid_pages = blk->valid_pages;
+        }
+    }
+
+    if (victim_blk_idx == -1)
+    {
+        fprintf(stderr, "No victim block found for translation GC.\n");
+        return;
+    }
+
+    struct translation_block *victim_blk = &ssd->translation_blocks[victim_blk_idx];
+
+    // Find a free block to copy valid pages into
+    int free_blk_idx = -1;
+    for (int i = 0; i < 16; i++)
+    {
+        struct translation_block *blk = &ssd->translation_blocks[i];
+        if (!blk->is_full && i != victim_blk_idx)
+        {
+            free_blk_idx = i;
+            break;
+        }
+    }
+
+    if (free_blk_idx == -1)
+    {
+        fprintf(stderr, "No free translation blocks available for GC.\n");
+        return;
+    }
+
+    struct translation_block *free_blk = &ssd->translation_blocks[free_blk_idx];
+
+    // Copy valid pages
+    for (int page_idx = 0; page_idx < 256; page_idx++)
+    {
+        struct translation_page *victim_page = &victim_blk->pages[page_idx];
+        if (victim_page->mp != NULL && victim_page->mp->dppn != NULL)
+        {
+            // Find a free page in free_blk
+            int free_page_idx = -1;
+            for (int i = 0; i < 256; i++)
             {
-                if (gtd[j].tppn.ppa == old_tppa.ppa)
+                if (free_blk->pages[i].mp == NULL)
                 {
-                    // 새로운 위치에 복사
-                    struct ppa new_ppa = get_new_page(ssd);
-                    struct map_page *mp = read_translation_page(ssd, &old_tppa);
-                    if (should_gc_translation(ssd))
-                    {
-                        translation_gc(ssd);
-                    }
-                    write_translation_page(ssd, &new_ppa, mp);
-                    gtd[j].tppn = new_ppa;
-                    valid_pages++;
-                    g_free(mp->dppn);
-                    g_free(mp);
+                    free_page_idx = i;
                     break;
                 }
+            }
+            if (free_page_idx == -1)
+            {
+                fprintf(stderr, "No free pages in free translation block.\n");
+                break;
+            }
+
+            struct translation_page *free_page = &free_blk->pages[free_page_idx];
+
+            // Copy the map_page
+            free_page->mp = malloc(sizeof(struct map_page));
+            if (!free_page->mp)
+            {
+                fprintf(stderr, "Failed to allocate memory for map_page during GC.\n");
+                exit(EXIT_FAILURE);
+            }
+
+            free_page->mp->dppn = malloc(sizeof(struct ppa) * 512);
+            if (!free_page->mp->dppn)
+            {
+                fprintf(stderr, "Failed to allocate memory for dppn array during GC.\n");
+                exit(EXIT_FAILURE);
+            }
+
+            memcpy(free_page->mp->dppn, victim_page->mp->dppn, sizeof(struct ppa) * 512);
+
+            // Update tppn
+            free_page->tppn.ppa = free_blk_idx * 256 + free_page_idx;
+            free_page->tvpn = victim_page->tvpn;
+
+            // Update GTD
+            uint64_t tvpn = victim_page->tvpn;
+            ssd->gtd[tvpn].tppn = free_page->tppn;
+
+            // Invalidate the victim page
+            free(victim_page->mp->dppn);
+            free(victim_page->mp);
+            victim_page->mp = NULL;
+            victim_page->tppn.ppa = UNMAPPED_PPA;
+            victim_page->tvpn = INVALID_TVPN;
+
+            // Update valid_pages counts
+            victim_blk->valid_pages--;
+            free_blk->valid_pages++;
+
+            if (free_blk->valid_pages == 256)
+            {
+                free_blk->is_full = true;
+                ssd->free_translation_blocks--;
             }
         }
     }
 
     // Erase the victim block
-    struct nand_cmd gce;
-    gce.type = GC_IO;
-    gce.cmd = NAND_ERASE;
-    gce.stime = 0;
-    struct ppa erase_ppa = {.g = {.ch = twp->ch, .lun = twp->lun, .pl = twp->pl, .blk = victim_blk, .pg = 0, .sec = 0}};
-    ssd_advance_status(ssd, &erase_ppa, &gce);
+    victim_blk->valid_pages = 0;
+    victim_blk->is_full = false;
+    ssd->free_translation_blocks++;
 
-    // Reset the write pointer
-    twp->pg = 0;
-    twp->blk = (victim_blk + 1) % spp->blks_per_pl;
-
-    return valid_pages;
+    // Free any residual pages
+    for (int page_idx = 0; page_idx < 256; page_idx++)
+    {
+        struct translation_page *page = &victim_blk->pages[page_idx];
+        if (page->mp != NULL)
+        {
+            if (page->mp->dppn != NULL)
+            {
+                free(page->mp->dppn);
+            }
+            free(page->mp);
+            page->mp = NULL;
+        }
+        page->tppn.ppa = UNMAPPED_PPA;
+        page->tvpn = INVALID_TVPN;
+    }
 }
 /* Calculate hash bucket */
 static inline int cmt_hash_func(uint64_t dlpn)
@@ -362,10 +435,6 @@ static void evict_ctp_entry(struct ctp *ctp_struct, struct ssd *ssd)
     // Flush to translation block if dirty
     if (victim->dirty)
     {
-        if (should_gc_translation(ssd))
-        {
-            translation_gc(ssd);
-        }
         // Write the translation page to flash
         write_translation_page(ssd, &victim->tppn, victim->mp);
 
@@ -436,44 +505,121 @@ static struct ctp_entry *find_ctp_entry(struct ctp *ctp_struct, uint64_t tvpn)
 }
 
 // Translation page를 flash에 쓰기
-static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map_page *mp)
+static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map_page *mp, uint64_t tvpn)
 {
-    // Translation Flash에 쓰기 시뮬레이션
-    struct nand_cmd twr;
-    twr.type = GC_IO;
-    twr.cmd = NAND_WRITE;
-    twr.stime = 0;
-    ssd_advance_status(ssd, tppa, &twr);
-
-    // 실제로는 flash에 써야 하지만 시뮬레이션에서는 maptbl 업데이트
-    uint64_t base_lpn = (tppa->g.blk * ssd->sp.pgs_per_blk + tppa->g.pg) * 512;
-    for (int i = 0; i < 512; i++)
+    // Check if current translation block is full
+    while (ssd->translation_blocks[ssd->current_translation_block].is_full)
     {
-        ssd->maptbl[base_lpn + i] = mp->dppn[i];
+        // Advance to the next block
+        ssd->current_translation_block = (ssd->current_translation_block + 1) % 16;
+
+        // If all blocks are full, perform garbage collection
+        if (ssd->free_translation_blocks == 0)
+        {
+            translation_gc(ssd);
+        }
     }
+
+    struct translation_block *curr_blk = &ssd->translation_blocks[ssd->current_translation_block];
+
+    // Find the next free page in the current block
+    int page_idx = -1;
+    for (int i = 0; i < 256; i++)
+    {
+        if (curr_blk->pages[i].mp == NULL || curr_blk->pages[i].mp->dppn == NULL)
+        {
+            page_idx = i;
+            break;
+        }
+    }
+
+    if (page_idx == -1)
+    {
+        // Current block is full, mark it and retry
+        curr_blk->is_full = true;
+        ssd->free_translation_blocks--;
+        write_translation_page(ssd, tppa, mp, tvpn);
+        return;
+    }
+
+    struct translation_page *page = &curr_blk->pages[page_idx];
+
+    // Free existing mp if any
+    if (page->mp != NULL)
+    {
+        if (page->mp->dppn != NULL)
+        {
+            free(page->mp->dppn);
+        }
+        free(page->mp);
+    }
+
+    // Assign the new map_page
+    page->mp = malloc(sizeof(struct map_page));
+    if (!page->mp)
+    {
+        fprintf(stderr, "Failed to allocate memory for map_page.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    page->mp->dppn = malloc(sizeof(struct ppa) * 512);
+    if (!page->mp->dppn)
+    {
+        fprintf(stderr, "Failed to allocate memory for dppn array.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // Copy the mappings
+    memcpy(page->mp->dppn, mp->dppn, sizeof(struct ppa) * 512);
+
+    // Assign tppn
+    page->tppn.ppa = ssd->current_translation_block * 256 + page_idx;
+
+    // Assign tvpn
+    page->tvpn = tvpn;
+
+    // Update tppa (output parameter)
+    tppa->ppa = page->tppn.ppa;
+
+    // Update GTD
+    ssd->gtd[tvpn].tppn = page->tppn;
+    ssd->gtd[tvpn].dirty = false;
+
+    // Update block metadata
+    curr_blk->valid_pages++;
+    if (curr_blk->valid_pages == 256)
+    {
+        curr_blk->is_full = true;
+        ssd->free_translation_blocks--;
+    }
+
+    // Mark the page as valid
+    page->dirty = false;
 }
 
 // Translation page를 flash에서 읽기
 static struct map_page *read_translation_page(struct ssd *ssd, struct ppa *tppa)
 {
-    struct map_page *mp = g_malloc0(sizeof(struct map_page));
-    mp->dppn = g_malloc0(sizeof(struct ppa) * 512); // 512 mappings per page
+    uint64_t tppn = tppa->ppa;
+    int blk_idx = tppn / 256;
+    int page_idx = tppn % 256;
 
-    // Translation Flash에서 읽기 시뮬레이션
-    struct nand_cmd trd;
-    trd.type = GC_IO;
-    trd.cmd = NAND_READ;
-    trd.stime = 0;
-    ssd_advance_status(ssd, tppa, &trd);
-
-    // 실제로는 flash에서 읽어와야 하지만 시뮬레이션에서는 maptbl 사용
-    uint64_t base_lpn = (tppa->g.blk * ssd->sp.pgs_per_blk + tppa->g.pg) * 512;
-    for (int i = 0; i < 512; i++)
+    if (blk_idx < 0 || blk_idx >= 16 || page_idx < 0 || page_idx >= 256)
     {
-        mp->dppn[i] = ssd->maptbl[base_lpn + i];
+        fprintf(stderr, "Invalid tppn: blk_idx=%d, page_idx=%d\n", blk_idx, page_idx);
+        return NULL;
     }
 
-    return mp;
+    struct translation_block *blk = &ssd->translation_blocks[blk_idx];
+    struct translation_page *page = &blk->pages[page_idx];
+
+    if (page->mp == NULL || page->mp->dppn == NULL)
+    {
+        fprintf(stderr, "Translation page not found at tppn=%lu\n", tppn);
+        return NULL;
+    }
+
+    return page->mp;
 }
 
 static void move_ctp_entry_to_tail(struct ctp *ctp_struct, struct ctp_entry *entry)
@@ -1086,14 +1232,23 @@ static void ssd_init_cdftl(struct ssd *ssd, struct ssdparams *spp)
     }
 
     /* Initialize Translation block */
-    ssd->trans_maptbl = g_malloc0(sizeof(struct ppa) * spp->tt_pgs);
-    for (int i = 0; i < spp->tt_pgs; i++)
+    ssd->free_translation_blocks = 16;
+    for (int i = 0; i < 16; i++)
     {
-        ssd->trans_maptbl[i].ppa = UNMAPPED_PPA;
+        ssd->translation_blocks[i].valid_pages = 0;
+        ssd->translation_blocks[i].is_full = false;
+        for (int j = 0; j < 256; j++)
+        {
+            struct translation_page *page = &ssd->translation_blocks[i].pages[j];
+            page->mp = malloc(sizeof(struct map_page));
+            page->mp->dppn = malloc(sizeof(struct ppa) * 512);
+            for (int k = 0; k < 512; k++)
+            {
+                page->mp->dppn[k].ppa = UNMAPPED_PPA;
+            }
+            page->dirty = false;
+        }
     }
-
-    /* Initialize write pointer */
-    memcpy(&ssd->trans_wp, &ssd->wp, sizeof(struct write_pointer));
 }
 
 void ssd_init(FemuCtrl *n)
