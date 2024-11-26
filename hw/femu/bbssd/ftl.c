@@ -12,7 +12,6 @@ static void ssd_advance_write_pointer(struct ssd *ssd);
 /* Garbage Collection Functions */
 static inline bool should_gc(struct ssd *ssd);
 static inline bool should_gc_high(struct ssd *ssd);
-static bool should_gc_translation(struct ssd *ssd);
 static void translation_gc(struct ssd *ssd);
 
 /* Hash Functions */
@@ -183,7 +182,7 @@ static void translation_gc(struct ssd *ssd)
             page->mp = NULL;
         }
         page->tppn.ppa = UNMAPPED_PPA;
-        page->tvpn = INVALID_TVPN;
+        page->tvpn = INVALID_LPN;
     }
 }
 /* Calculate hash bucket */
@@ -434,7 +433,7 @@ static void evict_ctp_entry(struct ctp *ctp_struct, struct ssd *ssd)
     if (victim->dirty)
     {
         // Write the translation page to flash
-        write_translation_page(ssd, &victim->tppn, victim->mp);
+        write_translation_page(ssd, &victim->tppn, victim->mp, victim->tvpn);
 
         // Update GTD
         ssd->gtd[victim->tvpn].tppn = victim->tppn;
@@ -788,12 +787,7 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
             if (gtd_ent->tppn.ppa != UNMAPPED_PPA)
             {
                 // Load translation page from flash
-                struct ppa tppn = ssd->trans_maptbl[tvpn];
-                if (tppn.ppa == UNMAPPED_PPA)
-                {
-                    // Translation page does not exist
-                    return;
-                }
+                struct ppa tppn = ssd->gtd[tvpn].tppn;
 
                 ctp_ent = g_malloc0(sizeof(struct ctp_entry));
                 ctp_ent->tvpn = tvpn;
@@ -1242,7 +1236,7 @@ static void ssd_init_cdftl(struct ssd *ssd, struct ssdparams *spp)
             {
                 page->mp->dppn[k].ppa = UNMAPPED_PPA;
             }
-            page->dirty = false;
+            // page->dirty = false;
         }
     }
 }
