@@ -124,14 +124,14 @@ static void translation_gc(struct ssd *ssd)
             if (!free_page->mp)
             {
                 ftl_debug("Failed to allocate memory for map_page during GC.\n");
-                exit(EXIT_FAILURE);
+                // exit(EXIT_FAILURE);
             }
 
             free_page->mp->dppn = malloc(sizeof(struct ppa) * 512);
             if (!free_page->mp->dppn)
             {
                 ftl_debug("Failed to allocate memory for dppn array during GC.\n");
-                exit(EXIT_FAILURE);
+                // // exit(EXIT_FAILURE);
             }
 
             memcpy(free_page->mp->dppn, victim_page->mp->dppn, sizeof(struct ppa) * 512);
@@ -554,14 +554,14 @@ static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map
     if (!page->mp)
     {
         ftl_debug(stderr, "Failed to allocate memory for map_page.\n");
-        exit(EXIT_FAILURE);
+        // // exit(EXIT_FAILURE);
     }
 
     page->mp->dppn = malloc(sizeof(struct ppa) * 512);
     if (!page->mp->dppn)
     {
         ftl_debug(stderr, "Failed to allocate memory for dppn array.\n");
-        exit(EXIT_FAILURE);
+        // // exit(EXIT_FAILURE);
     }
 
     // Copy the mappings
