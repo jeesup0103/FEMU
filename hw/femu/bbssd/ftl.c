@@ -69,7 +69,7 @@ static void translation_gc(struct ssd *ssd)
 
     if (victim_blk_idx == -1)
     {
-        fprintf(stderr, "No victim block found for translation GC.\n");
+        ftl_debug(stderr, "No victim block found for translation GC.\n");
         return;
     }
 
@@ -89,7 +89,7 @@ static void translation_gc(struct ssd *ssd)
 
     if (free_blk_idx == -1)
     {
-        fprintf(stderr, "No free translation blocks available for GC.\n");
+        ftl_debug(stderr, "No free translation blocks available for GC.\n");
         return;
     }
 
@@ -113,7 +113,7 @@ static void translation_gc(struct ssd *ssd)
             }
             if (free_page_idx == -1)
             {
-                fprintf(stderr, "No free pages in free translation block.\n");
+                ftl_debug("No free pages in free translation block.\n");
                 break;
             }
 
@@ -123,14 +123,14 @@ static void translation_gc(struct ssd *ssd)
             free_page->mp = malloc(sizeof(struct map_page));
             if (!free_page->mp)
             {
-                fprintf(stderr, "Failed to allocate memory for map_page during GC.\n");
+                ftl_debug("Failed to allocate memory for map_page during GC.\n");
                 exit(EXIT_FAILURE);
             }
 
             free_page->mp->dppn = malloc(sizeof(struct ppa) * 512);
             if (!free_page->mp->dppn)
             {
-                fprintf(stderr, "Failed to allocate memory for dppn array during GC.\n");
+                ftl_debug("Failed to allocate memory for dppn array during GC.\n");
                 exit(EXIT_FAILURE);
             }
 
@@ -553,14 +553,14 @@ static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map
     page->mp = malloc(sizeof(struct map_page));
     if (!page->mp)
     {
-        fprintf(stderr, "Failed to allocate memory for map_page.\n");
+        ftl_debug(stderr, "Failed to allocate memory for map_page.\n");
         exit(EXIT_FAILURE);
     }
 
     page->mp->dppn = malloc(sizeof(struct ppa) * 512);
     if (!page->mp->dppn)
     {
-        fprintf(stderr, "Failed to allocate memory for dppn array.\n");
+        ftl_debug(stderr, "Failed to allocate memory for dppn array.\n");
         exit(EXIT_FAILURE);
     }
 
@@ -601,7 +601,7 @@ static struct map_page *read_translation_page(struct ssd *ssd, struct ppa *tppa)
 
     if (blk_idx < 0 || blk_idx >= 16 || page_idx < 0 || page_idx >= 256)
     {
-        fprintf(stderr, "Invalid tppn: blk_idx=%d, page_idx=%d\n", blk_idx, page_idx);
+        ftl_debug(stderr, "Invalid tppn: blk_idx=%d, page_idx=%d\n", blk_idx, page_idx);
         return NULL;
     }
 
@@ -610,7 +610,7 @@ static struct map_page *read_translation_page(struct ssd *ssd, struct ppa *tppa)
 
     if (page->mp == NULL || page->mp->dppn == NULL)
     {
-        fprintf(stderr, "Translation page not found at tppn=%lu\n", tppn);
+        ftl_debug(stderr, "Translation page not found at tppn=%lu\n", tppn);
         return NULL;
     }
 
@@ -667,7 +667,7 @@ static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
         move_cmt_entry_to_tail(ssd->cmt, entry);
         if (entry->data.dppn.ppa != ssd->maptbl[lpn].ppa)
         {
-            fprintf(stderr, "Error: CMT mismatch! entry->data.dppn.ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n",
+            ftl_debug(stderr, "Error: CMT mismatch! entry->data.dppn.ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n",
                     entry->data.dppn.ppa, ssd->maptbl[lpn].ppa);
         }
         // return entry->data.dppn;
@@ -698,7 +698,7 @@ static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
 
             if (ppa.ppa != ssd->maptbl[lpn].ppa)
             {
-                fprintf(stderr, "Error: CTP mismatch! ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n", ppa.ppa,
+                ftl_debug(stderr, "Error: CTP mismatch! ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n", ppa.ppa,
                         ssd->maptbl[lpn].ppa);
             }
 
@@ -723,7 +723,7 @@ static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
 
         if (ppa.ppa != ssd->maptbl[lpn].ppa)
         {
-            fprintf(stderr, "Error: FLASH mismatch! ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n", ppa.ppa,
+            ftl_debug(stderr, "Error: FLASH mismatch! ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n", ppa.ppa,
                     ssd->maptbl[lpn].ppa);
         }
 
