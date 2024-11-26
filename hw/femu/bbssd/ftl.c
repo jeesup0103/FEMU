@@ -785,6 +785,9 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
     struct ctp_entry *ctp_ent = find_ctp_entry(ssd->ctp, tvpn);
     if (ctp_ent)
     {
+
+        ssd->ctp_hit++;
+
         // Tdemand is in CTP
         // Replace RDppn with RD'_ppn in CTP
         ctp_ent->mp->dppn[lpn % 512] = *new_ppa;
@@ -795,16 +798,27 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
         struct cmt_entry *cmt_ent = find_cmt_entry(ssd->cmt, lpn);
         if (cmt_ent)
         {
+
+            ssd->cmt_hit++;
+
             // Erase (RDlpn, RDppn) from CMT
             remove_cmt_entry(ssd, cmt_ent);
 
             // CTP hit and CMT hit
             // printf("In ctp and in cmt\n");
         }
+        else{
+            ssd->cmt_miss++;
+
+        }
         // printf("In ctp not in cmt\n");
     }
     else
     {
+
+        ssd->ctp_miss++;
+
+
         // Tdemand is not in CTP
         // CTP miss
         // Check if (RDlpn, RDppn) is in CMT
@@ -812,6 +826,9 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
         struct gtd_entry *gtd_ent = &ssd->gtd[tvpn];
         if (cmt_ent)
         {
+
+            ssd->cmt_hit++;
+
             // Replace ppn in CMT
             cmt_ent->data.dppn = *new_ppa;
             cmt_ent->data.dirty = true;
@@ -822,6 +839,8 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
         }
         else
         {
+            ssd->cmt_miss++;
+
             // Fetch Tdemand into CTP
             if (gtd_ent->tppn.ppa != UNMAPPED_PPA)
             {
@@ -1289,6 +1308,13 @@ static void ssd_init_cdftl(struct ssd *ssd, struct ssdparams *spp)
             // page->dirty = false;
         }
     }
+
+
+    /* cache hit and miss */
+    ssd->cmt_hit = 0;
+    ssd->cmt_miss = 0;
+    ssd->ctp_hit = 0;
+    ssd->ctp_miss = 0;
 }
 
 void ssd_init(FemuCtrl *n)

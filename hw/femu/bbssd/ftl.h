@@ -308,6 +308,11 @@ struct ssd
     bool *dataplane_started_ptr;
     QemuThread ftl_thread;
 
+    uint64_t cmt_hit;
+    uint64_t cmt_miss;
+    uint64_t ctp_hit;
+    uint64_t ctp_miss;
+
 };
 
 void ssd_init(FemuCtrl *n);
