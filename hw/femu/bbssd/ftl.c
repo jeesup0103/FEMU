@@ -208,8 +208,8 @@ static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map
     {
         // Invalidate the old translation page
         uint64_t old_tppn = gtd_ent->tppn.ppa;
-        int old_blk_idx = old_tppn / PAGES_PER_BLOCK;
-        int old_page_idx = old_tppn % PAGES_PER_BLOCK;
+        int old_blk_idx = old_tppn / 256;
+        int old_page_idx = old_tppn % 256;
 
         struct translation_block *old_blk = &ssd->translation_blocks[old_blk_idx];
         struct translation_page *old_page = &old_blk->pages[old_page_idx];
@@ -220,7 +220,7 @@ static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map
             old_blk->valid_pages--;
 
             // Update block's full status
-            if (old_blk->is_full && old_blk->valid_pages < PAGES_PER_BLOCK)
+            if (old_blk->is_full && old_blk->valid_pages < 256)
             {
                 old_blk->is_full = false;
                 ssd->free_translation_blocks++;
