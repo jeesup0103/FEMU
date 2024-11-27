@@ -185,126 +185,238 @@ static void translation_gc(struct ssd *ssd)
 }
 
 // Translation page를 flash에 쓰기
+// static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map_page *mp, uint64_t tvpn)
+// {
+//     // Check if current translation block is full
+//     int block_idx = 0;
+//     while (ssd->translation_blocks[block_idx].is_full)
+//     {
+//         // Advance to the next block
+//         block_idx = (block_idx + 1) % 16;
+
+//         // If all blocks are full, perform garbage collection
+//         if (ssd->free_translation_blocks == 0)
+//         {
+//             // printf("Need GC in tp\n");
+//             translation_gc(ssd);
+//         }
+//     }
+
+//     // Check for existing translation page
+//     struct gtd_entry *gtd_ent = &ssd->gtd[tvpn];
+
+//     if (gtd_ent->tppn.ppa != UNMAPPED_PPA)
+//     {
+//         // Invalidate the old translation page
+//         uint64_t old_tppn = gtd_ent->tppn.ppa;
+//         int old_blk_idx = old_tppn / 256;
+//         int old_page_idx = old_tppn % 256;
+
+//         struct translation_block *old_blk = &ssd->translation_blocks[old_blk_idx];
+//         struct translation_page *old_page = &old_blk->pages[old_page_idx];
+
+//         if (old_page->is_valid)
+//         {
+//             old_page->is_valid = false;
+//             old_blk->valid_pages--;
+
+//             // Update block's full status
+//             if (old_blk->is_full && old_blk->valid_pages < 256)
+//             {
+//                 old_blk->is_full = false;
+//                 ssd->free_translation_blocks++;
+//             }
+//         }
+//     }
+
+//     struct translation_block *curr_blk = &ssd->translation_blocks[block_idx];
+
+//     // Find the next free page in the current block
+//     int page_idx = -1;
+//     for (int i = 0; i < 256; i++)
+//     {
+//         if (curr_blk->pages[i].mp == NULL || curr_blk->pages[i].mp->dppn == NULL)
+//         {
+//             page_idx = i;
+//             break;
+//         }
+//     }
+
+//     if (page_idx == -1)
+//     {
+//         // Current block is full, mark it and retry
+//         curr_blk->is_full = true;
+//         ssd->free_translation_blocks--;
+//         write_translation_page(ssd, tppa, mp, tvpn);
+//         return;
+//     }
+
+//     struct translation_page *page = &curr_blk->pages[page_idx];
+
+//     // Free existing mp if any
+//     if (page->mp != NULL)
+//     {
+//         if (page->mp->dppn != NULL)
+//         {
+//             free(page->mp->dppn);
+//         }
+//         free(page->mp);
+//     }
+
+//     // Assign the new map_page
+//     page->mp = malloc(sizeof(struct map_page));
+//     page->mp->dppn = malloc(sizeof(struct ppa) * 512);
+
+//     // Copy the mappings
+//     memcpy(page->mp->dppn, mp->dppn, sizeof(struct ppa) * 512);
+
+//     // Assign tppn
+//     page->tppn.ppa = block_idx * 256 + page_idx;
+
+//     // Assign tvpn
+//     page->tvpn = tvpn;
+//     page->is_valid = true;
+
+//     // Update tppa (output parameter)
+//     tppa->ppa = page->tppn.ppa;
+
+//     // Update GTD
+//     ssd->gtd[tvpn].tppn = page->tppn;
+//     ssd->gtd[tvpn].dirty = false;
+
+//     // Update block metadata
+//     curr_blk->valid_pages++;
+//     if (curr_blk->valid_pages == 256)
+//     {
+//         curr_blk->is_full = true;
+//         ssd->free_translation_blocks--;
+//     }
+
+//     // Mark the page as valid
+//     // page->dirty = false;
+// }
+
 static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map_page *mp, uint64_t tvpn)
 {
-    // Check if current translation block is full
+    // Start from the current block index
     int block_idx = 0;
-    while (ssd->translation_blocks[block_idx].is_full)
+
+    while (1) // Loop until a free page is found
     {
-        // Advance to the next block
-        block_idx = (block_idx + 1) % 16;
-
-        // If all blocks are full, perform garbage collection
-        if (ssd->free_translation_blocks == 0)
+        // If the current block is full, move to the next one
+        while (ssd->translation_blocks[block_idx].is_full)
         {
-            // printf("Need GC in tp\n");
-            translation_gc(ssd);
-        }
-    }
+            block_idx = (block_idx + 1) % 16;
 
-    // Check for existing translation page
-    struct gtd_entry *gtd_ent = &ssd->gtd[tvpn];
-
-    if (gtd_ent->tppn.ppa != UNMAPPED_PPA)
-    {
-        // Invalidate the old translation page
-        uint64_t old_tppn = gtd_ent->tppn.ppa;
-        int old_blk_idx = old_tppn / 256;
-        int old_page_idx = old_tppn % 256;
-
-        struct translation_block *old_blk = &ssd->translation_blocks[old_blk_idx];
-        struct translation_page *old_page = &old_blk->pages[old_page_idx];
-
-        if (old_page->is_valid)
-        {
-            old_page->is_valid = false;
-            old_blk->valid_pages--;
-
-            // Update block's full status
-            if (old_blk->is_full && old_blk->valid_pages < 256)
+            // If all blocks are full, perform garbage collection
+            if (ssd->free_translation_blocks == 0)
             {
-                old_blk->is_full = false;
-                ssd->free_translation_blocks++;
+                translation_gc(ssd);
             }
         }
-    }
 
-    struct translation_block *curr_blk = &ssd->translation_blocks[block_idx];
+        struct translation_block *curr_blk = &ssd->translation_blocks[block_idx];
 
-    // Find the next free page in the current block
-    int page_idx = -1;
-    for (int i = 0; i < 256; i++)
-    {
-        if (curr_blk->pages[i].mp == NULL || curr_blk->pages[i].mp->dppn == NULL)
+        // Find a free page in the current block
+        int page_idx = -1;
+        for (int i = 0; i < 256; i++)
         {
-            page_idx = i;
-            break;
+            if (!curr_blk->pages[i].is_valid)
+            {
+                page_idx = i;
+                break;
+            }
         }
-    }
 
-    if (page_idx == -1)
-    {
-        // Current block is full, mark it and retry
-        curr_blk->is_full = true;
-        ssd->free_translation_blocks--;
-        write_translation_page(ssd, tppa, mp, tvpn);
-        return;
-    }
-
-    struct translation_page *page = &curr_blk->pages[page_idx];
-
-    // Free existing mp if any
-    if (page->mp != NULL)
-    {
-        if (page->mp->dppn != NULL)
+        if (page_idx == -1)
         {
-            free(page->mp->dppn);
+            // Mark the current block as full and continue
+            curr_blk->is_full = true;
+            ssd->free_translation_blocks--;
+            continue;
         }
-        free(page->mp);
+
+        // Found a free page; proceed to write
+        struct translation_page *page = &curr_blk->pages[page_idx];
+
+        // Free existing mp if any
+        if (page->mp != NULL)
+        {
+            if (page->mp->dppn != NULL)
+            {
+                free(page->mp->dppn);
+            }
+            free(page->mp);
+        }
+
+        // Allocate and assign the new map_page
+        page->mp = malloc(sizeof(struct map_page));
+        if (!page->mp)
+        {
+            fprintf(stderr, "Failed to allocate memory for map_page.\n");
+            exit(EXIT_FAILURE);
+        }
+
+        page->mp->dppn = malloc(sizeof(struct ppa) * 512);
+        if (!page->mp->dppn)
+        {
+            fprintf(stderr, "Failed to allocate memory for dppn array.\n");
+            exit(EXIT_FAILURE);
+        }
+
+        // Copy the mappings
+        memcpy(page->mp->dppn, mp->dppn, sizeof(struct ppa) * 512);
+
+        // Assign tppn
+        page->tppn.ppa = block_idx * 256 + page_idx;
+
+        // Assign tvpn
+        page->tvpn = tvpn;
+        page->is_valid = true;
+
+        // Update tppa (output parameter)
+        tppa->ppa = page->tppn.ppa;
+
+        // Update GTD
+        ssd->gtd[tvpn].tppn = page->tppn;
+        ssd->gtd[tvpn].dirty = false;
+        ssd->gtd[tvpn].location = 1; // On flash
+
+        // Update block metadata
+        curr_blk->valid_pages++;
+        if (curr_blk->valid_pages == 256)
+        {
+            curr_blk->is_full = true;
+            ssd->free_translation_blocks--;
+        }
+
+        // Invalidate old translation page if it exists
+        struct gtd_entry *gtd_ent = &ssd->gtd[tvpn];
+        if (gtd_ent->tppn.ppa != UNMAPPED_PPA && gtd_ent->tppn.ppa != page->tppn.ppa)
+        {
+            uint64_t old_tppn = gtd_ent->tppn.ppa;
+            int old_blk_idx = old_tppn / 256;
+            int old_page_idx = old_tppn % 256;
+
+            struct translation_block *old_blk = &ssd->translation_blocks[old_blk_idx];
+            struct translation_page *old_page = &old_blk->pages[old_page_idx];
+
+            if (old_page->is_valid)
+            {
+                old_page->is_valid = false;
+                old_blk->valid_pages--;
+
+                if (old_blk->is_full && old_blk->valid_pages < 256)
+                {
+                    old_blk->is_full = false;
+                    ssd->free_translation_blocks++;
+                }
+            }
+        }
+
+        // Exit the loop after writing the translation page
+        break;
     }
-
-    // Assign the new map_page
-    page->mp = malloc(sizeof(struct map_page));
-    if (!page->mp)
-    {
-        printf( "Failed to allocate memory for map_page.\n");
-        // // exit(EXIT_FAILURE);
-    }
-
-    page->mp->dppn = malloc(sizeof(struct ppa) * 512);
-    if (!page->mp->dppn)
-    {
-        printf( "Failed to allocate memory for dppn array.\n");
-        // // exit(EXIT_FAILURE);
-    }
-
-    // Copy the mappings
-    memcpy(page->mp->dppn, mp->dppn, sizeof(struct ppa) * 512);
-
-    // Assign tppn
-    page->tppn.ppa = block_idx * 256 + page_idx;
-
-    // Assign tvpn
-    page->tvpn = tvpn;
-    page->is_valid = true;
-
-    // Update tppa (output parameter)
-    tppa->ppa = page->tppn.ppa;
-
-    // Update GTD
-    ssd->gtd[tvpn].tppn = page->tppn;
-    ssd->gtd[tvpn].dirty = false;
-
-    // Update block metadata
-    curr_blk->valid_pages++;
-    if (curr_blk->valid_pages == 256)
-    {
-        curr_blk->is_full = true;
-        ssd->free_translation_blocks--;
-    }
-
-    // Mark the page as valid
-    // page->dirty = false;
 }
 
 // Translation page를 flash에서 읽기
