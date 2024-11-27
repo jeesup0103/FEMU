@@ -377,19 +377,6 @@ static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map
         // Update tppa (output parameter)
         tppa->ppa = page->tppn.ppa;
 
-        // Update GTD
-        ssd->gtd[tvpn].tppn = page->tppn;
-        ssd->gtd[tvpn].dirty = false;
-        ssd->gtd[tvpn].location = 1; // On flash
-
-        // Update block metadata
-        curr_blk->valid_pages++;
-        if (curr_blk->valid_pages == 256)
-        {
-            curr_blk->is_full = true;
-            ssd->free_translation_blocks--;
-        }
-
         // Invalidate old translation page if it exists
         struct gtd_entry *gtd_ent = &ssd->gtd[tvpn];
         if (gtd_ent->tppn.ppa != UNMAPPED_PPA && gtd_ent->tppn.ppa != page->tppn.ppa)
@@ -412,6 +399,19 @@ static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map
                     ssd->free_translation_blocks++;
                 }
             }
+        }
+
+        // Update GTD
+        ssd->gtd[tvpn].tppn = page->tppn;
+        ssd->gtd[tvpn].dirty = false;
+        ssd->gtd[tvpn].location = 1; // On flash
+
+        // Update block metadata
+        curr_blk->valid_pages++;
+        if (curr_blk->valid_pages == 256)
+        {
+            curr_blk->is_full = true;
+            ssd->free_translation_blocks--;
         }
 
         // Exit the loop after writing the translation page
