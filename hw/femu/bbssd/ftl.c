@@ -176,44 +176,18 @@ static void translation_gc(struct ssd *ssd)
 // Translation page를 flash에 쓰기
 static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map_page *mp, uint64_t tvpn)
 {
-    // Check if current translation block is full
+    // Check if gc condition
     if (ssd->free_translation_blocks == 1)
     {
-        // printf("Need GC in tp\n");
         translation_gc(ssd);
     }
+
+    // Find block with empty page
     int block_idx = 0;
     while (ssd->translation_blocks[block_idx].is_full)
     {
         // Advance to the next block
         block_idx = (block_idx + 1) % 16;
-    }
-
-    // Check for existing translation page
-    struct gtd_entry *gtd_ent = &ssd->gtd[tvpn];
-
-    if (gtd_ent->tppn.ppa != UNMAPPED_PPA)
-    {
-        // Invalidate the old translation page
-        uint64_t old_tppn = gtd_ent->tppn.ppa;
-        int old_blk_idx = old_tppn / 256;
-        int old_page_idx = old_tppn % 256;
-
-        struct translation_block *old_blk = &ssd->translation_blocks[old_blk_idx];
-        struct translation_page *old_page = &old_blk->pages[old_page_idx];
-
-        if (old_page->is_valid)
-        {
-            old_page->is_valid = false;
-            old_blk->valid_pages--;
-
-            // Update block's full status
-            if (old_blk->is_full && old_blk->valid_pages < 256)
-            {
-                old_blk->is_full = false;
-                ssd->free_translation_blocks++;
-            }
-        }
     }
 
     struct translation_block *curr_blk = &ssd->translation_blocks[block_idx];
@@ -289,9 +263,6 @@ static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map
         curr_blk->is_full = true;
         ssd->free_translation_blocks--;
     }
-
-    // Mark the page as valid
-    // page->dirty = false;
 }
 
 // Translation page를 flash에서 읽기
@@ -422,10 +393,46 @@ static void evict_cmt_entry(struct ssd *ssd)
         *bucket_entry = (*bucket_entry)->next;
     }
 
-    // If victim is dirty, flush the mapping
+    // If the victim entry is dirty, write it back to the CTP
     if (victim->data.dirty)
     {
-        victim->data.dirty = false;
+        uint64_t dlpn = victim->data.dlpn;
+        uint64_t tvpn = dlpn / 512; // Translation Virtual Page Number
+        uint64_t offset = dlpn % 512;
+
+        // Find or create the corresponding CTP entry
+        struct ctp_entry *ctp_ent = find_ctp_entry(ssd->ctp, tvpn);
+        if (!ctp_ent)
+        {
+            // If the CTP entry does not exist
+            ctp_ent = g_malloc0(sizeof(struct ctp_entry));
+            ctp_ent->tvpn = tvpn;
+            struct gtd_entry *gtd_ent = &ssd->gtd[tvpn];
+
+            if (gtd_ent->tppn.ppa != UNMAPPED_PPA)
+            {
+                // Load the translation page from flash
+                ctp_ent->tppn = gtd_ent->tppn;
+                ctp_ent->mp = read_translation_page(ssd, &gtd_ent->tppn);
+            }
+            else
+            {
+                // Create a new map page
+                ctp_ent->mp = g_malloc0(sizeof(struct map_page));
+                ctp_ent->mp->dppn = g_malloc0(sizeof(struct ppa) * 512);
+                for (int i = 0; i < 512; i++)
+                {
+                    ctp_ent->mp->dppn[i].ppa = UNMAPPED_PPA;
+                }
+            }
+
+            ctp_ent->dirty = false; // Initially clean
+            insert_ctp_entry(ssd->ctp, ctp_ent, ssd);
+        }
+
+        // Update the mapping in the CTP
+        ctp_ent->mp->dppn[offset] = victim->data.dppn;
+        ctp_ent->dirty = true; // Mark the CTP entry as dirty
     }
 
     g_free(victim);
