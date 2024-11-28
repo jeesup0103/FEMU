@@ -64,7 +64,7 @@ static void translation_gc(struct ssd *ssd)
 
     if (victim_blk_idx == -1)
     {
-        printf("No victim block found for translation GC.\n");
+        // printf("No victim block found for translation GC.\n");
         exit(1);
         return;
     }
@@ -109,7 +109,7 @@ static void translation_gc(struct ssd *ssd)
             }
             if (free_page_idx == -1)
             {
-                printf("No free pages in free translation block.\n");
+                // printf("No free pages in free translation block.\n");
                 break;
             }
 
@@ -228,14 +228,14 @@ static void write_translation_page(struct ssd *ssd, struct ppa *tppa, struct map
     page->mp = malloc(sizeof(struct map_page));
     if (!page->mp)
     {
-        printf("Failed to allocate memory for map_page.\n");
+        // printf("Failed to allocate memory for map_page.\n");
         // // exit(EXIT_FAILURE);
     }
 
     page->mp->dppn = malloc(sizeof(struct ppa) * 512);
     if (!page->mp->dppn)
     {
-        printf("Failed to allocate memory for dppn array.\n");
+        // printf("Failed to allocate memory for dppn array.\n");
         // // exit(EXIT_FAILURE);
     }
 
@@ -274,7 +274,7 @@ static struct map_page *read_translation_page(struct ssd *ssd, struct ppa *tppa)
 
     if (blk_idx < 0 || blk_idx >= 16 || page_idx < 0 || page_idx >= 256)
     {
-        printf("Invalid tppn: blk_idx=%d, page_idx=%d\n", blk_idx, page_idx);
+        // printf("Invalid tppn: blk_idx=%d, page_idx=%d\n", blk_idx, page_idx);
         return NULL;
     }
 
@@ -283,7 +283,7 @@ static struct map_page *read_translation_page(struct ssd *ssd, struct ppa *tppa)
 
     if (!page->is_valid || page->mp == NULL || page->mp->dppn == NULL)
     {
-        printf("Translation page not found at tppn=%lu\n", tppn);
+        // printf("Translation page not found at tppn=%lu\n", tppn);
         return NULL;
     }
 
@@ -397,7 +397,7 @@ static void evict_cmt_entry(struct ssd *ssd)
     if (victim->data.dirty)
     {
         uint64_t dlpn = victim->data.dlpn;
-        uint64_t tvpn = dlpn / 512; // Translation Virtual Page Number
+        uint64_t tvpn = dlpn / 512; 
         uint64_t offset = dlpn % 512;
 
         // Find or create the corresponding CTP entry
@@ -688,11 +688,13 @@ static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
     struct cmt_entry *entry = find_cmt_entry(ssd->cmt, lpn);
     if (entry)
     {
+        ssd->cmt_hit++;
+
         move_cmt_entry_to_tail(ssd->cmt, entry);
         if (entry->data.dppn.ppa != ssd->maptbl[lpn].ppa)
         {
-            printf("Error: CMT mismatch! entry->data.dppn.ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n",
-                   entry->data.dppn.ppa, ssd->maptbl[lpn].ppa);
+            // printf("Error: CMT mismatch! entry->data.dppn.ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n",
+            //        entry->data.dppn.ppa, ssd->maptbl[lpn].ppa);
         }
         else
         {
@@ -702,6 +704,8 @@ static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
         // return entry->data.dppn;
         return ssd->maptbl[lpn];
     }
+    else
+        ssd->cmt_miss++;
 
     uint64_t tvpn = lpn / 512;
 
@@ -721,22 +725,28 @@ static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
         struct ctp_entry *ctp_entry = find_ctp_entry(ssd->ctp, tvpn);
         if (ctp_entry)
         {
+            ssd->ctp_hit++;
+
             move_ctp_entry_to_tail(ssd->ctp, ctp_entry);
             uint64_t offset = lpn % 512;
             ppa = ctp_entry->mp->dppn[offset];
 
             if (ppa.ppa != ssd->maptbl[lpn].ppa)
             {
-                printf("Error: CTP mismatch! ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n", ppa.ppa, ssd->maptbl[lpn].ppa);
+                // printf("Error: CTP mismatch! ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n", ppa.ppa, ssd->maptbl[lpn].ppa);
             }
 
             insert_cmt_entry(ssd, lpn, ppa, false);
             // return ppa;
             return ssd->maptbl[lpn];
         }
+        else
+            ssd->ctp_miss++;
     }
     else
     {
+        ssd->ctp_miss++;
+
         // Load translation page from flash
         struct ctp_entry *ctp_ent = g_malloc0(sizeof(struct ctp_entry));
         ctp_ent->tvpn = tvpn;
@@ -755,7 +765,7 @@ static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
 
         if (ppa.ppa != ssd->maptbl[lpn].ppa)
         {
-            printf("Error: FLASH mismatch! ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n", ppa.ppa, ssd->maptbl[lpn].ppa);
+            // printf("Error: FLASH mismatch! ppa = %lu, ssd->maptbl[lpn].ppa = %lu\n", ppa.ppa, ssd->maptbl[lpn].ppa);
         }
 
         insert_cmt_entry(ssd, lpn, ppa, false);
@@ -846,7 +856,7 @@ static inline void set_maptbl_ent(struct ssd *ssd, uint64_t lpn, struct ppa *new
                 ctp_ent->tppn = tppn;
                 ctp_ent->dirty = false;
                 ctp_ent->mp = read_translation_page(ssd, &tppn);
-                printf("Reading translation page\n");
+                // printf("Reading translation page\n");
             }
             else
             {
