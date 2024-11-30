@@ -37,7 +37,7 @@
 #define NVME_MAX_NAMESPACES 1			
 #define NVME_MAX_ENDGRPS	1			
 #define MAX_RUHS			4
-#define RG_DEGREE			16	/* RG_DEGREE must be larger than luns_per_ch */
+#define RG_DEGREE			16	/* # of chips per RG, it should not be smaller than luns_per_ch */
 
 typedef struct NvmeReclaimUnit {		
     uint64_t ruamw;
