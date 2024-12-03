@@ -283,7 +283,6 @@ static void test_block(gconstpointer opaque)
                                test_block_init_func,
                                test_block_write_func,
                                &header,
-                               0,
                                &error_abort);
     g_assert(blk);
 
@@ -363,7 +362,6 @@ test_luks_bad_header(gconstpointer data)
                                test_block_init_func,
                                test_block_write_func,
                                &buf,
-                               0,
                                &error_abort);
     g_assert(blk);
 

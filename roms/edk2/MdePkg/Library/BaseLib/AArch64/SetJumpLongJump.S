@@ -33,6 +33,7 @@ GCC_ASM_EXPORT(InternalLongJump)
 #  value to be returned by SetJump().
 #
 #  If JumpBuffer is NULL, then ASSERT().
+#  For IPF CPUs, if JumpBuffer is not aligned on a 16-byte boundary, then ASSERT().
 #
 #  @param  JumpBuffer    A pointer to CPU context buffer.
 #
@@ -45,15 +46,6 @@ GCC_ASM_EXPORT(InternalLongJump)
 #  );
 #
 ASM_PFX(SetJump):
-        AARCH64_BTI(c)
-#ifndef MDEPKG_NDEBUG
-        stp     x29, x30, [sp, #-32]!
-        mov     x29, sp
-        str     x0, [sp, #16]
-        bl      InternalAssertJumpBuffer
-        ldr     x0, [sp, #16]
-        ldp     x29, x30, [sp], #32
-#endif
         mov     x16, sp // use IP0 so save SP
 #define REG_PAIR(REG1, REG2, OFFS)      stp REG1, REG2, [x0, OFFS]
 #define REG_ONE(REG1, OFFS)             str REG1, [x0, OFFS]
@@ -61,7 +53,7 @@ ASM_PFX(SetJump):
         FPR_LAYOUT
 #undef REG_PAIR
 #undef REG_ONE
-        mov     x0, #0
+        mov     w0, #0
         ret
 
 #/**
@@ -69,7 +61,7 @@ ASM_PFX(SetJump):
 #
 #  Restores the CPU context from the buffer specified by JumpBuffer.
 #  This function never returns to the caller.
-#  Instead it resumes execution based on the state of JumpBuffer.
+#  Instead is resumes execution based on the state of JumpBuffer.
 #
 #  @param  JumpBuffer    A pointer to CPU context buffer.
 #  @param  Value         The value to return when the SetJump() context is restored.
@@ -83,7 +75,6 @@ ASM_PFX(SetJump):
 #  );
 #
 ASM_PFX(InternalLongJump):
-        AARCH64_BTI(c)
 #define REG_PAIR(REG1, REG2, OFFS)      ldp REG1, REG2, [x0, OFFS]
 #define REG_ONE(REG1, OFFS)             ldr REG1, [x0, OFFS]
         GPR_LAYOUT
@@ -91,9 +82,10 @@ ASM_PFX(InternalLongJump):
 #undef REG_PAIR
 #undef REG_ONE
         mov     sp, x16
-        cmp     x1, #0
-        mov     x0, #1
-        csel    x0, x1, x0, ne
-        ret
+        cmp     w1, #0
+        mov     w0, #1
+        csel    w0, w1, w0, ne
+        // use br not ret, as ret is guaranteed to mispredict
+        br      x30
 
 ASM_FUNCTION_REMOVE_IF_UNREFERENCED

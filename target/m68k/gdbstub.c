@@ -23,7 +23,8 @@
 
 int m68k_cpu_gdb_read_register(CPUState *cs, GByteArray *mem_buf, int n)
 {
-    CPUM68KState *env = cpu_env(cs);
+    M68kCPU *cpu = M68K_CPU(cs);
+    CPUM68KState *env = &cpu->env;
 
     if (n < 8) {
         /* D0-D7 */
@@ -49,7 +50,8 @@ int m68k_cpu_gdb_read_register(CPUState *cs, GByteArray *mem_buf, int n)
 
 int m68k_cpu_gdb_write_register(CPUState *cs, uint8_t *mem_buf, int n)
 {
-    CPUM68KState *env = cpu_env(cs);
+    M68kCPU *cpu = M68K_CPU(cs);
+    CPUM68KState *env = &cpu->env;
     uint32_t tmp;
 
     tmp = ldl_p(mem_buf);

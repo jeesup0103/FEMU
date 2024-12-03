@@ -4,7 +4,6 @@ packages:
   - cpp
   - gcc
   - gettext
-  - gettext-native
   - glib2
   - gnutls
   - libc

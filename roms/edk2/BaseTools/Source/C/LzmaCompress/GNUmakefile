@@ -24,4 +24,4 @@ OBJECTS = \
 
 include $(MAKEROOT)/Makefiles/app.makefile
 
-CFLAGS += -D_7ZIP_ST
+BUILD_CFLAGS += -D_7ZIP_ST

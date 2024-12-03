@@ -86,12 +86,7 @@ OpteeSharedMemoryRemap (
     return EFI_BUFFER_TOO_SMALL;
   }
 
-  Status = ArmSetMemoryAttributes (
-             PhysicalAddress,
-             Size,
-             EFI_MEMORY_WB | EFI_MEMORY_XP,
-             0
-             );
+  Status = ArmSetMemoryAttributes (PhysicalAddress, Size, EFI_MEMORY_WB);
   if (EFI_ERROR (Status)) {
     return Status;
   }

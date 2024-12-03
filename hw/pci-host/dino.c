@@ -1,5 +1,5 @@
 /*
- * HP-PARISC Dino PCI chipset emulation, as in B160L and similar machines
+ * HP-PARISC Dino PCI chipset emulation, as in B160L and similiar machines
  *
  * (C) 2017-2019 by Helge Deller <deller@gmx.de>
  *
@@ -287,7 +287,7 @@ static const VMStateDescription vmstate_dino = {
     .name = "Dino",
     .version_id = 2,
     .minimum_version_id = 1,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_UINT32(iar0, DinoState),
         VMSTATE_UINT32(iar1, DinoState),
         VMSTATE_UINT32(imr, DinoState),
@@ -353,10 +353,6 @@ static AddressSpace *dino_pcihost_set_iommu(PCIBus *bus, void *opaque,
 
     return &s->bm_as;
 }
-
-static const PCIIOMMUOps dino_iommu_ops = {
-    .get_address_space = dino_pcihost_set_iommu,
-};
 
 /*
  * Dino interrupts are connected as shown on Page 78, Table 23
@@ -485,7 +481,7 @@ static void dino_pcihost_init(Object *obj)
         g_free(name);
     }
 
-    pci_setup_iommu(phb->bus, &dino_iommu_ops, s);
+    pci_setup_iommu(phb->bus, dino_pcihost_set_iommu, s);
 
     sysbus_init_mmio(sbd, &s->this_mem);
 

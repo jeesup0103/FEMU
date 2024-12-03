@@ -25,6 +25,7 @@ GCC_ASM_EXPORT(ArmReadIdIsar0)
 #  );
 #
 ASM_PFX(ArmReadIdIsar0):
-  AARCH64_BTI(c)
   mrs  x0, id_aa64isar0_el1 // Read ID_AA64ISAR0 Register
   ret
+
+

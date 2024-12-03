@@ -6,9 +6,6 @@
 # SPDX-License-Identifier: BSD-2-Clause-Patent
 ##
 {
-    "PrEval": {
-        "DscPath": "EmbeddedPkg.dsc",
-    },
     ## options defined .pytool/Plugin/LicenseCheck
     "LicenseCheck": {
         "IgnoreFiles": []
@@ -50,9 +47,7 @@
             "MdePkg/MdePkg.dec"
         ],
         # For host based unit tests
-        "AcceptableDependencies-HOST_APPLICATION":[
-            "UnitTestFrameworkPkg/UnitTestFrameworkPkg.dec"
-        ],
+        "AcceptableDependencies-HOST_APPLICATION":[],
         # For UEFI shell based apps
         "AcceptableDependencies-UEFI_APPLICATION":[],
         "IgnoreInf": []

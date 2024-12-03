@@ -18,7 +18,6 @@
         ],
         ## Both file path and directory path are accepted.
         "IgnoreFiles": [
-            "Tools/",
             "Include/Coreboot.h",
             "Library/CbParseLib/CbParseLib.c",
             "PayloadLoaderPeim/ElfLib/ElfCommon.h",

@@ -197,8 +197,10 @@ static uint32_t do_getpsr(CPUSPARCState *env)
 /* Avoid ifdefs below for the abi32 and abi64 paths. */
 #ifdef TARGET_ABI32
 #define TARGET_TT_SYSCALL  (TT_TRAP + 0x10) /* t_linux */
+#define syscall_cc         psr
 #else
 #define TARGET_TT_SYSCALL  (TT_TRAP + 0x6d) /* tl0_linux64 */
+#define syscall_cc         xcc
 #endif
 
 /* Avoid ifdefs below for the v9 and pre-v9 hw traps. */
@@ -222,6 +224,11 @@ void cpu_loop (CPUSPARCState *env)
         cpu_exec_end(cs);
         process_queued_cpu_work(cs);
 
+        /* Compute PSR before exposing state.  */
+        if (env->cc_op != CC_OP_FLAGS) {
+            cpu_get_psr(env);
+        }
+
         switch (trapnr) {
         case TARGET_TT_SYSCALL:
             ret = do_syscall (env, env->gregs[1],
@@ -233,10 +240,10 @@ void cpu_loop (CPUSPARCState *env)
                 break;
             }
             if ((abi_ulong)ret >= (abi_ulong)(-515)) {
-                set_syscall_C(env, 1);
+                env->syscall_cc |= PSR_CARRY;
                 ret = -ret;
             } else {
-                set_syscall_C(env, 0);
+                env->syscall_cc &= ~PSR_CARRY;
             }
             env->regwptr[0] = ret;
             /* next instruction */
@@ -293,7 +300,7 @@ void cpu_loop (CPUSPARCState *env)
         case TT_FP_EXCP:
             {
                 int code = TARGET_FPE_FLTUNK;
-                target_ulong fsr = cpu_get_fsr(env);
+                target_ulong fsr = env->fsr;
 
                 if ((fsr & FSR_FTT_MASK) == FSR_FTT_IEEE_EXCP) {
                     if (fsr & FSR_NVC) {

@@ -23,57 +23,49 @@
 #include <Library/HobLib.h>
 #include <Guid/EarlyPL011BaseAddress.h>
 
-STATIC UINTN          mSerialBaseAddress;
-STATIC RETURN_STATUS  mPermanentStatus = RETURN_SUCCESS;
+STATIC UINTN  mSerialBaseAddress;
 
-/**
-  Program hardware of Serial port
-
-  @retval RETURN_SUCCESS    If the serial port was initialized successfully by
-                            this call, or an earlier call, to
-                            SerialPortInitialize().
-
-  @retval RETURN_NOT_FOUND  If no PL011 base address could be found.
-
-  @return                   Error codes forwarded from
-                            PL011UartInitializePort().
-**/
 RETURN_STATUS
 EFIAPI
 SerialPortInitialize (
   VOID
   )
 {
-  VOID                            *Hob;
-  RETURN_STATUS                   Status;
-  CONST EARLY_PL011_BASE_ADDRESS  *UartBase;
-  UINTN                           SerialBaseAddress;
-  UINT64                          BaudRate;
-  UINT32                          ReceiveFifoDepth;
-  EFI_PARITY_TYPE                 Parity;
-  UINT8                           DataBits;
-  EFI_STOP_BITS_TYPE              StopBits;
+  return RETURN_SUCCESS;
+}
 
-  if (mSerialBaseAddress != 0) {
-    return RETURN_SUCCESS;
-  }
+/**
 
-  if (RETURN_ERROR (mPermanentStatus)) {
-    return mPermanentStatus;
-  }
+  Program hardware of Serial port
+
+  @return    RETURN_NOT_FOUND if no PL011 base address could be found
+             Otherwise, result of PL011UartInitializePort () is returned
+
+**/
+RETURN_STATUS
+EFIAPI
+FdtPL011SerialPortLibInitialize (
+  VOID
+  )
+{
+  VOID                *Hob;
+  CONST UINT64        *UartBase;
+  UINT64              BaudRate;
+  UINT32              ReceiveFifoDepth;
+  EFI_PARITY_TYPE     Parity;
+  UINT8               DataBits;
+  EFI_STOP_BITS_TYPE  StopBits;
 
   Hob = GetFirstGuidHob (&gEarlyPL011BaseAddressGuid);
   if ((Hob == NULL) || (GET_GUID_HOB_DATA_SIZE (Hob) != sizeof *UartBase)) {
-    Status = RETURN_NOT_FOUND;
-    goto Failed;
+    return RETURN_NOT_FOUND;
   }
 
   UartBase = GET_GUID_HOB_DATA (Hob);
 
-  SerialBaseAddress = (UINTN)UartBase->ConsoleAddress;
-  if (SerialBaseAddress == 0) {
-    Status = RETURN_NOT_FOUND;
-    goto Failed;
+  mSerialBaseAddress = (UINTN)*UartBase;
+  if (mSerialBaseAddress == 0) {
+    return RETURN_NOT_FOUND;
   }
 
   BaudRate         = (UINTN)PcdGet64 (PcdUartDefaultBaudRate);
@@ -82,25 +74,15 @@ SerialPortInitialize (
   DataBits         = PcdGet8 (PcdUartDefaultDataBits);
   StopBits         = (EFI_STOP_BITS_TYPE)PcdGet8 (PcdUartDefaultStopBits);
 
-  Status = PL011UartInitializePort (
-             SerialBaseAddress,
-             FixedPcdGet32 (PL011UartClkInHz),
-             &BaudRate,
-             &ReceiveFifoDepth,
-             &Parity,
-             &DataBits,
-             &StopBits
-             );
-  if (RETURN_ERROR (Status)) {
-    goto Failed;
-  }
-
-  mSerialBaseAddress = SerialBaseAddress;
-  return RETURN_SUCCESS;
-
-Failed:
-  mPermanentStatus = Status;
-  return Status;
+  return PL011UartInitializePort (
+           mSerialBaseAddress,
+           FixedPcdGet32 (PL011UartClkInHz),
+           &BaudRate,
+           &ReceiveFifoDepth,
+           &Parity,
+           &DataBits,
+           &StopBits
+           );
 }
 
 /**
@@ -120,7 +102,7 @@ SerialPortWrite (
   IN UINTN  NumberOfBytes
   )
 {
-  if (!RETURN_ERROR (SerialPortInitialize ())) {
+  if (mSerialBaseAddress != 0) {
     return PL011UartWrite (mSerialBaseAddress, Buffer, NumberOfBytes);
   }
 
@@ -144,7 +126,7 @@ SerialPortRead (
   IN  UINTN  NumberOfBytes
   )
 {
-  if (!RETURN_ERROR (SerialPortInitialize ())) {
+  if (mSerialBaseAddress != 0) {
     return PL011UartRead (mSerialBaseAddress, Buffer, NumberOfBytes);
   }
 
@@ -164,7 +146,7 @@ SerialPortPoll (
   VOID
   )
 {
-  if (!RETURN_ERROR (SerialPortInitialize ())) {
+  if (mSerialBaseAddress != 0) {
     return PL011UartPoll (mSerialBaseAddress);
   }
 
@@ -217,7 +199,7 @@ SerialPortSetAttributes (
 {
   RETURN_STATUS  Status;
 
-  if (RETURN_ERROR (SerialPortInitialize ())) {
+  if (mSerialBaseAddress == 0) {
     Status = RETURN_UNSUPPORTED;
   } else {
     Status = PL011UartInitializePort (
@@ -252,7 +234,7 @@ SerialPortSetControl (
 {
   RETURN_STATUS  Status;
 
-  if (RETURN_ERROR (SerialPortInitialize ())) {
+  if (mSerialBaseAddress == 0) {
     Status = RETURN_UNSUPPORTED;
   } else {
     Status = PL011UartSetControl (mSerialBaseAddress, Control);
@@ -279,7 +261,7 @@ SerialPortGetControl (
 {
   RETURN_STATUS  Status;
 
-  if (RETURN_ERROR (SerialPortInitialize ())) {
+  if (mSerialBaseAddress == 0) {
     Status = RETURN_UNSUPPORTED;
   } else {
     Status = PL011UartGetControl (mSerialBaseAddress, Control);

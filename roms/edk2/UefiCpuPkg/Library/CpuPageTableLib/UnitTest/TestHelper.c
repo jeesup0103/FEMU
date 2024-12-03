@@ -1,7 +1,7 @@
 /** @file
   helper file for Unit tests of the CpuPageTableLib instance of the CpuPageTableLib class
 
-  Copyright (c) 2022 - 2023, Intel Corporation. All rights reserved.<BR>
+  Copyright (c) 2022, Intel Corporation. All rights reserved.<BR>
   SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
@@ -9,7 +9,6 @@
 #include "CpuPageTableLibUnitTest.h"
 #include "../CpuPageTable.h"
 
-#define IA32_PAE_RESERVED_MASK  0x7FF0000000000000ull
 //
 // Global Data to validate if the page table is legal
 // mValidMaskNoLeaf[0] is not used
@@ -96,7 +95,6 @@ InitGlobalData (
   @param[in]   Level          the level of PagingEntry.
   @param[in]   MaxLeafLevel   Max leaf entry level.
   @param[in]   LinearAddress  The linear address verified.
-  @param[in]   PagingMode     The paging mode.
 
   @retval  Leaf entry.
 **/
@@ -105,17 +103,12 @@ IsPageTableEntryValid (
   IN IA32_PAGING_ENTRY  *PagingEntry,
   IN UINTN              Level,
   IN UINTN              MaxLeafLevel,
-  IN UINT64             Address,
-  IN PAGING_MODE        PagingMode
+  IN UINT64             Address
   )
 {
   UINT64             Index;
   IA32_PAGING_ENTRY  *ChildPageEntry;
   UNIT_TEST_STATUS   Status;
-
-  if (PagingMode == PagingPae) {
-    UT_ASSERT_EQUAL (PagingEntry->Uint64 & IA32_PAE_RESERVED_MASK, 0);
-  }
 
   if (PagingEntry->Pce.Present == 0) {
     return UNIT_TEST_PASSED;
@@ -147,9 +140,9 @@ IsPageTableEntryValid (
     UT_ASSERT_EQUAL ((PagingEntry->Uint64 & mValidMaskNoLeaf[Level].Uint64), PagingEntry->Uint64);
   }
 
-  ChildPageEntry = (IA32_PAGING_ENTRY  *)(UINTN)(IA32_PNLE_PAGE_TABLE_BASE_ADDRESS (&PagingEntry->Pnle));
+  ChildPageEntry = (IA32_PAGING_ENTRY  *)(UINTN)(((UINTN)(PagingEntry->Pnle.Bits.PageTableBaseAddress)) << 12);
   for (Index = 0; Index < 512; Index++) {
-    Status = IsPageTableEntryValid (&ChildPageEntry[Index], Level-1, MaxLeafLevel, Address + (Index<<(9*(Level-1) + 3)), PagingMode);
+    Status = IsPageTableEntryValid (&ChildPageEntry[Index], Level-1, MaxLeafLevel, Address + (Index<<(9*(Level-1) + 3)));
     if (Status != UNIT_TEST_PASSED) {
       return Status;
     }
@@ -178,13 +171,10 @@ IsPageTableValid (
   UNIT_TEST_STATUS   Status;
   IA32_PAGING_ENTRY  *PagingEntry;
 
-  if (PageTable == 0) {
-    return UNIT_TEST_PASSED;
-  }
-
-  if ((PagingMode == Paging32bit) || (PagingMode >= PagingModeMax)) {
+  if ((PagingMode == Paging32bit) || (PagingMode == PagingPae) || (PagingMode >= PagingModeMax)) {
     //
     // 32bit paging is never supported.
+    // PAE paging will be supported later.
     //
     return UNIT_TEST_ERROR_TEST_FAILED;
   }
@@ -193,14 +183,8 @@ IsPageTableValid (
   MaxLevel     = (UINT8)(PagingMode >> 8);
 
   PagingEntry = (IA32_PAGING_ENTRY *)(UINTN)PageTable;
-  for (Index = 0; Index < ((PagingMode == PagingPae) ? 4 : 512); Index++) {
-    if (PagingMode == PagingPae) {
-      UT_ASSERT_EQUAL (PagingEntry[Index].PdptePae.Bits.MustBeZero, 0);
-      UT_ASSERT_EQUAL (PagingEntry[Index].PdptePae.Bits.MustBeZero2, 0);
-      UT_ASSERT_EQUAL (PagingEntry[Index].PdptePae.Bits.MustBeZero3, 0);
-    }
-
-    Status = IsPageTableEntryValid (&PagingEntry[Index], MaxLevel, MaxLeafLevel, Index << (9 * MaxLevel + 3), PagingMode);
+  for (Index = 0; Index < 512; Index++) {
+    Status = IsPageTableEntryValid (&PagingEntry[Index], MaxLevel, MaxLeafLevel, Index << (9 * MaxLevel + 3));
     if (Status != UNIT_TEST_PASSED) {
       return Status;
     }
@@ -245,7 +229,7 @@ GetEntryFromSubPageTable (
   //
   // Not a leaf
   //
-  ChildPageEntry = (IA32_PAGING_ENTRY  *)(UINTN)(IA32_PNLE_PAGE_TABLE_BASE_ADDRESS (&PagingEntry->Pnle));
+  ChildPageEntry = (IA32_PAGING_ENTRY  *)(UINTN)(((UINTN)(PagingEntry->Pnle.Bits.PageTableBaseAddress)) << 12);
   *Level         = *Level -1;
   Index          = Address >> (*Level * 9 + 3);
   ASSERT (Index == (Index & ((1<< 9) - 1)));
@@ -276,7 +260,7 @@ GetEntryFromPageTable (
   UINT64             Index;
   IA32_PAGING_ENTRY  *PagingEntry;
 
-  if ((PagingMode == Paging32bit) || (PagingMode >= PagingModeMax)) {
+  if ((PagingMode == Paging32bit) || (PagingMode == PagingPae) || (PagingMode >= PagingModeMax)) {
     //
     // 32bit paging is never supported.
     // PAE paging will be supported later.

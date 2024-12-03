@@ -348,6 +348,70 @@ static void nvme_ns_init_identify(FemuCtrl *n, NvmeIdNs *id_ns)
     }
 }
 
+static int cal_rgif(int nrg)
+{
+	int n = nrg;
+	int cnt = 0;
+
+	while (n != 1)
+	{
+		n = n / 2;
+		cnt++;
+	}
+
+	return cnt;
+}
+
+static int nvme_init_endgrps(FemuCtrl *n, Error **errp) 			
+{ 
+    assert(n->num_endgrps == 1); 
+
+	NvmeNamespace *ns = &n->namespaces[0];
+	NvmeRuHandle *ruh = NULL;
+    const uint8_t lba_index = NVME_ID_NS_FLBAS_INDEX(ns->id_ns.flbas);
+    const uint8_t data_shift = ns->id_ns.lbaf[lba_index].lbads;
+	BbCtrlParams *bbp = &n->bb_params;
+
+    for (int i = 0; i < n->num_endgrps; i++)
+	{
+        NvmeEnduranceGroup *endgrp = &n->endgrps[i]; 
+
+		endgrp->fdp.runs = RG_DEGREE * bbp->pgs_per_blk * bbp->secs_per_pg * bbp->secsz;	
+		endgrp->fdp.nrg = bbp->nchs * bbp->luns_per_ch / RG_DEGREE; /* # of RGs */
+		endgrp->fdp.rgif = cal_rgif(endgrp->fdp.nrg);				/* # of bits for RG in PID */
+		endgrp->fdp.fdpa |= (1 << 7); 								/* fdp configs is valid */
+		endgrp->fdp.fdpa |= endgrp->fdp.rgif; 						
+		endgrp->fdp.nruh = MAX_RUHS;
+
+		endgrp->fdp.hbmw = 0;
+		endgrp->fdp.mbmw = 0;
+		endgrp->fdp.mbe = 0; 
+
+		endgrp->fdp.ruhs = g_new(NvmeRuHandle, endgrp->fdp.nruh); 
+
+		for (int ruhid = 0; ruhid < endgrp->fdp.nruh; ruhid++)
+		{
+			endgrp->fdp.ruhs[ruhid] = (NvmeRuHandle)
+			{
+				.ruht = NVME_RUHT_INITIALLY_ISOLATED, 				
+				.ruha = NVME_RUHA_HOST,
+				.ruamw = endgrp->fdp.runs >> data_shift,
+				.lbafi = lba_index,
+				.rus = g_new(NvmeReclaimUnit, endgrp->fdp.nrg)
+			}; 
+			ruh = &endgrp->fdp.ruhs[ruhid];
+			/* FIXME: if you want to use additional fdp events, add event types at below */
+			ruh->event_filter |= ((uint64_t)1 << nvme_fdp_evf_shifts[FDP_EVT_MEDIA_REALLOC]);
+		}
+		for (int rgid = 0; rgid < endgrp->fdp.nrg; rgid++)
+			ruh->rus[rgid].ruamw = ruh->ruamw;
+
+		endgrp->fdp.enabled = true; 
+    }
+
+    return 0;
+}																	
+
 static int nvme_init_namespace(FemuCtrl *n, NvmeNamespace *ns, Error **errp)
 {
     NvmeIdNs *id_ns = &ns->id_ns;
@@ -365,6 +429,17 @@ static int nvme_init_namespace(FemuCtrl *n, NvmeNamespace *ns, Error **errp)
     ns->ns_blks = ns_blks(ns, lba_index);
     ns->util = bitmap_new(num_blks);
     ns->uncorrectable = bitmap_new(num_blks);
+	ns->endgrp = &n->endgrps[0]; 
+
+	/* FIXME: FEMU doesn't support 'ns_mgmt_cmd()' that specifies the RUHs 
+	   the namespace to be created can use, so I determined the nphs as maximum value
+	   which can utilize for one namespace in the endurance group 	*/ 
+	ns->fdp.nphs = ns->endgrp->fdp.nruh;										
+	ns->fdp.phs = g_new(uint16_t, ns->fdp.nphs); 			
+
+	/* FIXME: Identity relation for easy implementation */
+	for (int i = 0; i < ns->fdp.nphs; i++)
+		ns->fdp.phs[i] = i;														
 
     return 0;
 }
@@ -408,7 +483,8 @@ static void nvme_init_ctrl(FemuCtrl *n)
     id->mdts         = n->mdts;
     id->ver          = 0x00010300;
     /* TODO: NVME_OACS_NS_MGMT */
-    id->oacs         = cpu_to_le16(n->oacs | NVME_OACS_DBBUF);
+    id->oacs         = cpu_to_le16(n->oacs | NVME_OACS_NS_MGMT | NVME_OACS_FORMAT | 
+						NVME_OACS_DBBUF | NVME_OACS_DIRECTIVES);				
     id->acl          = n->acl;
     id->aerl         = n->aerl;
     id->frmw         = 7 << 1 | 1;
@@ -429,6 +505,8 @@ static void nvme_init_ctrl(FemuCtrl *n)
     id->psd[0].mp    = cpu_to_le16(0x9c4);
     id->psd[0].enlat = cpu_to_le32(0x10);
     id->psd[0].exlat = cpu_to_le32(0x4);
+	n->features.fdp_mode 		= 0;			
+	n->features.fdp_events		= 0; 		
 
     n->features.arbitration     = 0x1f0f0706;
     n->features.power_mgmt      = 0;
@@ -555,18 +633,17 @@ static void femu_realize(PCIDevice *pci_dev, Error **errp)
     n->sq = g_malloc0(sizeof(*n->sq) * (n->nr_io_queues + 1));
     n->cq = g_malloc0(sizeof(*n->cq) * (n->nr_io_queues + 1));
     n->namespaces = g_malloc0(sizeof(*n->namespaces) * n->num_namespaces);
+	n->endgrps = g_malloc0(sizeof(*n->endgrps) * n->num_endgrps); 
     n->elpes = g_malloc0(sizeof(*n->elpes) * (n->elpe + 1));
     n->aer_reqs = g_malloc0(sizeof(*n->aer_reqs) * (n->aerl + 1));
     n->features.int_vector_config = g_malloc0(sizeof(*n->features.int_vector_config) * (n->nr_io_queues + 1));
 
     nvme_init_pci(n);
     nvme_init_ctrl(n);
+	nvme_init_endgrps(n, errp); 						
     nvme_init_namespaces(n, errp);
 
     nvme_register_extensions(n);
-
-    n->bytes_written_host = 0;
-    n->bytes_written_gc = 0;
 
     if (n->ext_ops.init) {
         n->ext_ops.init(n, errp);
@@ -622,6 +699,7 @@ static Property femu_props[] = {
     DEFINE_PROP_STRING("serial", FemuCtrl, serial),
     DEFINE_PROP_UINT32("devsz_mb", FemuCtrl, memsz, 1024), /* in MB */
     DEFINE_PROP_UINT32("namespaces", FemuCtrl, num_namespaces, 1),
+    DEFINE_PROP_UINT32("endgrps", FemuCtrl, num_endgrps, 1),	
     DEFINE_PROP_UINT32("queues", FemuCtrl, nr_io_queues, 8),
     DEFINE_PROP_UINT32("entries", FemuCtrl, max_q_ents, 0x7ff),
     DEFINE_PROP_UINT8("multipoller_enabled", FemuCtrl, multipoller_enabled, 0),
@@ -668,9 +746,8 @@ static Property femu_props[] = {
     DEFINE_PROP_UINT16("lmetasize", FemuCtrl, oc_params.sos, 16),
     DEFINE_PROP_UINT8("zns_num_ch", FemuCtrl, zns_params.zns_num_ch, 2),
     DEFINE_PROP_UINT8("zns_num_lun", FemuCtrl, zns_params.zns_num_lun, 4),
-    DEFINE_PROP_UINT8("zns_num_plane", FemuCtrl, zns_params.zns_num_plane, 2),
-    DEFINE_PROP_UINT8("zns_num_blk", FemuCtrl, zns_params.zns_num_blk, 32),
-    DEFINE_PROP_INT32("zns_flash_type", FemuCtrl, zns_params.zns_flash_type, QLC),
+    DEFINE_PROP_UINT64("zns_read", FemuCtrl, zns_params.zns_read, 40000),
+    DEFINE_PROP_UINT64("zns_write", FemuCtrl, zns_params.zns_write, 200000),
     DEFINE_PROP_INT32("secsz", FemuCtrl, bb_params.secsz, 512),
     DEFINE_PROP_INT32("secs_per_pg", FemuCtrl, bb_params.secs_per_pg, 8),
     DEFINE_PROP_INT32("pgs_per_blk", FemuCtrl, bb_params.pgs_per_blk, 256),

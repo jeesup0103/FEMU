@@ -339,7 +339,7 @@ void cryptodev_backend_free_client(
  * @backend: the cryptodev backend object
  * @errp: pointer to a NULL-initialized error object
  *
- * Clean the resource associated with @backend that realizaed
+ * Clean the resouce associated with @backend that realizaed
  * by the specific backend's init() callback
  */
 void cryptodev_backend_cleanup(
@@ -407,7 +407,7 @@ int cryptodev_backend_crypto_operation(
 /**
  * cryptodev_backend_set_used:
  * @backend: the cryptodev backend object
- * @used: true or false
+ * @used: ture or false
  *
  * Set the cryptodev backend is used by virtio-crypto or not
  */
@@ -427,7 +427,7 @@ bool cryptodev_backend_is_used(CryptoDevBackend *backend);
 /**
  * cryptodev_backend_set_ready:
  * @backend: the cryptodev backend object
- * @ready: true or false
+ * @ready: ture or false
  *
  * Set the cryptodev backend is ready or not, which is called
  * by the children of the cryptodev banckend interface.

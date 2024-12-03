@@ -16,7 +16,7 @@
 
 #include "sysemu/cpus.h"
 
-void accel_blocker_init(void);
+extern void accel_blocker_init(void);
 
 /*
  * accel_{cpu_}ioctl_begin/end:
@@ -26,10 +26,10 @@ void accel_blocker_init(void);
  * called, preventing new ioctls to run. They will continue only after
  * accel_ioctl_inibith_end().
  */
-void accel_ioctl_begin(void);
-void accel_ioctl_end(void);
-void accel_cpu_ioctl_begin(CPUState *cpu);
-void accel_cpu_ioctl_end(CPUState *cpu);
+extern void accel_ioctl_begin(void);
+extern void accel_ioctl_end(void);
+extern void accel_cpu_ioctl_begin(CPUState *cpu);
+extern void accel_cpu_ioctl_end(CPUState *cpu);
 
 /*
  * accel_ioctl_inhibit_begin: start critical section
@@ -42,7 +42,7 @@ void accel_cpu_ioctl_end(CPUState *cpu);
  * This allows the caller to access shared data or perform operations without
  * worrying of concurrent vcpus accesses.
  */
-void accel_ioctl_inhibit_begin(void);
+extern void accel_ioctl_inhibit_begin(void);
 
 /*
  * accel_ioctl_inhibit_end: end critical section started by
@@ -50,6 +50,6 @@ void accel_ioctl_inhibit_begin(void);
  *
  * This function allows blocked accel_{cpu_}ioctl_begin() to continue.
  */
-void accel_ioctl_inhibit_end(void);
+extern void accel_ioctl_inhibit_end(void);
 
 #endif /* ACCEL_BLOCKER_H */

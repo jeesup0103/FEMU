@@ -19,6 +19,7 @@
 ;  value to be returned by SetJump().
 ;
 ;  If JumpBuffer is NULL, then ASSERT().
+;  For IPF CPUs, if JumpBuffer is not aligned on a 16-byte boundary, then ASSERT().
 ;
 ;  @param  JumpBuffer    A pointer to CPU context buffer.
 ;
@@ -33,7 +34,7 @@
 SetJump
   MOV  R3, R13
   STM  R0, {R3-R12,R14}
-  MOV  R0, #0
+  EOR  R0, R0
   BX   LR
 
 ;/**
@@ -41,7 +42,7 @@ SetJump
 ;
 ;  Restores the CPU context from the buffer specified by JumpBuffer.
 ;  This function never returns to the caller.
-;  Instead it resumes execution based on the state of JumpBuffer.
+;  Instead is resumes execution based on the state of JumpBuffer.
 ;
 ;  @param  JumpBuffer    A pointer to CPU context buffer.
 ;  @param  Value         The value to return when the SetJump() context is restored.
@@ -57,8 +58,6 @@ SetJump
 InternalLongJump
   LDM   R0, {R3-R12,R14}
   MOV   R13, R3
-  CMP   R1, #0
-  MOVEQ R1, #1
   MOV   R0, R1
   BX    LR
 

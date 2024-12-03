@@ -29,7 +29,6 @@
 #include <Library/PrePiLib.h>
 #include <Library/PlatformInitLib.h>
 #include <Library/PrePiHobListPointerLib.h>
-#include <Library/SerialPortLib.h>
 #include <Register/RiscV64/RiscVImpl.h>
 
 /**

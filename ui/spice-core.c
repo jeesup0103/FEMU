@@ -42,7 +42,7 @@
 /* core bits */
 
 static SpiceServer *spice_server;
-static NotifierWithReturn migration_state;
+static Notifier migration_state;
 static const char *auth = "spice";
 static char *auth_passwd;
 static time_t auth_expires = TIME_MAX;
@@ -217,12 +217,12 @@ static void channel_event(int event, SpiceChannelEventInfo *info)
      * not do that.  It isn't that easy to fix it in spice and even
      * when it is fixed we still should cover the already released
      * spice versions.  So detect that we've been called from another
-     * thread and grab the BQL if so before calling qemu
+     * thread and grab the iothread lock if so before calling qemu
      * functions.
      */
     bool need_lock = !qemu_thread_is_self(&me);
     if (need_lock) {
-        bql_lock();
+        qemu_mutex_lock_iothread();
     }
 
     if (info->flags & SPICE_CHANNEL_EVENT_FLAG_ADDR_EXT) {
@@ -260,7 +260,7 @@ static void channel_event(int event, SpiceChannelEventInfo *info)
     }
 
     if (need_lock) {
-        bql_unlock();
+        qemu_mutex_unlock_iothread();
     }
 
     qapi_free_SpiceServerInfo(server);
@@ -568,23 +568,24 @@ static SpiceInfo *qmp_query_spice_real(Error **errp)
     return info;
 }
 
-static int migration_state_notifier(NotifierWithReturn *notifier,
-                                    MigrationEvent *e, Error **errp)
+static void migration_state_notifier(Notifier *notifier, void *data)
 {
+    MigrationState *s = data;
+
     if (!spice_have_target_host) {
-        return 0;
+        return;
     }
 
-    if (e->type == MIG_EVENT_PRECOPY_SETUP) {
+    if (migration_in_setup(s)) {
         spice_server_migrate_start(spice_server);
-    } else if (e->type == MIG_EVENT_PRECOPY_DONE) {
+    } else if (migration_has_finished(s) ||
+               migration_in_postcopy_after_devices(s)) {
         spice_server_migrate_end(spice_server, true);
         spice_have_target_host = false;
-    } else if (e->type == MIG_EVENT_PRECOPY_FAILED) {
+    } else if (migration_has_failed(s)) {
         spice_server_migrate_end(spice_server, false);
         spice_have_target_host = false;
     }
-    return 0;
 }
 
 int qemu_spice_migrate_info(const char *hostname, int port, int tls_port,
@@ -820,7 +821,8 @@ static void qemu_spice_init(void)
     };
     using_spice = 1;
 
-    migration_add_notifier(&migration_state, migration_state_notifier);
+    migration_state.notify = migration_state_notifier;
+    add_migration_state_change_notifier(&migration_state);
     spice_migrate.base.sif = &migrate_interface.base;
     qemu_spice.add_interface(&spice_migrate.base);
 

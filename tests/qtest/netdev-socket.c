@@ -82,7 +82,7 @@ static int inet_get_free_port_socket_ipv6(int sock)
 
 static int inet_get_free_port_multiple(int nb, int *port, bool ipv6)
 {
-    g_autofree int *sock = g_new(int, nb);
+    int sock[nb];
     int i;
 
     for (i = 0; i < nb; i++) {
@@ -127,7 +127,7 @@ static void test_stream_inet_ipv4(void)
                        "addr.ipv4=on,addr.ipv6=off,"
                        "addr.host=127.0.0.1,addr.port=%d", port);
 
-    EXPECT_STATE(qts0, "st0: index=0,type=stream,listening\r\n", 0);
+    EXPECT_STATE(qts0, "st0: index=0,type=stream,\r\n", 0);
 
     qts1 = qtest_initf("-nodefaults -M none "
                        "-netdev stream,server=false,id=st0,addr.type=inet,"
@@ -189,26 +189,28 @@ static void wait_stream_disconnected(QTestState *qts, const char *id)
     qobject_unref(resp);
 }
 
-static void test_stream_unix_reconnect(void)
+static void test_stream_inet_reconnect(void)
 {
     QTestState *qts0, *qts1;
+    int port;
     SocketAddress *addr;
-    gchar *path;
 
-    path = g_strconcat(tmpdir, "/stream_unix_reconnect", NULL);
+    port = inet_get_free_port(false);
     qts0 = qtest_initf("-nodefaults -M none "
-                       "-netdev stream,id=st0,server=true,addr.type=unix,"
-                       "addr.path=%s", path);
+                       "-netdev stream,id=st0,server=true,addr.type=inet,"
+                       "addr.ipv4=on,addr.ipv6=off,"
+                       "addr.host=127.0.0.1,addr.port=%d", port);
 
-    EXPECT_STATE(qts0, "st0: index=0,type=stream,listening\r\n", 0);
+    EXPECT_STATE(qts0, "st0: index=0,type=stream,\r\n", 0);
 
     qts1 = qtest_initf("-nodefaults -M none "
-                       "-netdev stream,server=false,id=st0,addr.type=unix,"
-                       "addr.path=%s,reconnect=1", path);
+                       "-netdev stream,server=false,id=st0,addr.type=inet,"
+                       "addr.ipv4=on,addr.ipv6=off,reconnect=1,"
+                       "addr.host=127.0.0.1,addr.port=%d", port);
 
     wait_stream_connected(qts0, "st0", &addr);
-    g_assert_cmpint(addr->type, ==, SOCKET_ADDRESS_TYPE_UNIX);
-    g_assert_cmpstr(addr->u.q_unix.path, ==, path);
+    g_assert_cmpint(addr->type, ==, SOCKET_ADDRESS_TYPE_INET);
+    g_assert_cmpstr(addr->u.inet.host, ==, "127.0.0.1");
     qapi_free_SocketAddress(addr);
 
     /* kill server */
@@ -219,23 +221,24 @@ static void test_stream_unix_reconnect(void)
 
     /* restart server */
     qts0 = qtest_initf("-nodefaults -M none "
-                       "-netdev stream,id=st0,server=true,addr.type=unix,"
-                       "addr.path=%s", path);
+                       "-netdev stream,id=st0,server=true,addr.type=inet,"
+                       "addr.ipv4=on,addr.ipv6=off,"
+                       "addr.host=127.0.0.1,addr.port=%d", port);
 
     /* wait connection events*/
     wait_stream_connected(qts0, "st0", &addr);
-    g_assert_cmpint(addr->type, ==, SOCKET_ADDRESS_TYPE_UNIX);
-    g_assert_cmpstr(addr->u.q_unix.path, ==, path);
+    g_assert_cmpint(addr->type, ==, SOCKET_ADDRESS_TYPE_INET);
+    g_assert_cmpstr(addr->u.inet.host, ==, "127.0.0.1");
     qapi_free_SocketAddress(addr);
 
     wait_stream_connected(qts1, "st0", &addr);
-    g_assert_cmpint(addr->type, ==, SOCKET_ADDRESS_TYPE_UNIX);
-    g_assert_cmpstr(addr->u.q_unix.path, ==, path);
+    g_assert_cmpint(addr->type, ==, SOCKET_ADDRESS_TYPE_INET);
+    g_assert_cmpstr(addr->u.inet.host, ==, "127.0.0.1");
+    g_assert_cmpint(atoi(addr->u.inet.port), ==, port);
     qapi_free_SocketAddress(addr);
 
     qtest_quit(qts1);
     qtest_quit(qts0);
-    g_free(path);
 }
 
 static void test_stream_inet_ipv6(void)
@@ -250,7 +253,7 @@ static void test_stream_inet_ipv6(void)
                        "addr.ipv4=off,addr.ipv6=on,"
                        "addr.host=::1,addr.port=%d", port);
 
-    EXPECT_STATE(qts0, "st0: index=0,type=stream,listening\r\n", 0);
+    EXPECT_STATE(qts0, "st0: index=0,type=stream,\r\n", 0);
 
     qts1 = qtest_initf("-nodefaults -M none "
                        "-netdev stream,server=false,id=st0,addr.type=inet,"
@@ -282,7 +285,7 @@ static void test_stream_unix(void)
                        "addr.type=unix,addr.path=%s,",
                        path);
 
-    EXPECT_STATE(qts0, "st0: index=0,type=stream,listening\r\n", 0);
+    EXPECT_STATE(qts0, "st0: index=0,type=stream,\r\n", 0);
 
     qts1 = qtest_initf("-nodefaults -M none "
                        "-netdev stream,id=st0,server=false,"
@@ -314,7 +317,7 @@ static void test_stream_unix_abstract(void)
                        "addr.abstract=on",
                        path);
 
-    EXPECT_STATE(qts0, "st0: index=0,type=stream,listening\r\n", 0);
+    EXPECT_STATE(qts0, "st0: index=0,type=stream,\r\n", 0);
 
     qts1 = qtest_initf("-nodefaults -M none "
                        "-netdev stream,id=st0,server=false,"
@@ -401,7 +404,7 @@ static void test_dgram_inet(void)
     qtest_quit(qts0);
 }
 
-#if !defined(_WIN32) && !defined(CONFIG_DARWIN)
+#ifndef _WIN32
 static void test_dgram_mcast(void)
 {
     QTestState *qts;
@@ -414,9 +417,7 @@ static void test_dgram_mcast(void)
 
     qtest_quit(qts);
 }
-#endif
 
-#ifndef _WIN32
 static void test_dgram_unix(void)
 {
     QTestState *qts0, *qts1;
@@ -513,9 +514,11 @@ int main(int argc, char **argv)
     if (has_ipv4) {
         qtest_add_func("/netdev/stream/inet/ipv4", test_stream_inet_ipv4);
         qtest_add_func("/netdev/dgram/inet", test_dgram_inet);
-#if !defined(_WIN32) && !defined(CONFIG_DARWIN)
+#ifndef _WIN32
         qtest_add_func("/netdev/dgram/mcast", test_dgram_mcast);
 #endif
+        qtest_add_func("/netdev/stream/inet/reconnect",
+                       test_stream_inet_reconnect);
     }
     if (has_ipv6) {
         qtest_add_func("/netdev/stream/inet/ipv6", test_stream_inet_ipv6);
@@ -526,9 +529,7 @@ int main(int argc, char **argv)
 #ifndef _WIN32
         qtest_add_func("/netdev/dgram/unix", test_dgram_unix);
 #endif
-        qtest_add_func("/netdev/stream/unix/oneshot", test_stream_unix);
-        qtest_add_func("/netdev/stream/unix/reconnect",
-                       test_stream_unix_reconnect);
+        qtest_add_func("/netdev/stream/unix", test_stream_unix);
 #ifdef CONFIG_LINUX
         qtest_add_func("/netdev/stream/unix/abstract",
                        test_stream_unix_abstract);

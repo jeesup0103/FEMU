@@ -11,7 +11,7 @@
 #define __FDT_HELPER_H__
 
 #include <sbi/sbi_types.h>
-#include <sbi/sbi_domain.h>
+#include <sbi/sbi_scratch.h>
 
 struct fdt_match {
 	const char *compatible;
@@ -48,9 +48,6 @@ int fdt_parse_phandle_with_args(void *fdt, int nodeoff,
 int fdt_get_node_addr_size(void *fdt, int node, int index,
 			   uint64_t *addr, uint64_t *size);
 
-int fdt_get_node_addr_size_by_name(void *fdt, int node, const char *name,
-				   uint64_t *addr, uint64_t *size);
-
 bool fdt_node_is_enabled(void *fdt, int nodeoff);
 
 int fdt_parse_hart_id(void *fdt, int cpu_offset, u32 *hartid);
@@ -58,9 +55,6 @@ int fdt_parse_hart_id(void *fdt, int cpu_offset, u32 *hartid);
 int fdt_parse_max_enabled_hart_id(void *fdt, u32 *max_hartid);
 
 int fdt_parse_timebase_frequency(void *fdt, unsigned long *freq);
-
-int fdt_parse_isa_extensions(void *fdt, unsigned int hard_id,
-			     unsigned long *extensions);
 
 int fdt_parse_gaisler_uart_node(void *fdt, int nodeoffset,
 				struct platform_uart_data *uart);
@@ -99,8 +93,7 @@ int fdt_parse_plic_node(void *fdt, int nodeoffset, struct plic_data *plic);
 
 int fdt_parse_plic(void *fdt, struct plic_data *plic, const char *compat);
 
-int fdt_parse_aclint_node(void *fdt, int nodeoffset,
-			  bool for_timer, bool allow_regname,
+int fdt_parse_aclint_node(void *fdt, int nodeoffset, bool for_timer,
 			  unsigned long *out_addr1, unsigned long *out_size1,
 			  unsigned long *out_addr2, unsigned long *out_size2,
 			  u32 *out_first_hartid, u32 *out_hart_count);
@@ -116,7 +109,7 @@ int fdt_parse_compat_addr(void *fdt, uint64_t *addr,
 
 static inline void *fdt_get_address(void)
 {
-	return (void *)root.next_arg1;
+	return sbi_scratch_thishart_arg1_ptr();
 }
 
 #endif /* __FDT_HELPER_H__ */

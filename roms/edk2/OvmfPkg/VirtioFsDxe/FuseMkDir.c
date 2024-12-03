@@ -127,7 +127,7 @@ VirtioFsFuseMkDir (
         DEBUG_ERROR,
         "%a: Label=\"%s\" ParentNodeId=%Lu Name=\"%a\" "
         "Errno=%d\n",
-        __func__,
+        __FUNCTION__,
         VirtioFs->Label,
         ParentNodeId,
         Name,

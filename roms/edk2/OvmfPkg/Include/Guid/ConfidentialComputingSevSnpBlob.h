@@ -18,16 +18,14 @@
     { 0x85, 0x54, 0x93, 0xd7, 0x77, 0x91, 0x2d, 0x42 }, \
   }
 
-typedef PACKED struct {
+typedef struct {
   UINT32    Header;
   UINT16    Version;
-  UINT16    Reserved;
+  UINT16    Reserved1;
   UINT64    SecretsPhysicalAddress;
   UINT32    SecretsSize;
-  UINT32    Reserved1;
   UINT64    CpuidPhysicalAddress;
   UINT32    CpuidLSize;
-  UINT32    Reserved2;
 } CONFIDENTIAL_COMPUTING_SNP_BLOB_LOCATION;
 
 extern EFI_GUID  gConfidentialComputingSevSnpBlobGuid;

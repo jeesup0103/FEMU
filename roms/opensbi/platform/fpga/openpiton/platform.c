@@ -24,8 +24,6 @@
 #define OPENPITON_DEFAULT_UART_REG_WIDTH	1
 #define OPENPITON_DEFAULT_UART_REG_OFFSET	0
 #define OPENPITON_DEFAULT_PLIC_ADDR		0xfff1100000
-#define OPENPITON_DEFAULT_PLIC_SIZE		(0x200000 + \
-				(OPENPITON_DEFAULT_HART_COUNT * 0x1000))
 #define OPENPITON_DEFAULT_PLIC_NUM_SOURCES	2
 #define OPENPITON_DEFAULT_HART_COUNT		3
 #define OPENPITON_DEFAULT_CLINT_ADDR		0xfff1020000
@@ -42,7 +40,6 @@ static struct platform_uart_data uart = {
 };
 static struct plic_data plic = {
 	.addr = OPENPITON_DEFAULT_PLIC_ADDR,
-	.size = OPENPITON_DEFAULT_PLIC_SIZE,
 	.num_src = OPENPITON_DEFAULT_PLIC_NUM_SOURCES,
 };
 
@@ -63,7 +60,7 @@ static struct aclint_mtimer_data mtimer = {
 	.mtimecmp_size = ACLINT_DEFAULT_MTIMECMP_SIZE,
 	.first_hartid = 0,
 	.hart_count = OPENPITON_DEFAULT_HART_COUNT,
-	.has_64bit_mmio = true,
+	.has_64bit_mmio = TRUE,
 };
 
 /*
@@ -223,7 +220,5 @@ const struct sbi_platform platform = {
 	.features = SBI_PLATFORM_DEFAULT_FEATURES,
 	.hart_count = OPENPITON_DEFAULT_HART_COUNT,
 	.hart_stack_size = SBI_PLATFORM_DEFAULT_HART_STACK_SIZE,
-	.heap_size =
-		SBI_PLATFORM_DEFAULT_HEAP_SIZE(OPENPITON_DEFAULT_HART_COUNT),
 	.platform_ops_addr = (unsigned long)&platform_ops
 };

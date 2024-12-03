@@ -16,7 +16,7 @@
 
  SmmPerformanceHandlerEx(), SmmPerformanceHandler() will receive untrusted input and do basic validation.
 
-Copyright (c) 2011 - 2023, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2011 - 2021, Intel Corporation. All rights reserved.<BR>
 SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
@@ -48,7 +48,6 @@ SPIN_LOCK             mSmmFpdtLock;
 PERFORMANCE_PROPERTY  mPerformanceProperty;
 UINT32                mCachedLength   = 0;
 UINT32                mBootRecordSize = 0;
-BOOLEAN               mPerformanceMeasurementEnabled;
 
 //
 // Interfaces for SMM PerformanceMeasurement Protocol.
@@ -931,35 +930,6 @@ FpdtSmiHandler (
 }
 
 /**
-  This is the Event call back function is triggered in SMM to notify the Library
-  the system is entering runtime phase.
-
-  @param[in] Protocol   Points to the protocol's unique identifier
-  @param[in] Interface  Points to the interface instance
-  @param[in] Handle     The handle on which the interface was installed
-
-  @retval EFI_SUCCESS SmmAtRuntimeCallBack runs successfully
- **/
-EFI_STATUS
-EFIAPI
-SmmCorePerformanceLibExitBootServicesCallback (
-  IN CONST EFI_GUID  *Protocol,
-  IN VOID            *Interface,
-  IN EFI_HANDLE      Handle
-  )
-{
-  //
-  // Disable performance measurement after ExitBootServices because
-  // 1. Performance measurement might impact SMI latency at runtime;
-  // 2. Performance log is copied to non SMRAM at ReadyToBoot so runtime performance
-  //    log is not useful.
-  //
-  mPerformanceMeasurementEnabled = FALSE;
-
-  return EFI_SUCCESS;
-}
-
-/**
   SmmBase2 protocol notify callback function, when SMST and SMM memory service get initialized
   this function is callbacked to initialize the Smm Performance Lib
 
@@ -978,7 +948,6 @@ InitializeSmmCorePerformanceLib (
   EFI_HANDLE            SmiHandle;
   EFI_STATUS            Status;
   PERFORMANCE_PROPERTY  *PerformanceProperty;
-  VOID                  *Registration;
 
   //
   // Initialize spin lock
@@ -1018,16 +987,6 @@ InitializeSmmCorePerformanceLib (
     Status = gBS->InstallConfigurationTable (&gPerformanceProtocolGuid, &mPerformanceProperty);
     ASSERT_EFI_ERROR (Status);
   }
-
-  //
-  // Register callback function for ExitBootServices event.
-  //
-  Status = gSmst->SmmRegisterProtocolNotify (
-                    &gEdkiiSmmExitBootServicesProtocolGuid,
-                    SmmCorePerformanceLibExitBootServicesCallback,
-                    &Registration
-                    );
-  ASSERT_EFI_ERROR (Status);
 }
 
 /**
@@ -1051,8 +1010,6 @@ SmmCorePerformanceLibConstructor (
   EFI_STATUS  Status;
   EFI_EVENT   Event;
   VOID        *Registration;
-
-  mPerformanceMeasurementEnabled =  (BOOLEAN)((PcdGet8 (PcdPerformanceLibraryPropertyMask) & PERFORMANCE_LIBRARY_PROPERTY_MEASUREMENT_ENABLED) != 0);
 
   if (!PerformanceMeasurementEnabled ()) {
     //
@@ -1426,7 +1383,7 @@ PerformanceMeasurementEnabled (
   VOID
   )
 {
-  return mPerformanceMeasurementEnabled;
+  return (BOOLEAN)((PcdGet8 (PcdPerformanceLibraryPropertyMask) & PERFORMANCE_LIBRARY_PROPERTY_MEASUREMENT_ENABLED) != 0);
 }
 
 /**

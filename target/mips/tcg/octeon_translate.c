@@ -7,8 +7,10 @@
  */
 
 #include "qemu/osdep.h"
-#include "translate.h"
+#include "tcg/tcg-op.h"
 #include "tcg/tcg-op-gvec.h"
+#include "exec/helper-gen.h"
+#include "translate.h"
 
 /* Include the auto-generated decoder.  */
 #include "decode-octeon.c.inc"

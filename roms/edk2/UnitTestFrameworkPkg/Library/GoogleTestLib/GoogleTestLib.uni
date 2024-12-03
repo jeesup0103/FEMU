@@ -1,7 +1,10 @@
 // /** @file
 // This module provides GoogleTest Library implementation.
 //
+// This module provides GoogleTest Library implementation.
+//
 // Copyright (c) 2022, Intel Corporation. All rights reserved.<BR>
+//
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 //
 // **/

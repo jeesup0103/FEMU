@@ -44,7 +44,6 @@
 
 [Guids]
   gEfiMemoryTypeInformationGuid
-  gUefiOvmfPkgPlatformInfoGuid
 
 [LibraryClasses]
   BaseLib

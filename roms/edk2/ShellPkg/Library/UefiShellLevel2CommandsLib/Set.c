@@ -14,7 +14,7 @@
 
   If you spawn a pre 2.0 shell from the Shell 2.0 the environment variable may not carry through.
 
-  @retval STATUS_SUCCESS  the printout was successful
+  @retval STATUS_SUCCESS  the printout was sucessful
   @return any return code from GetNextVariableName except EFI_NOT_FOUND
 **/
 SHELL_STATUS

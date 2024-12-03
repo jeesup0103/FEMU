@@ -100,7 +100,8 @@ AmlParseStream (
 **/
 typedef
 EFI_STATUS
-(EFIAPI *AML_PARSE_FUNCTION)(
+EFIAPI
+(*AML_PARSE_FUNCTION) (
   IN      CONST AML_NODE_HEADER   *Node,
   IN            AML_PARSE_FORMAT  ExpectedFormat,
   IN  OUT       AML_STREAM        *FStream,

@@ -24,12 +24,6 @@
 #include <Library/DefaultExceptionHandlerLib.h>
 
 //
-// Maximum number of characters to print to serial (UINT8s) and to console if
-// available (as UINT16s)
-//
-#define MAX_PRINT_CHARS  100
-
-//
 // The number of elements in a CHAR8 array, including the terminating NUL, that
 // is meant to hold the string rendering of the CPSR.
 //
@@ -204,8 +198,7 @@ DefaultExceptionHandler (
   IN OUT EFI_SYSTEM_CONTEXT  SystemContext
   )
 {
-  CHAR8    Buffer[MAX_PRINT_CHARS];
-  CHAR16   UnicodeBuffer[MAX_PRINT_CHARS];
+  CHAR8    Buffer[100];
   UINTN    CharCount;
   UINT32   DfsrStatus;
   UINT32   IfsrStatus;
@@ -223,10 +216,9 @@ DefaultExceptionHandler (
                 SystemContext.SystemContextArm->CPSR
                 );
   SerialPortWrite ((UINT8 *)Buffer, CharCount);
-
-  // Prepare a unicode buffer for ConOut, if applicable, as Buffer is used
-  // below.
-  UnicodeSPrintAsciiFormat (UnicodeBuffer, MAX_PRINT_CHARS, Buffer);
+  if (gST->ConOut != NULL) {
+    AsciiPrint (Buffer);
+  }
 
   DEBUG_CODE_BEGIN ();
   CHAR8   *Pdb;
@@ -297,14 +289,6 @@ DefaultExceptionHandler (
   }
 
   DEBUG ((DEBUG_ERROR, "\n"));
-
-  // Attempt to print that we had a synchronous exception to ConOut.  We do
-  // this after the serial logging as ConOut's logging is more complex and we
-  // aren't guaranteed to succeed.
-  if (gST->ConOut != NULL) {
-    gST->ConOut->OutputString (gST->ConOut, UnicodeBuffer);
-  }
-
   ASSERT (FALSE);
 
   CpuDeadLoop ();   // may return if executing under a debugger

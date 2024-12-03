@@ -21,9 +21,8 @@ tests = {
   'test-opts-visitor': [testqapi],
   'test-visitor-serialization': [testqapi],
   'test-bitmap': [],
-  'test-resv-mem': [],
-  # all code tested by test-x86-topo is inside topology.h
-  'test-x86-topo': [],
+  # all code tested by test-x86-cpuid is inside topology.h
+  'test-x86-cpuid': [],
   'test-cutils': [],
   'test-div128': [],
   'test-shift128': [],
@@ -51,7 +50,6 @@ tests = {
   'test-qapi-util': [],
   'test-interval-tree': [],
   'test-xs-node': [qom],
-  'test-virtio-dmabuf': [meson.project_source_root() / 'hw/display/virtio-dmabuf.c'],
 }
 
 if have_system or have_tools
@@ -60,7 +58,7 @@ if have_system or have_tools
   }
 
   if seccomp.found()
-    tests += {'test-seccomp': ['../../system/qemu-seccomp.c', seccomp]}
+    tests += {'test-seccomp': ['../../softmmu/qemu-seccomp.c', seccomp]}
   endif
 endif
 
@@ -100,7 +98,7 @@ if have_block
   }
   if gnutls.found() and \
      tasn1.found() and \
-     host_os != 'windows'
+     'CONFIG_POSIX' in config_host
     tests += {
       'test-crypto-tlscredsx509': ['crypto-tls-x509-helpers.c', 'pkix_asn1_tab.c',
                                    tasn1, crypto, gnutls],
@@ -115,17 +113,17 @@ if have_block
   if xts == 'private'
     tests += {'test-crypto-xts': [crypto, io]}
   endif
-  if host_os != 'windows'
-    tests += {
-      'test-image-locking': [testblock],
-      'test-nested-aio-poll': [testblock],
-    }
+  if 'CONFIG_POSIX' in config_host
+    tests += {'test-image-locking': [testblock]}
   endif
   if config_host_data.get('CONFIG_REPLICATION')
     tests += {'test-replication': [testblock]}
   endif
   if nettle.found() or gcrypt.found()
     tests += {'test-crypto-pbkdf': [io]}
+  endif
+  if config_host_data.get('CONFIG_EPOLL_CREATE1')
+    tests += {'test-fdmon-epoll': [testblock]}
   endif
 endif
 
@@ -149,8 +147,8 @@ if have_system
   # Some tests: test-char, test-qdev-global-props, and test-qga,
   # are not runnable under TSan due to a known issue.
   # https://github.com/google/sanitizers/issues/1116
-  if not get_option('tsan')
-    if host_os != 'windows'
+  if 'CONFIG_TSAN' not in config_host
+    if 'CONFIG_POSIX' in config_host
         tests += {
           'test-char': ['socket-helpers.c', qom, io, chardev]
         }
@@ -162,7 +160,7 @@ if have_system
   endif
 endif
 
-if have_ga and host_os == 'linux'
+if have_ga and targetos == 'linux'
   tests += {'test-qga': ['../qtest/libqmp.c']}
   test_deps += {'test-qga': qga}
 endif
@@ -172,12 +170,8 @@ test_env.set('G_TEST_SRCDIR', meson.current_source_dir())
 test_env.set('G_TEST_BUILDDIR', meson.current_build_dir())
 
 slow_tests = {
-  'test-aio-multithread' : 120,
-  'test-bufferiszero': 60,
-  'test-crypto-block' : 300,
-  'test-crypto-tlscredsx509': 90,
-  'test-crypto-tlssession': 90,
-  'test-replication': 60,
+  'test-crypto-tlscredsx509': 45,
+  'test-crypto-tlssession': 45
 }
 
 foreach test_name, extra: tests

@@ -181,7 +181,7 @@ Audio data is recorded and replay automatically. The command line for recording
 and replaying must contain identical specifications of audio hardware, e.g.:
 
 .. parsed-literal::
-    -audio pa,model=ac97
+    -soundhw ac97
 
 Serial ports
 ------------

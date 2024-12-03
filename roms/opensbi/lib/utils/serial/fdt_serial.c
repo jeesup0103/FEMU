@@ -17,6 +17,13 @@
 extern struct fdt_serial *fdt_serial_drivers[];
 extern unsigned long fdt_serial_drivers_size;
 
+static struct fdt_serial dummy = {
+	.match_table = NULL,
+	.init = NULL,
+};
+
+static struct fdt_serial *current_driver = &dummy;
+
 int fdt_serial_init(void)
 {
 	const void *prop;
@@ -50,15 +57,20 @@ int fdt_serial_init(void)
 		if (!match)
 			continue;
 
-		/* drv->init must not be NULL */
-		if (drv->init == NULL)
-			return SBI_EFAIL;
-
-		rc = drv->init(fdt, noff, match);
-		if (rc == SBI_ENODEV)
-			continue;
-		return rc;
+		if (drv->init) {
+			rc = drv->init(fdt, noff, match);
+			if (rc == SBI_ENODEV)
+				continue;
+			if (rc)
+				return rc;
+		}
+		current_driver = drv;
+		break;
 	}
+
+	/* Check if we found desired driver */
+	if (current_driver != &dummy)
+		goto done;
 
 	/* Lastly check all DT nodes */
 	for (pos = 0; pos < fdt_serial_drivers_size; pos++) {
@@ -68,15 +80,17 @@ int fdt_serial_init(void)
 		if (noff < 0)
 			continue;
 
-		/* drv->init must not be NULL */
-		if (drv->init == NULL)
-			return SBI_EFAIL;
-
-		rc = drv->init(fdt, noff, match);
-		if (rc == SBI_ENODEV)
-			continue;
-		return rc;
+		if (drv->init) {
+			rc = drv->init(fdt, noff, match);
+			if (rc == SBI_ENODEV)
+				continue;
+			if (rc)
+				return rc;
+		}
+		current_driver = drv;
+		break;
 	}
 
-	return SBI_ENODEV;
+done:
+	return 0;
 }

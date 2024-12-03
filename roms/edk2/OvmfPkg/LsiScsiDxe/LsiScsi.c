@@ -512,7 +512,7 @@ Error:
   DEBUG ((
     DEBUG_VERBOSE,
     "%a: dstat: %02X, sist0: %02X, sist1: %02X\n",
-    __func__,
+    __FUNCTION__,
     DStat,
     SIst0,
     SIst1
@@ -800,7 +800,7 @@ LsiScsiExitBoot (
   LSI_SCSI_DEV  *Dev;
 
   Dev = Context;
-  DEBUG ((DEBUG_VERBOSE, "%a: Context=0x%p\n", __func__, Context));
+  DEBUG ((DEBUG_VERBOSE, "%a: Context=0x%p\n", __FUNCTION__, Context));
   LsiScsiReset (Dev);
 }
 

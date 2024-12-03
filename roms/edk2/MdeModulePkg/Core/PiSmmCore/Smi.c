@@ -109,8 +109,6 @@ SmiManage (
   BOOLEAN      SuccessReturn;
   EFI_STATUS   Status;
 
-  PERF_FUNCTION_BEGIN ();
-
   Status        = EFI_NOT_FOUND;
   SuccessReturn = FALSE;
   if (HandlerType == NULL) {
@@ -127,7 +125,6 @@ SmiManage (
       //
       // There is no handler registered for this interrupt source
       //
-      PERF_FUNCTION_END ();
       return Status;
     }
   }
@@ -151,7 +148,6 @@ SmiManage (
         // no additional handlers will be processed and EFI_INTERRUPT_PENDING will be returned.
         //
         if (HandlerType != NULL) {
-          PERF_FUNCTION_END ();
           return EFI_INTERRUPT_PENDING;
         }
 
@@ -164,7 +160,6 @@ SmiManage (
         // additional handlers will be processed.
         //
         if (HandlerType != NULL) {
-          PERF_FUNCTION_END ();
           return EFI_SUCCESS;
         }
 
@@ -199,7 +194,6 @@ SmiManage (
     Status = EFI_SUCCESS;
   }
 
-  PERF_FUNCTION_END ();
   return Status;
 }
 

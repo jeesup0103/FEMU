@@ -24,32 +24,32 @@
 #include <sbi/sbi_unpriv.h>
 #include <sbi/sbi_hart.h>
 
-static bool sbi_load_hart_mask_unpriv(ulong *pmask, ulong *hmask,
-				      struct sbi_trap_info *uptrap)
+static int sbi_load_hart_mask_unpriv(ulong *pmask, ulong *hmask,
+				     struct sbi_trap_info *uptrap)
 {
 	ulong mask = 0;
 
 	if (pmask) {
 		mask = sbi_load_ulong(pmask, uptrap);
 		if (uptrap->cause)
-			return false;
+			return SBI_ETRAP;
 	} else {
 		sbi_hsm_hart_interruptible_mask(sbi_domain_thishart_ptr(),
 						0, &mask);
 	}
 	*hmask = mask;
 
-	return true;
+	return 0;
 }
 
 static int sbi_ecall_legacy_handler(unsigned long extid, unsigned long funcid,
-				    struct sbi_trap_regs *regs,
-				    struct sbi_ecall_return *out)
+				    const struct sbi_trap_regs *regs,
+				    unsigned long *out_val,
+				    struct sbi_trap_info *out_trap)
 {
 	int ret = 0;
 	struct sbi_tlb_info tlb_info;
 	u32 source_hart = current_hartid();
-	struct sbi_trap_info trap = {0};
 	ulong hmask = 0;
 
 	switch (extid) {
@@ -70,51 +70,40 @@ static int sbi_ecall_legacy_handler(unsigned long extid, unsigned long funcid,
 		sbi_ipi_clear_smode();
 		break;
 	case SBI_EXT_0_1_SEND_IPI:
-		if (sbi_load_hart_mask_unpriv((ulong *)regs->a0,
-						&hmask, &trap)) {
+		ret = sbi_load_hart_mask_unpriv((ulong *)regs->a0,
+						&hmask, out_trap);
+		if (ret != SBI_ETRAP)
 			ret = sbi_ipi_send_smode(hmask, 0);
-		} else {
-			trap.epc = regs->mepc;
-			sbi_trap_redirect(regs, &trap);
-			out->skip_regs_update = true;
-		}
 		break;
 	case SBI_EXT_0_1_REMOTE_FENCE_I:
-		if (sbi_load_hart_mask_unpriv((ulong *)regs->a0,
-						&hmask, &trap)) {
+		ret = sbi_load_hart_mask_unpriv((ulong *)regs->a0,
+						&hmask, out_trap);
+		if (ret != SBI_ETRAP) {
 			SBI_TLB_INFO_INIT(&tlb_info, 0, 0, 0, 0,
-					  SBI_TLB_FENCE_I, source_hart);
+					  sbi_tlb_local_fence_i,
+					  source_hart);
 			ret = sbi_tlb_request(hmask, 0, &tlb_info);
-		} else {
-			trap.epc = regs->mepc;
-			sbi_trap_redirect(regs, &trap);
-			out->skip_regs_update = true;
 		}
 		break;
 	case SBI_EXT_0_1_REMOTE_SFENCE_VMA:
-		if (sbi_load_hart_mask_unpriv((ulong *)regs->a0,
-						&hmask, &trap)) {
+		ret = sbi_load_hart_mask_unpriv((ulong *)regs->a0,
+						&hmask, out_trap);
+		if (ret != SBI_ETRAP) {
 			SBI_TLB_INFO_INIT(&tlb_info, regs->a1, regs->a2, 0, 0,
-					  SBI_TLB_SFENCE_VMA, source_hart);
+					  sbi_tlb_local_sfence_vma,
+					  source_hart);
 			ret = sbi_tlb_request(hmask, 0, &tlb_info);
-		} else {
-			trap.epc = regs->mepc;
-			sbi_trap_redirect(regs, &trap);
-			out->skip_regs_update = true;
 		}
 		break;
 	case SBI_EXT_0_1_REMOTE_SFENCE_VMA_ASID:
-		if (sbi_load_hart_mask_unpriv((ulong *)regs->a0,
-						&hmask, &trap)) {
+		ret = sbi_load_hart_mask_unpriv((ulong *)regs->a0,
+						&hmask, out_trap);
+		if (ret != SBI_ETRAP) {
 			SBI_TLB_INFO_INIT(&tlb_info, regs->a1,
 					  regs->a2, regs->a3, 0,
-					  SBI_TLB_SFENCE_VMA_ASID,
+					  sbi_tlb_local_sfence_vma_asid,
 					  source_hart);
 			ret = sbi_tlb_request(hmask, 0, &tlb_info);
-		} else {
-			trap.epc = regs->mepc;
-			sbi_trap_redirect(regs, &trap);
-			out->skip_regs_update = true;
 		}
 		break;
 	case SBI_EXT_0_1_SHUTDOWN:
@@ -123,21 +112,13 @@ static int sbi_ecall_legacy_handler(unsigned long extid, unsigned long funcid,
 		break;
 	default:
 		ret = SBI_ENOTSUPP;
-	}
+	};
 
 	return ret;
 }
 
-struct sbi_ecall_extension ecall_legacy;
-
-static int sbi_ecall_legacy_register_extensions(void)
-{
-	return sbi_ecall_register_extension(&ecall_legacy);
-}
-
 struct sbi_ecall_extension ecall_legacy = {
-	.extid_start		= SBI_EXT_0_1_SET_TIMER,
-	.extid_end		= SBI_EXT_0_1_SHUTDOWN,
-	.register_extensions	= sbi_ecall_legacy_register_extensions,
-	.handle			= sbi_ecall_legacy_handler,
+	.extid_start = SBI_EXT_0_1_SET_TIMER,
+	.extid_end = SBI_EXT_0_1_SHUTDOWN,
+	.handle = sbi_ecall_legacy_handler,
 };

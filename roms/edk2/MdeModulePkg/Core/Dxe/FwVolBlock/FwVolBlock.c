@@ -551,7 +551,6 @@ ProduceFVBProtocolOnBuffer (
     //
     FvbDev->DevicePath = (EFI_DEVICE_PATH_PROTOCOL *)AllocateCopyPool (sizeof (FV_MEMMAP_DEVICE_PATH), &mFvMemmapDevicePathTemplate);
     if (FvbDev->DevicePath == NULL) {
-      FreePool (FvbDev->LbaCache);
       FreePool (FvbDev);
       return EFI_OUT_OF_RESOURCES;
     }
@@ -564,7 +563,6 @@ ProduceFVBProtocolOnBuffer (
     //
     FvbDev->DevicePath = (EFI_DEVICE_PATH_PROTOCOL *)AllocateCopyPool (sizeof (FV_PIWG_DEVICE_PATH), &mFvPIWGDevicePathTemplate);
     if (FvbDev->DevicePath == NULL) {
-      FreePool (FvbDev->LbaCache);
       FreePool (FvbDev);
       return EFI_OUT_OF_RESOURCES;
     }

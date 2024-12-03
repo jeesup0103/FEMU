@@ -91,7 +91,7 @@ FailedAllocate:
   DEBUG ((
     EFI_D_ERROR,
     "%a: Failed to allocate memory for hardware info\n",
-    __func__
+    __FUNCTION__
     ));
 
   return EFI_OUT_OF_RESOURCES;

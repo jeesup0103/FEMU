@@ -29,139 +29,216 @@ typedef struct {
 // Functions declarations
 //
 
-/**
-  Allocates a new string and copies 'String' to clone it
-
-  @param String          The string to clone
-
-  @return CHAR8* - NULL if there are not enough resources
-**/
 CHAR8*
 CloneString (
   IN CHAR8       *String
   )
 ;
-
 /**
-  Remove all comments, leading and trailing whitespace from the string.
 
-  @param String          The string to 'strip'
+Routine Description:
 
-  @return EFI_STATUS
+  Allocates a new string and copies 'String' to clone it
+
+Arguments:
+
+  String          The string to clone
+
+Returns:
+
+  CHAR8* - NULL if there are not enough resources
+
 **/
+
+
 EFI_STATUS
 StripInfDscStringInPlace (
   IN CHAR8       *String
   )
 ;
-
 /**
-  Creates and returns a 'split' STRING_LIST by splitting the string
-  on whitespace boundaries.
 
-  @param String          The string to 'split'
+Routine Description:
 
-  @return EFI_STATUS
+  Remove all comments, leading and trailing whitespace from the string.
+
+Arguments:
+
+  String          The string to 'strip'
+
+Returns:
+
+  EFI_STATUS
+
 **/
+
+
 STRING_LIST*
 SplitStringByWhitespace (
   IN CHAR8       *String
   )
 ;
-
 /**
-  Creates a new STRING_LIST with 0 strings.
 
-  @return STRING_LIST* - Null if there is not enough resources to create the object.
+Routine Description:
+
+  Creates and returns a 'split' STRING_LIST by splitting the string
+  on whitespace boundaries.
+
+Arguments:
+
+  String          The string to 'split'
+
+Returns:
+
+  EFI_STATUS
+
 **/
+
+
 STRING_LIST*
 NewStringList (
   )
 ;
-
-
 /**
-  Adds String to StringList.  A new copy of String is made before it is
-  added to StringList.
 
-  @return EFI_STATUS
+Routine Description:
+
+  Creates a new STRING_LIST with 0 strings.
+
+Returns:
+
+  STRING_LIST* - Null if there is not enough resources to create the object.
+
 **/
+
+
 EFI_STATUS
 AppendCopyOfStringToList (
   IN OUT STRING_LIST **StringList,
   IN CHAR8       *String
   )
 ;
-
 /**
-  Removes the last string from StringList and frees the memory associated
-  with it.
 
-  @param StringList        The string list to remove the string from
+Routine Description:
 
-  @return EFI_STATUS
+  Adds String to StringList.  A new copy of String is made before it is
+  added to StringList.
+
+Returns:
+
+  EFI_STATUS
+
 **/
+
+
 EFI_STATUS
 RemoveLastStringFromList (
   IN STRING_LIST       *StringList
   )
 ;
-
-
 /**
-  Allocates a STRING_LIST structure that can store StringCount strings.
 
-  @param StringCount        The number of strings that need to be stored
+Routine Description:
 
-  @return EFI_STATUS
+  Removes the last string from StringList and frees the memory associated
+  with it.
+
+Arguments:
+
+  StringList        The string list to remove the string from
+
+Returns:
+
+  EFI_STATUS
+
 **/
+
+
 STRING_LIST*
 AllocateStringListStruct (
   IN UINTN StringCount
   )
 ;
-
-
 /**
-  Frees all memory associated with StringList.
 
-  @param StringList        The string list to free
+Routine Description:
 
-  @return EFI_STATUS
+  Allocates a STRING_LIST structure that can store StringCount strings.
+
+Arguments:
+
+  StringCount        The number of strings that need to be stored
+
+Returns:
+
+  EFI_STATUS
+
 **/
+
+
 VOID
 FreeStringList (
   IN STRING_LIST       *StringList
   )
 ;
-
-
 /**
-  Generates a string that represents the STRING_LIST
 
-  @param StringList        The string list to convert to a string
+Routine Description:
 
-  @return CHAR8* The string list represented with a single string.  The returned
-           string must be freed by the caller.
+  Frees all memory associated with StringList.
+
+Arguments:
+
+  StringList        The string list to free
+
+Returns:
+
+  EFI_STATUS
+
 **/
+
+
 CHAR8*
 StringListToString (
   IN STRING_LIST       *StringList
   )
 ;
-
-
 /**
-  Prints out the string list
 
-  @param StringList        The string list to print
+Routine Description:
+
+  Generates a string that represents the STRING_LIST
+
+Arguments:
+
+  StringList        The string list to convert to a string
+
+Returns:
+
+  CHAR8* - The string list represented with a single string.  The returned
+           string must be freed by the caller.
+
 **/
+
+
 VOID
 PrintStringList (
   IN STRING_LIST       *StringList
   )
 ;
+/**
 
+Routine Description:
+
+  Prints out the string list
+
+Arguments:
+
+  StringList        The string list to print
+
+**/
 
 
 #endif

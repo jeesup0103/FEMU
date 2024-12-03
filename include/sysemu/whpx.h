@@ -10,8 +10,6 @@
  *
  */
 
-/* header to be included in non-WHPX-specific code */
-
 #ifndef QEMU_WHPX_H
 #define QEMU_WHPX_H
 

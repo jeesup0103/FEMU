@@ -2,7 +2,6 @@
 os:
   name: 'Debian'
   version: '11'
-  libosinfo_id: 'http://debian.org/debian/11'
 
 packaging:
   format: 'deb'
@@ -22,7 +21,6 @@ ansible_python_package: python3
 ansible_python_interpreter: /usr/bin/python3
 
 install:
-  unattended_scheme: preseed
   url: http://deb.debian.org/debian/dists/bullseye/main/installer-amd64/
 
 containers:

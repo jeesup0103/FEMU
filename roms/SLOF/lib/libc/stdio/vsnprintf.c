@@ -234,12 +234,13 @@ print_format(char **buffer, size_t bufsize, const char *format, void *var)
 		form++;
 	}
 
+	
 	return (long int) (*buffer - start);
 }
 
 
 /*
- * The vsnprintf function prints a formatted string into a buffer.
+ * The vsnprintf function prints a formated strings into a buffer.
  * BUG: buffer size checking does not fully work yet
  */
 int
@@ -265,7 +266,7 @@ vsnprintf(char *buffer, size_t bufsize, const char *format, va_list arg)
 		if(*ptr == '%') {
 			char formstr[20];
 			int i=0;
-
+			
 			do {
 				formstr[i] = *ptr;
 				ptr++;
@@ -291,7 +292,7 @@ vsnprintf(char *buffer, size_t bufsize, const char *format, va_list arg)
 			ptr++;
 		}
 	}
-
+	
 	*buffer = '\0';
 
 	return (buffer - bstart);

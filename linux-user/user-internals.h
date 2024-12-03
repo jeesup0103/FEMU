@@ -71,7 +71,7 @@ const char *target_strerror(int err);
 int get_osversion(void);
 void init_qemu_uname_release(void);
 void fork_start(void);
-void fork_end(pid_t pid);
+void fork_end(int child);
 
 /**
  * probe_guest_base:

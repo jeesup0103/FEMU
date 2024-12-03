@@ -310,7 +310,7 @@ QemuVideoBochsEdid (
     DEBUG ((
       DEBUG_INFO,
       "%a: mmio read failed\n",
-      __func__
+      __FUNCTION__
       ));
     return;
   }
@@ -321,7 +321,7 @@ QemuVideoBochsEdid (
     DEBUG ((
       DEBUG_INFO,
       "%a: magic check failed\n",
-      __func__
+      __FUNCTION__
       ));
     return;
   }
@@ -329,7 +329,7 @@ QemuVideoBochsEdid (
   DEBUG ((
     DEBUG_INFO,
     "%a: blob found (extensions: %d)\n",
-    __func__,
+    __FUNCTION__,
     Private->Edid[126]
     ));
 
@@ -339,7 +339,7 @@ QemuVideoBochsEdid (
     DEBUG ((
       DEBUG_INFO,
       "%a: no detailed timing descriptor\n",
-      __func__
+      __FUNCTION__
       ));
     return;
   }
@@ -349,7 +349,7 @@ QemuVideoBochsEdid (
   DEBUG ((
     DEBUG_INFO,
     "%a: default resolution: %dx%d\n",
-    __func__,
+    __FUNCTION__,
     *XRes,
     *YRes
     ));
@@ -436,7 +436,7 @@ QemuVideoBochsModeSetup (
         DEBUG_ERROR,
         "%a: can't read size of drawable buffer from QXL "
         "ROM\n",
-        __func__
+        __FUNCTION__
         ));
       return EFI_NOT_FOUND;
     }
@@ -448,7 +448,7 @@ QemuVideoBochsModeSetup (
   DEBUG ((
     DEBUG_INFO,
     "%a: AvailableFbSize=0x%x\n",
-    __func__,
+    __FUNCTION__,
     AvailableFbSize
     ));
 

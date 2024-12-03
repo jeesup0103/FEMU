@@ -23,9 +23,6 @@ config Q800
     select ESP
     select DP8393X
     select OR_IRQ
-    select DJMEMC
-    select IOSB
-    select ASC
 
 config M68K_VIRT
     bool

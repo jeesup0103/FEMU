@@ -1304,7 +1304,7 @@ GetSection (
         DEBUG ((
           DEBUG_ERROR,
           "%a: recursion aborted due to nesting depth\n",
-          __func__
+          __FUNCTION__
           ));
         //
         // Map "aborted" to "not found".

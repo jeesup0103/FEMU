@@ -44,7 +44,6 @@ enum {
     FEMU_DISABLE_LOG = 7,
 };
 
-
 #define BLK_BITS    (16)
 #define PG_BITS     (16)
 #define SEC_BITS    (8)
@@ -127,6 +126,7 @@ struct ssdparams {
     int gc_thres_lines;
     double gc_thres_pcent_high;
     int gc_thres_lines_high;
+    int gc_thres_rus_high; 
     bool enable_gc_delay;
 
     /* below are all calculated values */
@@ -140,6 +140,9 @@ struct ssdparams {
     int pgs_per_lun;  /* # of pages per LUN (Die) */
     int pgs_per_ch;   /* # of pages per channel */
     int tt_pgs;       /* total # of pages in the SSD */
+#ifdef DEVICE_UTIL_DEBUG
+	int tt_valid_pgs;	
+#endif
 
     int blks_per_lun; /* # of blocks per LUN */
     int blks_per_ch;  /* # of blocks per channel */
@@ -149,6 +152,13 @@ struct ssdparams {
     int pgs_per_line;
     int blks_per_line;
     int tt_lines;
+
+    int secs_per_ru;	
+    int pgs_per_ru;
+    int blks_per_ru;
+	int chs_per_ru;
+	int luns_per_ru;
+    int tt_rus;			
 
     int pls_per_ch;   /* # of planes per channel */
     int tt_pls;       /* total # of planes in the SSD */
@@ -194,14 +204,50 @@ struct nand_cmd {
     int64_t stime; /* Coperd: request arrival time */
 };
 
+typedef struct ru {		
+	int id;
+	struct {
+		int ch;
+		int lun;
+		int pl;
+		int blk;
+		int pg;
+	} wp;
+	struct nand_block* blks[RG_DEGREE];
+	int ipc;
+	int vpc;
+	QTAILQ_ENTRY(ru) entry;	/* in either {free, victim, full} list */
+	size_t pos;				/* position in the priority queue for victim ru */
+	int ruhid;				/* needed for gc */
+} ru; 					
+
+struct ruh {				
+	int ruht;					/* ruh type: initially isolated or persistently isolated */
+	int* cur_ruids;
+};						
+
+struct ru_mgmt {	
+	struct ru *rus;
+	QTAILQ_HEAD(free_ru_list, ru) free_ru_list;
+	pqueue_t *victim_ru_pq;
+	QTAILQ_HEAD(full_ru_list, ru) full_ru_list;
+	int tt_rus;
+	int free_ru_cnt;
+	int victim_ru_cnt;
+	int full_ru_cnt; 
+	int ii_gc_ruid;	 /* recalim unit ID for initially isolated gc */
+};							
+
 struct ssd {
     char *ssdname;
     struct ssdparams sp;
     struct ssd_channel *ch;
     struct ppa *maptbl; /* page level mapping table */
     uint64_t *rmap;     /* reverse mapptbl, assume it's stored in OOB */
-    struct write_pointer wp;
     struct line_mgmt lm;
+	struct ru_mgmt *rums; 	/* raclaim unit managements */		
+	struct ruh *ruhtbl;			/* ruh table */							
+	bool fdp_enabled;
 
     /* lockless ring for communication with NVMe IO thread */
     struct rte_ring **to_ftl;

@@ -32,7 +32,6 @@
 
 
 [LibraryClasses]
-  BaseLib
   DebugLib
   BaseMemoryLib
   MemoryAllocationLib

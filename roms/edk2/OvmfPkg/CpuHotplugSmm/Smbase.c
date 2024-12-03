@@ -62,7 +62,7 @@ SmbaseAllocatePostSmmPen (
     DEBUG ((
       DEBUG_ERROR,
       "%a: mPostSmmPenSize=%u: %r\n",
-      __func__,
+      __FUNCTION__,
       mPostSmmPenSize,
       Status
       ));
@@ -77,11 +77,11 @@ SmbaseAllocatePostSmmPen (
                             &Address
                             );
   if (EFI_ERROR (Status)) {
-    DEBUG ((DEBUG_ERROR, "%a: AllocatePages(): %r\n", __func__, Status));
+    DEBUG ((DEBUG_ERROR, "%a: AllocatePages(): %r\n", __FUNCTION__, Status));
     return Status;
   }
 
-  DEBUG ((DEBUG_INFO, "%a: Post-SMM Pen at 0x%Lx\n", __func__, Address));
+  DEBUG ((DEBUG_INFO, "%a: Post-SMM Pen at 0x%Lx\n", __FUNCTION__, Address));
   *PenAddress = (UINT32)Address;
   return EFI_SUCCESS;
 }
@@ -211,7 +211,7 @@ SmbaseRelocate (
     DEBUG ((
       DEBUG_ERROR,
       "%a: ApicId=" FMT_APIC_ID " Smbase=0x%Lx: %r\n",
-      __func__,
+      __FUNCTION__,
       ApicId,
       (UINT64)Smbase,
       Status
@@ -289,7 +289,7 @@ SmbaseRelocate (
     DEBUG ((
       DEBUG_ERROR,
       "%a: ApicId=" FMT_APIC_ID " ApicIdGate=0x%Lx: %r\n",
-      __func__,
+      __FUNCTION__,
       ApicId,
       ExchangeResult,
       Status

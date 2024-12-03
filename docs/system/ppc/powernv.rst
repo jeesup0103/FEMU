@@ -195,6 +195,11 @@ Use a MTD drive to add a PNOR to the machine, and get a NVRAM :
 
   -drive file=./witherspoon.pnor,format=raw,if=mtd
 
+CAVEATS
+-------
+
+ * No support for multiple HW threads (SMT=1). Same as pseries.
+
 Maintainer contact information
 ------------------------------
 

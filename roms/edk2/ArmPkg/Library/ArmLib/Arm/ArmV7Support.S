@@ -16,7 +16,6 @@
 .set CTRL_C_BIT,  (1 << 2)
 .set CTRL_B_BIT,  (1 << 7)
 .set CTRL_I_BIT,  (1 << 12)
-.set CTRL_AFE_BIT,(1 << 29)
 
 
 ASM_FUNC(ArmInvalidateDataCacheEntryByMVA)
@@ -65,7 +64,6 @@ ASM_FUNC(ArmInvalidateInstructionCache)
 ASM_FUNC(ArmEnableMmu)
   mrc     p15,0,R0,c1,c0,0
   orr     R0,R0,#1
-  orr     R0,R0,#CTRL_AFE_BIT
   mcr     p15,0,R0,c1,c0,0
   dsb
   isb

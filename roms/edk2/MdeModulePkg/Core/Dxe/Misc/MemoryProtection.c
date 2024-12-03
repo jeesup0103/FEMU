@@ -32,7 +32,6 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #include <Library/DxeServicesTableLib.h>
 #include <Library/DebugLib.h>
 #include <Library/UefiLib.h>
-#include <Library/ImagePropertiesRecordLib.h>
 
 #include <Guid/EventGroup.h>
 #include <Guid/MemoryAttributesTable.h>
@@ -66,6 +65,29 @@ UINT32  mImageProtectionPolicy;
 extern LIST_ENTRY  mGcdMemorySpaceMap;
 
 STATIC LIST_ENTRY  mProtectedImageRecordList;
+
+/**
+  Sort code section in image record, based upon CodeSegmentBase from low to high.
+
+  @param  ImageRecord    image record to be sorted
+**/
+VOID
+SortImageRecordCodeSection (
+  IN IMAGE_PROPERTIES_RECORD  *ImageRecord
+  );
+
+/**
+  Check if code section in image record is valid.
+
+  @param  ImageRecord    image record to be checked
+
+  @retval TRUE  image record is valid
+  @retval FALSE image record is invalid
+**/
+BOOLEAN
+IsImageRecordCodeSectionValid (
+  IN IMAGE_PROPERTIES_RECORD  *ImageRecord
+  );
 
 /**
   Get the image type.
@@ -816,7 +838,7 @@ InitializeDxeNxMemoryProtectionPolicy (
         DEBUG ((
           DEBUG_INFO,
           "%a: StackBase = 0x%016lx  StackSize = 0x%016lx\n",
-          __func__,
+          __FUNCTION__,
           MemoryHob->AllocDescriptor.MemoryBaseAddress,
           MemoryHob->AllocDescriptor.MemoryLength
           ));
@@ -842,7 +864,7 @@ InitializeDxeNxMemoryProtectionPolicy (
   DEBUG ((
     DEBUG_INFO,
     "%a: applying strict permissions to active memory regions\n",
-    __func__
+    __FUNCTION__
     ));
 
   MergeMemoryMapForProtectionPolicy (MemoryMap, &MemoryMapSize, DescriptorSize);
@@ -904,7 +926,7 @@ InitializeDxeNxMemoryProtectionPolicy (
     DEBUG ((
       DEBUG_INFO,
       "%a: applying strict permissions to inactive memory regions\n",
-      __func__
+      __FUNCTION__
       ));
 
     CoreAcquireGcdMemoryLock ();

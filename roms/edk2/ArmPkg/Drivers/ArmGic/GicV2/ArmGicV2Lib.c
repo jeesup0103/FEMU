@@ -1,13 +1,12 @@
 /** @file
 *
-*  Copyright (c) 2013-2023, ARM Limited. All rights reserved.
+*  Copyright (c) 2013-2014, ARM Limited. All rights reserved.
 *
 *  SPDX-License-Identifier: BSD-2-Clause-Patent
 *
 **/
 
 #include <Library/ArmGicLib.h>
-#include <Library/DebugLib.h>
 #include <Library/IoLib.h>
 
 UINTN
@@ -27,6 +26,5 @@ ArmGicV2EndOfInterrupt (
   IN UINTN   Source
   )
 {
-  ASSERT (Source <= MAX_UINT32);
-  MmioWrite32 (GicInterruptInterfaceBase + ARM_GIC_ICCEIOR, (UINT32)Source);
+  MmioWrite32 (GicInterruptInterfaceBase + ARM_GIC_ICCEIOR, Source);
 }

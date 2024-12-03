@@ -388,17 +388,10 @@ TimerInterruptHandler (
                     );
 
     //
-    // Save main counter value before calling notification function
-    // that may enable interrupts and allow interrupt nesting.
-    //
-    mPreviousMainCounter = MainCounter;
-
-    //
     // Call registered notification function passing in the time since the last
     // interrupt in 100 ns units.
     //
     mTimerNotifyFunction (TimerPeriod);
-    return;
   }
 
   //

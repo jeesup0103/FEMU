@@ -1,5 +1,1 @@
 source tpm/Kconfig
-
-config IOMMUFD
-    bool
-    depends on VFIO

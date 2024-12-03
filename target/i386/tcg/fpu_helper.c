@@ -21,7 +21,6 @@
 #include <math.h>
 #include "cpu.h"
 #include "tcg-cpu.h"
-#include "exec/cpu_ldst.h"
 #include "exec/helper-proto.h"
 #include "fpu/softfloat.h"
 #include "fpu/softfloat-macros.h"
@@ -484,8 +483,9 @@ void helper_fcomi_ST0_FT0(CPUX86State *env)
     FloatRelation ret;
 
     ret = floatx80_compare(ST0, FT0, &env->fp_status);
-    eflags = cpu_cc_compute_all(env) & ~(CC_Z | CC_P | CC_C);
-    CC_SRC = eflags | fcomi_ccval[ret + 1];
+    eflags = cpu_cc_compute_all(env, CC_OP);
+    eflags = (eflags & ~(CC_Z | CC_P | CC_C)) | fcomi_ccval[ret + 1];
+    CC_SRC = eflags;
     merge_exception_flags(env, old_flags);
 }
 
@@ -496,8 +496,9 @@ void helper_fucomi_ST0_FT0(CPUX86State *env)
     FloatRelation ret;
 
     ret = floatx80_compare_quiet(ST0, FT0, &env->fp_status);
-    eflags = cpu_cc_compute_all(env) & ~(CC_Z | CC_P | CC_C);
-    CC_SRC = eflags | fcomi_ccval[ret + 1];
+    eflags = cpu_cc_compute_all(env, CC_OP);
+    eflags = (eflags & ~(CC_Z | CC_P | CC_C)) | fcomi_ccval[ret + 1];
+    CC_SRC = eflags;
     merge_exception_flags(env, old_flags);
 }
 
@@ -3007,11 +3008,6 @@ void helper_xsetbv(CPUX86State *env, uint32_t ecx, uint64_t mask)
 
     /* Only XCR0 is defined at present; the FPU may not be disabled.  */
     if (ecx != 0 || (mask & XSTATE_FP_MASK) == 0) {
-        goto do_gpf;
-    }
-
-    /* SSE can be disabled, but only if AVX is disabled too.  */
-    if ((mask & (XSTATE_SSE_MASK | XSTATE_YMM_MASK)) == XSTATE_YMM_MASK) {
         goto do_gpf;
     }
 

@@ -16,7 +16,6 @@ native:
 - augeas-lenses
 - autoconf
 - automake
-- awk
 - bash
 - bash-completion
 - bc
@@ -31,6 +30,7 @@ native:
 - clang
 - clang-devel
 - cloud-init
+- cloud-utils-growpart
 - codespell
 - cpp
 - cppi
@@ -91,7 +91,7 @@ native:
 - libaio-devel
 - libapparmor-devel
 - libarchive-devel
-- libasan8
+- libasan6
 - libattr-devel
 - libblkid-devel
 - libbpf-devel
@@ -147,7 +147,6 @@ native:
 - libvirt-devel
 - libvirt-glib-devel
 - libwsman-devel
-- libxdp-devel
 - libxml2
 - libxml2-devel
 - libxslt
@@ -163,7 +162,6 @@ native:
 - make
 - meson
 - mkisofs
-- mtools
 - nano
 - nbd
 - nbdkit
@@ -211,7 +209,6 @@ native:
 - perl-base
 - php-devel
 - php-imagick
-- pipewire-devel
 - pkgconfig
 - polkit
 - python3-Pillow
@@ -223,7 +220,7 @@ native:
 - python3-devel
 - python3-docutils
 - python3-gobject
-- python3-libxml2
+- python3-libxml2-python
 - python3-lxml
 - python3-numpy
 - python3-opencv
@@ -233,7 +230,6 @@ native:
 - python3-selinux
 - python3-setuptools
 - python3-sphinx_rtd_theme
-- python3-tomli
 - python3-wheel
 - python39-flake8
 - qemu
@@ -241,6 +237,7 @@ native:
 - rdma-core-devel
 - readline-devel
 - rpcgen
+- rpm
 - rpm-build
 - ruby
 - ruby-devel
@@ -257,7 +254,6 @@ native:
 - spice-protocol-devel
 - strace
 - sudo
-- swtpm
 - systemd-devel
 - systemd-rpm-macros
 - systemtap-sdt-devel
@@ -287,5 +283,3 @@ native:
 - zlib-devel
 - zlib-devel-static
 - zstd
-pypi:
-- build

@@ -59,7 +59,7 @@ AcpiTimerLibConstructor (
       DEBUG ((
         DEBUG_ERROR,
         "%a: Unknown Host Bridge Device ID: 0x%04x\n",
-        __func__,
+        __FUNCTION__,
         HostBridgeDevId
         ));
       ASSERT (FALSE);
@@ -119,7 +119,7 @@ InternalAcpiGetTimerTick (
       DEBUG ((
         DEBUG_ERROR,
         "%a: Unknown Host Bridge Device ID: 0x%04x\n",
-        __func__,
+        __FUNCTION__,
         HostBridgeDevId
         ));
       ASSERT (FALSE);

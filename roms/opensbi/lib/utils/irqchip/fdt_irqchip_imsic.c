@@ -11,10 +11,15 @@
 #include <libfdt.h>
 #include <sbi/riscv_asm.h>
 #include <sbi/sbi_error.h>
-#include <sbi/sbi_heap.h>
+#include <sbi/sbi_hartmask.h>
 #include <sbi_utils/fdt/fdt_helper.h>
 #include <sbi_utils/irqchip/fdt_irqchip.h>
 #include <sbi_utils/irqchip/imsic.h>
+
+#define IMSIC_MAX_NR			16
+
+static unsigned long imsic_count = 0;
+static struct imsic_data imsic[IMSIC_MAX_NR];
 
 static int irqchip_imsic_update_hartid_table(void *fdt, int nodeoff,
 					     struct imsic_data *id)
@@ -43,6 +48,8 @@ static int irqchip_imsic_update_hartid_table(void *fdt, int nodeoff,
 		err = fdt_parse_hart_id(fdt, cpu_offset, &hartid);
 		if (err)
 			return SBI_EINVAL;
+		if (SBI_HARTMASK_MAX_BITS <= hartid)
+			return SBI_EINVAL;
 
 		switch (hwirq) {
 		case IRQ_M_EXT:
@@ -64,27 +71,27 @@ static int irqchip_imsic_cold_init(void *fdt, int nodeoff,
 	int rc;
 	struct imsic_data *id;
 
-	id = sbi_zalloc(sizeof(*id));
-	if (!id)
-		return SBI_ENOMEM;
+	if (IMSIC_MAX_NR <= imsic_count)
+		return SBI_ENOSPC;
+	id = &imsic[imsic_count];
 
 	rc = fdt_parse_imsic_node(fdt, nodeoff, id);
-	if (rc || !id->targets_mmode)
-		goto fail_free_data;
-
-	rc = imsic_cold_irqchip_init(id);
 	if (rc)
-		goto fail_free_data;
+		return rc;
+	if (!id->targets_mmode)
+		return 0;
 
 	rc = irqchip_imsic_update_hartid_table(fdt, nodeoff, id);
 	if (rc)
-		goto fail_free_data;
+		return rc;
+
+	rc = imsic_cold_irqchip_init(id);
+	if (rc)
+		return rc;
+
+	imsic_count++;
 
 	return 0;
-
-fail_free_data:
-	sbi_free(id);
-	return rc;
 }
 
 static const struct fdt_match irqchip_imsic_match[] = {

@@ -202,7 +202,7 @@ static void coroutine_fn qemu_co_mutex_lock_slowpath(AioContext *ctx,
     push_waiter(mutex, &w);
 
     /*
-     * Add waiter before reading mutex->handoff.  Pairs with qatomic_set_mb
+     * Add waiter before reading mutex->handoff.  Pairs with qatomic_mb_set
      * in qemu_co_mutex_unlock.
      */
     smp_mb__after_rmw();
@@ -310,7 +310,7 @@ void coroutine_fn qemu_co_mutex_unlock(CoMutex *mutex)
 
         our_handoff = mutex->sequence;
         /* Set handoff before checking for waiters.  */
-        qatomic_set_mb(&mutex->handoff, our_handoff);
+        qatomic_mb_set(&mutex->handoff, our_handoff);
         if (!has_waiters(mutex)) {
             /* The concurrent lock has not added itself yet, so it
              * will be able to pick our handoff.

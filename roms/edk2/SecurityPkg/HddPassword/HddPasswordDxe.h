@@ -17,6 +17,7 @@
 #include <Protocol/AtaPassThru.h>
 #include <Protocol/PciIo.h>
 #include <Protocol/HiiConfigAccess.h>
+#include <Protocol/VariableLock.h>
 
 #include <Guid/MdeModuleHii.h>
 #include <Guid/EventGroup.h>

@@ -54,7 +54,7 @@ ArmVirtGetMemoryMap (
     DEBUG ((
       DEBUG_ERROR,
       "%a: Error: Failed to Allocate Pages\n",
-      __func__
+      __FUNCTION__
       ));
     return;
   }

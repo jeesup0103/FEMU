@@ -189,7 +189,7 @@ QemuRamfbGraphicsOutputSetMode (
     DEBUG ((
       DEBUG_WARN,
       "%a: clearing the screen failed: %r\n",
-      __func__,
+      __FUNCTION__,
       Status
       ));
   }

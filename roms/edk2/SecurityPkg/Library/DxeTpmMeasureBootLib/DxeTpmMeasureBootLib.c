@@ -17,10 +17,7 @@
 
 Copyright (c) 2009 - 2018, Intel Corporation. All rights reserved.<BR>
 SPDX-License-Identifier: BSD-2-Clause-Patent
-Copyright (c) Microsoft Corporation.<BR>
 
-Copyright (c) Microsoft Corporation.<BR>
-SPDX-License-Identifier: BSD-2-Clause-Patent
 **/
 
 #include <PiDxe.h>
@@ -42,8 +39,6 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #include <Library/PeCoffLib.h>
 #include <Library/SecurityManagementLib.h>
 #include <Library/HobLib.h>
-
-#include "DxeTpmMeasureBootLibSanitization.h"
 
 //
 // Flag to check GPT partition. It only need be measured once.
@@ -141,9 +136,6 @@ TcgMeasureGptTable (
   UINT32                      EventSize;
   UINT32                      EventNumber;
   EFI_PHYSICAL_ADDRESS        EventLogLastEntry;
-  UINT32                      AllocSize;
-
-  GptData = NULL;
 
   if (mMeasureGptCount > 0) {
     return EFI_SUCCESS;
@@ -174,8 +166,8 @@ TcgMeasureGptTable (
                      BlockIo->Media->BlockSize,
                      (UINT8 *)PrimaryHeader
                      );
-  if (EFI_ERROR (Status) || EFI_ERROR (TpmSanitizeEfiPartitionTableHeader (PrimaryHeader, BlockIo))) {
-    DEBUG ((DEBUG_ERROR, "Failed to read Partition Table Header or invalid Partition Table Header!\n"));
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_ERROR, "Failed to Read Partition Table Header!\n"));
     FreePool (PrimaryHeader);
     return EFI_DEVICE_ERROR;
   }
@@ -183,13 +175,7 @@ TcgMeasureGptTable (
   //
   // Read the partition entry.
   //
-  Status = TpmSanitizePrimaryHeaderAllocationSize (PrimaryHeader, &AllocSize);
-  if (EFI_ERROR (Status)) {
-    FreePool (PrimaryHeader);
-    return EFI_DEVICE_ERROR;
-  }
-
-  EntryPtr = (UINT8 *)AllocatePool (AllocSize);
+  EntryPtr = (UINT8 *)AllocatePool (PrimaryHeader->NumberOfPartitionEntries * PrimaryHeader->SizeOfPartitionEntry);
   if (EntryPtr == NULL) {
     FreePool (PrimaryHeader);
     return EFI_OUT_OF_RESOURCES;
@@ -199,7 +185,7 @@ TcgMeasureGptTable (
                      DiskIo,
                      BlockIo->Media->MediaId,
                      MultU64x32 (PrimaryHeader->PartitionEntryLBA, BlockIo->Media->BlockSize),
-                     AllocSize,
+                     PrimaryHeader->NumberOfPartitionEntries * PrimaryHeader->SizeOfPartitionEntry,
                      EntryPtr
                      );
   if (EFI_ERROR (Status)) {
@@ -224,8 +210,9 @@ TcgMeasureGptTable (
   //
   // Prepare Data for Measurement
   //
-  Status   = TpmSanitizePrimaryHeaderGptEventSize (PrimaryHeader, NumberOfPartition, &EventSize);
-  TcgEvent = (TCG_PCR_EVENT *)AllocateZeroPool (EventSize);
+  EventSize = (UINT32)(sizeof (EFI_GPT_DATA) - sizeof (GptData->Partitions)
+                       + NumberOfPartition * PrimaryHeader->SizeOfPartitionEntry);
+  TcgEvent = (TCG_PCR_EVENT *)AllocateZeroPool (EventSize + sizeof (TCG_PCR_EVENT_HDR));
   if (TcgEvent == NULL) {
     FreePool (PrimaryHeader);
     FreePool (EntryPtr);
@@ -234,7 +221,7 @@ TcgMeasureGptTable (
 
   TcgEvent->PCRIndex  = 5;
   TcgEvent->EventType = EV_EFI_GPT_EVENT;
-  TcgEvent->EventSize = EventSize - sizeof (TCG_PCR_EVENT_HDR);
+  TcgEvent->EventSize = EventSize;
   GptData             = (EFI_GPT_DATA *)TcgEvent->Event;
 
   //
@@ -346,22 +333,18 @@ TcgMeasurePeImage (
   ImageLoad     = NULL;
   SectionHeader = NULL;
   Sha1Ctx       = NULL;
-  TcgEvent      = NULL;
   FilePathSize  = (UINT32)GetDevicePathSize (FilePath);
 
+  //
   // Determine destination PCR by BootPolicy
   //
-  Status = TpmSanitizePeImageEventSize (FilePathSize, &EventSize);
-  if (EFI_ERROR (Status)) {
-    return EFI_UNSUPPORTED;
-  }
-
-  TcgEvent = AllocateZeroPool (EventSize);
+  EventSize = sizeof (*ImageLoad) - sizeof (ImageLoad->DevicePath) + FilePathSize;
+  TcgEvent  = AllocateZeroPool (EventSize + sizeof (TCG_PCR_EVENT));
   if (TcgEvent == NULL) {
     return EFI_OUT_OF_RESOURCES;
   }
 
-  TcgEvent->EventSize = EventSize - sizeof (TCG_PCR_EVENT_HDR);
+  TcgEvent->EventSize = EventSize;
   ImageLoad           = (EFI_IMAGE_LOAD_EVENT *)TcgEvent->Event;
 
   switch (ImageType) {
@@ -378,13 +361,11 @@ TcgMeasurePeImage (
       TcgEvent->PCRIndex  = 2;
       break;
     default:
-      DEBUG (
-        (
-         DEBUG_ERROR,
-         "TcgMeasurePeImage: Unknown subsystem type %d",
-         ImageType
-        )
-        );
+      DEBUG ((
+        DEBUG_ERROR,
+        "TcgMeasurePeImage: Unknown subsystem type %d",
+        ImageType
+        ));
       goto Finish;
   }
 

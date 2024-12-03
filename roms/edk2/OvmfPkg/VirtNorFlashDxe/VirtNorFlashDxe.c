@@ -422,11 +422,11 @@ NorFlashFvbInitialize (
   // Install the Default FVB header if required
   if (EFI_ERROR (Status)) {
     // There is no valid header, so time to install one.
-    DEBUG ((DEBUG_INFO, "%a: The FVB Header is not valid.\n", __func__));
+    DEBUG ((DEBUG_INFO, "%a: The FVB Header is not valid.\n", __FUNCTION__));
     DEBUG ((
       DEBUG_INFO,
       "%a: Installing a correct one for this volume.\n",
-      __func__
+      __FUNCTION__
       ));
 
     // Erase all the NorFlash that is reserved for variable storage

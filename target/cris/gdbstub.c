@@ -23,7 +23,8 @@
 
 int crisv10_cpu_gdb_read_register(CPUState *cs, GByteArray *mem_buf, int n)
 {
-    CPUCRISState *env = cpu_env(cs);
+    CRISCPU *cpu = CRIS_CPU(cs);
+    CPUCRISState *env = &cpu->env;
 
     if (n < 15) {
         return gdb_get_reg32(mem_buf, env->regs[n]);
@@ -54,7 +55,8 @@ int crisv10_cpu_gdb_read_register(CPUState *cs, GByteArray *mem_buf, int n)
 
 int cris_cpu_gdb_read_register(CPUState *cs, GByteArray *mem_buf, int n)
 {
-    CPUCRISState *env = cpu_env(cs);
+    CRISCPU *cpu = CRIS_CPU(cs);
+    CPUCRISState *env = &cpu->env;
     uint8_t srs;
 
     srs = env->pregs[PR_SRS];
@@ -88,7 +90,8 @@ int cris_cpu_gdb_read_register(CPUState *cs, GByteArray *mem_buf, int n)
 
 int cris_cpu_gdb_write_register(CPUState *cs, uint8_t *mem_buf, int n)
 {
-    CPUCRISState *env = cpu_env(cs);
+    CRISCPU *cpu = CRIS_CPU(cs);
+    CPUCRISState *env = &cpu->env;
     uint32_t tmp;
 
     if (n > 49) {

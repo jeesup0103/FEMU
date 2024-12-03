@@ -24,9 +24,7 @@
 //
 // Protocol instances
 //
-extern EFI_DRIVER_BINDING_PROTOCOL   gRedfishConfigDriverBinding;
-extern EFI_COMPONENT_NAME_PROTOCOL   gRedfishConfigHandlerComponentName;
-extern EFI_COMPONENT_NAME2_PROTOCOL  gRedfishConfigHandlerComponentName2;
+extern EFI_DRIVER_BINDING_PROTOCOL  gRedfishConfigDriverBinding;
 
 extern REDFISH_CONFIG_DRIVER_DATA         gRedfishConfigData;
 extern EDKII_REDFISH_CREDENTIAL_PROTOCOL  *gCredential;

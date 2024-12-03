@@ -16,7 +16,6 @@
  */
 
 #include "qemu/osdep.h"
-#include "qemu/crc32c.h"
 #include "trace.h"
 #include "net_rx_pkt.h"
 #include "net/checksum.h"
@@ -24,10 +23,7 @@
 
 struct NetRxPkt {
     struct virtio_net_hdr virt_hdr;
-    struct {
-        struct eth_header eth;
-        struct vlan_header vlan;
-    } ehdr_buf;
+    uint8_t ehdr_buf[sizeof(struct eth_header) + sizeof(struct vlan_header)];
     struct iovec *vec;
     uint16_t vec_len_total;
     uint16_t vec_len;
@@ -93,7 +89,7 @@ net_rx_pkt_pull_data(struct NetRxPkt *pkt,
     if (pkt->ehdr_buf_len) {
         net_rx_pkt_iovec_realloc(pkt, iovcnt + 1);
 
-        pkt->vec[0].iov_base = &pkt->ehdr_buf;
+        pkt->vec[0].iov_base = pkt->ehdr_buf;
         pkt->vec[0].iov_len = pkt->ehdr_buf_len;
 
         pkt->tot_len = pllen + pkt->ehdr_buf_len;
@@ -107,7 +103,7 @@ net_rx_pkt_pull_data(struct NetRxPkt *pkt,
                                 iov, iovcnt, ploff, pkt->tot_len);
     }
 
-    eth_get_protocols(pkt->vec, pkt->vec_len, 0, &pkt->hasip4, &pkt->hasip6,
+    eth_get_protocols(pkt->vec, pkt->vec_len, &pkt->hasip4, &pkt->hasip6,
                       &pkt->l3hdr_off, &pkt->l4hdr_off, &pkt->l5hdr_off,
                       &pkt->ip6hdr_info, &pkt->ip4hdr_info, &pkt->l4hdr_info);
 
@@ -124,7 +120,7 @@ void net_rx_pkt_attach_iovec(struct NetRxPkt *pkt,
     assert(pkt);
 
     if (strip_vlan) {
-        pkt->ehdr_buf_len = eth_strip_vlan(iov, iovcnt, iovoff, &pkt->ehdr_buf,
+        pkt->ehdr_buf_len = eth_strip_vlan(iov, iovcnt, iovoff, pkt->ehdr_buf,
                                            &ploff, &tci);
     } else {
         pkt->ehdr_buf_len = 0;
@@ -137,17 +133,20 @@ void net_rx_pkt_attach_iovec(struct NetRxPkt *pkt,
 
 void net_rx_pkt_attach_iovec_ex(struct NetRxPkt *pkt,
                                 const struct iovec *iov, int iovcnt,
-                                size_t iovoff, int strip_vlan_index,
-                                uint16_t vet, uint16_t vet_ext)
+                                size_t iovoff, bool strip_vlan,
+                                uint16_t vet)
 {
     uint16_t tci = 0;
     uint16_t ploff = iovoff;
     assert(pkt);
 
-    pkt->ehdr_buf_len = eth_strip_vlan_ex(iov, iovcnt, iovoff,
-                                          strip_vlan_index, vet, vet_ext,
-                                          &pkt->ehdr_buf,
-                                          &ploff, &tci);
+    if (strip_vlan) {
+        pkt->ehdr_buf_len = eth_strip_vlan_ex(iov, iovcnt, iovoff, vet,
+                                              pkt->ehdr_buf,
+                                              &ploff, &tci);
+    } else {
+        pkt->ehdr_buf_len = 0;
+    }
 
     pkt->tci = tci;
 
@@ -187,13 +186,17 @@ size_t net_rx_pkt_get_total_len(struct NetRxPkt *pkt)
     return pkt->tot_len;
 }
 
-void net_rx_pkt_set_protocols(struct NetRxPkt *pkt,
-                              const struct iovec *iov, size_t iovcnt,
-                              size_t iovoff)
+void net_rx_pkt_set_protocols(struct NetRxPkt *pkt, const void *data,
+                              size_t len)
 {
+    const struct iovec iov = {
+        .iov_base = (void *)data,
+        .iov_len = len
+    };
+
     assert(pkt);
 
-    eth_get_protocols(iov, iovcnt, iovoff, &pkt->hasip4, &pkt->hasip6,
+    eth_get_protocols(&iov, 1, &pkt->hasip4, &pkt->hasip6,
                       &pkt->l3hdr_off, &pkt->l4hdr_off, &pkt->l5hdr_off,
                       &pkt->ip6hdr_info, &pkt->ip4hdr_info, &pkt->l4hdr_info);
 }
@@ -235,6 +238,11 @@ eth_ip6_hdr_info *net_rx_pkt_get_ip6_info(struct NetRxPkt *pkt)
 eth_ip4_hdr_info *net_rx_pkt_get_ip4_info(struct NetRxPkt *pkt)
 {
     return &pkt->ip4hdr_info;
+}
+
+eth_l4_hdr_info *net_rx_pkt_get_l4_info(struct NetRxPkt *pkt)
+{
+    return &pkt->l4hdr_info;
 }
 
 static inline void
@@ -552,73 +560,32 @@ _net_rx_pkt_calc_l4_csum(struct NetRxPkt *pkt)
     return csum;
 }
 
-static bool
-_net_rx_pkt_validate_sctp_sum(struct NetRxPkt *pkt)
-{
-    size_t csum_off;
-    size_t off = pkt->l4hdr_off;
-    size_t vec_len = pkt->vec_len;
-    struct iovec *vec;
-    uint32_t calculated = 0;
-    uint32_t original;
-    bool valid;
-
-    for (vec = pkt->vec; vec->iov_len < off; vec++) {
-        off -= vec->iov_len;
-        vec_len--;
-    }
-
-    csum_off = off + 8;
-
-    if (!iov_to_buf(vec, vec_len, csum_off, &original, sizeof(original))) {
-        return false;
-    }
-
-    if (!iov_from_buf(vec, vec_len, csum_off,
-                      &calculated, sizeof(calculated))) {
-        return false;
-    }
-
-    calculated = crc32c(0xffffffff,
-                        (uint8_t *)vec->iov_base + off, vec->iov_len - off);
-    calculated = iov_crc32c(calculated ^ 0xffffffff, vec + 1, vec_len - 1);
-    valid = calculated == le32_to_cpu(original);
-    iov_from_buf(vec, vec_len, csum_off, &original, sizeof(original));
-
-    return valid;
-}
-
 bool net_rx_pkt_validate_l4_csum(struct NetRxPkt *pkt, bool *csum_valid)
 {
-    uint32_t csum;
+    uint16_t csum;
 
     trace_net_rx_pkt_l4_csum_validate_entry();
+
+    if (pkt->l4hdr_info.proto != ETH_L4_HDR_PROTO_TCP &&
+        pkt->l4hdr_info.proto != ETH_L4_HDR_PROTO_UDP) {
+        trace_net_rx_pkt_l4_csum_validate_not_xxp();
+        return false;
+    }
+
+    if (pkt->l4hdr_info.proto == ETH_L4_HDR_PROTO_UDP &&
+        pkt->l4hdr_info.hdr.udp.uh_sum == 0) {
+        trace_net_rx_pkt_l4_csum_validate_udp_with_no_checksum();
+        return false;
+    }
 
     if (pkt->hasip4 && pkt->ip4hdr_info.fragment) {
         trace_net_rx_pkt_l4_csum_validate_ip4_fragment();
         return false;
     }
 
-    switch (pkt->l4hdr_info.proto) {
-    case ETH_L4_HDR_PROTO_UDP:
-        if (pkt->l4hdr_info.hdr.udp.uh_sum == 0) {
-            trace_net_rx_pkt_l4_csum_validate_udp_with_no_checksum();
-            return false;
-        }
-        /* fall through */
-    case ETH_L4_HDR_PROTO_TCP:
-        csum = _net_rx_pkt_calc_l4_csum(pkt);
-        *csum_valid = ((csum == 0) || (csum == 0xFFFF));
-        break;
+    csum = _net_rx_pkt_calc_l4_csum(pkt);
 
-    case ETH_L4_HDR_PROTO_SCTP:
-        *csum_valid = _net_rx_pkt_validate_sctp_sum(pkt);
-        break;
-
-    default:
-        trace_net_rx_pkt_l4_csum_validate_not_xxp();
-        return false;
-    }
+    *csum_valid = ((csum == 0) || (csum == 0xFFFF));
 
     trace_net_rx_pkt_l4_csum_validate_csum(*csum_valid);
 

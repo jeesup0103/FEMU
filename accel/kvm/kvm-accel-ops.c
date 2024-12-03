@@ -33,9 +33,10 @@ static void *kvm_vcpu_thread_fn(void *arg)
 
     rcu_register_thread();
 
-    bql_lock();
+    qemu_mutex_lock_iothread();
     qemu_thread_get_self(cpu->thread);
     cpu->thread_id = qemu_get_thread_id();
+    cpu->can_do_io = 1;
     current_cpu = cpu;
 
     r = kvm_init_vcpu(cpu, &error_fatal);
@@ -57,7 +58,7 @@ static void *kvm_vcpu_thread_fn(void *arg)
 
     kvm_destroy_vcpu(cpu);
     cpu_thread_signal_destroyed(cpu);
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
     rcu_unregister_thread();
     return NULL;
 }

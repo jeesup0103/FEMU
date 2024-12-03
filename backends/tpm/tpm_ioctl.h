@@ -238,7 +238,7 @@ struct ptm_lockstorage {
         } req; /* request */
         struct {
             ptm_res tpm_result;
-        } resp; /* response */
+        } resp; /* reponse */
     } u;
 };
 

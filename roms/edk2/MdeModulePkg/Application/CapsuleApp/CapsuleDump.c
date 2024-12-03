@@ -632,7 +632,6 @@ SplitFileNameExtension (
 
 **/
 INTN
-EFIAPI
 CompareFileNameInAlphabet (
   IN VOID  *Left,
   IN VOID  *Right

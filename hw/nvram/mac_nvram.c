@@ -33,7 +33,6 @@
 #include "migration/vmstate.h"
 #include "qemu/cutils.h"
 #include "qemu/module.h"
-#include "qemu/error-report.h"
 #include "trace.h"
 #include <zlib.h>
 
@@ -49,10 +48,7 @@ static void macio_nvram_writeb(void *opaque, hwaddr addr,
     trace_macio_nvram_write(addr, value);
     s->data[addr] = value;
     if (s->blk) {
-        if (blk_pwrite(s->blk, addr, 1, &s->data[addr], 0) < 0) {
-            error_report("%s: write of NVRAM data to backing store failed",
-                         blk_name(s->blk));
-        }
+        blk_pwrite(s->blk, addr, 1, &s->data[addr], 0);
     }
 }
 
@@ -83,7 +79,7 @@ static const VMStateDescription vmstate_macio_nvram = {
     .name = "macio_nvram",
     .version_id = 1,
     .minimum_version_id = 1,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_VBUFFER_UINT32(data, MacIONVRAMState, 0, NULL, size),
         VMSTATE_END_OF_LIST()
     }

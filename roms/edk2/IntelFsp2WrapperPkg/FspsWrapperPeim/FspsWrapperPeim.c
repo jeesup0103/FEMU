@@ -336,14 +336,6 @@ PeiMemoryDiscoveredNotify (
 
   DEBUG ((DEBUG_INFO, "FspSiliconInit status: %r\n", Status));
 
-  //
-  // Get FspHobList
-  //
-  GuidHob = GetFirstGuidHob (&gFspHobGuid);
-  ASSERT (GuidHob != NULL);
-  FspHobListPtr = *(VOID **)GET_GUID_HOB_DATA (GuidHob);
-  DEBUG ((DEBUG_INFO, "FspHobListPtr - 0x%x\n", FspHobListPtr));
-
   if (Status == FSP_STATUS_VARIABLE_REQUEST) {
     //
     // call to Variable request handler
@@ -364,6 +356,13 @@ PeiMemoryDiscoveredNotify (
     DEBUG ((DEBUG_ERROR, "ERROR - TestFspSiliconInitApiOutput () fail, Status = %r\n", Status));
   }
 
+  //
+  // Now FspHobList complete, process it
+  //
+  GuidHob = GetFirstGuidHob (&gFspHobGuid);
+  ASSERT (GuidHob != NULL);
+  FspHobListPtr = *(VOID **)GET_GUID_HOB_DATA (GuidHob);
+  DEBUG ((DEBUG_INFO, "FspHobListPtr - 0x%x\n", FspHobListPtr));
   PostFspsHobProcess (FspHobListPtr);
 
   //
@@ -439,7 +438,7 @@ FspsWrapperInitDispatchMode (
   // FSP-S Wrapper running in Dispatch mode and reports FSP-S FV to PEI dispatcher.
   //
   PeiServicesInstallFvInfoPpi (
-    &((EFI_FIRMWARE_VOLUME_HEADER *)(UINTN)PcdGet32 (PcdFspsBaseAddress))->FileSystemGuid,
+    NULL,
     (VOID *)(UINTN)PcdGet32 (PcdFspsBaseAddress),
     (UINT32)((EFI_FIRMWARE_VOLUME_HEADER *)(UINTN)PcdGet32 (PcdFspsBaseAddress))->FvLength,
     NULL,

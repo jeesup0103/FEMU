@@ -298,7 +298,7 @@ GetLongAdLsn (
     DEBUG ((
       DEBUG_ERROR,
       "%a: Fail to get the Partition Descriptor from the given Long Allocation Descriptor.\n",
-      __func__
+      __FUNCTION__
       ));
     return EFI_UNSUPPORTED;
   }

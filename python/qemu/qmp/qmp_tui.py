@@ -346,10 +346,7 @@ class App(QMPClient):
                 self._set_status('[Disconnected]')
                 await self.disconnect()
                 # check if a retry is needed
-                # mypy 1.4.0 doesn't believe runstate can change after
-                # disconnect(), hence the cast.
-                state = cast(Runstate, self.runstate)
-                if state == Runstate.IDLE:
+                if self.runstate == Runstate.IDLE:
                     continue
             await self.runstate_changed()
 

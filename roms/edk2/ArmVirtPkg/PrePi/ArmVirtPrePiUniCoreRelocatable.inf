@@ -35,7 +35,6 @@
   ArmPkg/ArmPkg.dec
   ArmPlatformPkg/ArmPlatformPkg.dec
   ArmVirtPkg/ArmVirtPkg.dec
-  OvmfPkg/OvmfPkg.dec
 
 [LibraryClasses]
   BaseLib
@@ -94,6 +93,6 @@
 [Pcd]
   gArmTokenSpaceGuid.PcdSystemMemoryBase
   gArmTokenSpaceGuid.PcdSystemMemorySize
+  gArmVirtTokenSpaceGuid.PcdDeviceTreeInitialBaseAddress
   gArmTokenSpaceGuid.PcdFdBaseAddress
   gArmTokenSpaceGuid.PcdFvBaseAddress
-  gUefiOvmfPkgTokenSpaceGuid.PcdDeviceTreeInitialBaseAddress

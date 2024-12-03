@@ -78,7 +78,7 @@ int sbi_ecall_register_extension(struct sbi_ecall_extension *ext)
 
 void sbi_ecall_unregister_extension(struct sbi_ecall_extension *ext)
 {
-	bool found = false;
+	bool found = FALSE;
 	struct sbi_ecall_extension *t;
 
 	if (!ext)
@@ -86,7 +86,7 @@ void sbi_ecall_unregister_extension(struct sbi_ecall_extension *ext)
 
 	sbi_list_for_each_entry(t, &ecall_exts_list, head) {
 		if (t == ext) {
-			found = true;
+			found = TRUE;
 			break;
 		}
 	}
@@ -101,12 +101,14 @@ int sbi_ecall_handler(struct sbi_trap_regs *regs)
 	struct sbi_ecall_extension *ext;
 	unsigned long extension_id = regs->a7;
 	unsigned long func_id = regs->a6;
-	struct sbi_ecall_return out = {0};
+	struct sbi_trap_info trap = {0};
+	unsigned long out_val = 0;
 	bool is_0_1_spec = 0;
 
 	ext = sbi_ecall_find_extension(extension_id);
 	if (ext && ext->handle) {
-		ret = ext->handle(extension_id, func_id, regs, &out);
+		ret = ext->handle(extension_id, func_id,
+				  regs, &out_val, &trap);
 		if (extension_id >= SBI_EXT_0_1_SET_TIMER &&
 		    extension_id <= SBI_EXT_0_1_SHUTDOWN)
 			is_0_1_spec = 1;
@@ -114,10 +116,11 @@ int sbi_ecall_handler(struct sbi_trap_regs *regs)
 		ret = SBI_ENOTSUPP;
 	}
 
-	if (!out.skip_regs_update) {
-		if (ret < SBI_LAST_ERR ||
-		    (extension_id != SBI_EXT_0_1_CONSOLE_GETCHAR &&
-		     SBI_SUCCESS < ret)) {
+	if (ret == SBI_ETRAP) {
+		trap.epc = regs->mepc;
+		sbi_trap_redirect(regs, &trap);
+	} else {
+		if (ret < SBI_LAST_ERR) {
 			sbi_printf("%s: Invalid error %d for ext=0x%lx "
 				   "func=0x%lx\n", __func__, ret,
 				   extension_id, func_id);
@@ -135,7 +138,7 @@ int sbi_ecall_handler(struct sbi_trap_regs *regs)
 		regs->mepc += 4;
 		regs->a0 = ret;
 		if (!is_0_1_spec)
-			regs->a1 = out.value;
+			regs->a1 = out_val;
 	}
 
 	return 0;
@@ -149,10 +152,7 @@ int sbi_ecall_init(void)
 
 	for (i = 0; i < sbi_ecall_exts_size; i++) {
 		ext = sbi_ecall_exts[i];
-		ret = SBI_ENODEV;
-
-		if (ext->register_extensions)
-			ret = ext->register_extensions();
+		ret = sbi_ecall_register_extension(ext);
 		if (ret)
 			return ret;
 	}

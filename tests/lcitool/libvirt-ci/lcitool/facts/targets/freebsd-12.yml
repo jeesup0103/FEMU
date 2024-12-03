@@ -2,7 +2,6 @@
 os:
   name: 'FreeBSD'
   version: '12'
-  libosinfo_id: 'http://freebsd.org/freebsd/12.3'
 
 packaging:
   format: 'pkg'
@@ -24,5 +23,5 @@ ansible_python_interpreter: /usr/local/bin/python3
 cirrus:
   instance_type: freebsd_instance
   image_selector: image_family
-  image_name: freebsd-12-4
+  image_name: freebsd-12-3
   arch: x86_64

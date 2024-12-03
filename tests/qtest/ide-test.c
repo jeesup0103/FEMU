@@ -34,6 +34,9 @@
 #include "hw/pci/pci_ids.h"
 #include "hw/pci/pci_regs.h"
 
+/* TODO actually test the results and get rid of this */
+#define qmp_discard_response(q, ...) qobject_unref(qtest_qmp(q, __VA_ARGS__))
+
 #define TEST_IMAGE_SIZE 64 * 1024 * 1024
 
 #define IDE_PCI_DEV     1
@@ -763,7 +766,7 @@ static void test_pci_retry_flush(void)
     qtest_qmp_eventwait(qts, "STOP");
 
     /* Complete the command */
-    qtest_qmp_assert_success(qts, "{'execute':'cont' }");
+    qmp_discard_response(qts, "{'execute':'cont' }");
 
     /* Check registers */
     data = qpci_io_readb(dev, ide_bar, reg_device);

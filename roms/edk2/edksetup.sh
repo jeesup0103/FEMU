@@ -20,7 +20,7 @@
 SCRIPTNAME="edksetup.sh"
 RECONFIG=FALSE
 
-HelpMsg()
+function HelpMsg()
 {
   echo "Usage: $SCRIPTNAME [Options]"
   echo
@@ -38,7 +38,7 @@ HelpMsg()
   echo "source $SCRIPTNAME"
 }
 
-SetWorkspace()
+function SetWorkspace()
 {
   #
   # If WORKSPACE is already set, then we can return right now
@@ -49,10 +49,10 @@ SetWorkspace()
     return 0
   fi
 
-  if [ ! -f ${SCRIPTNAME} ] && [ -z "$PACKAGES_PATH" ]
+  if [ ! ${BASH_SOURCE[0]} -ef ./$SCRIPTNAME ] && [ -z "$PACKAGES_PATH" ]
   then
-    echo Source this script from the base of your tree.  For example:
-    echo "  cd /Path/To/Edk2/Clone"
+    echo Run this script from the base of your tree.  For example:
+    echo "  cd /Path/To/Edk/Root"
     echo "  . $SCRIPTNAME"
     return 1
   fi
@@ -75,7 +75,7 @@ SetWorkspace()
   return 0
 }
 
-SetupEnv()
+function SetupEnv()
 {
   if [ -n "$EDK_TOOLS_PATH" ]
   then
@@ -85,7 +85,9 @@ SetupEnv()
     . $WORKSPACE/BaseTools/BuildEnv
   elif [ -n "$PACKAGES_PATH" ]
   then
-    for DIR in $(echo $PACKAGES_PATH | tr ':' ' ')
+    PATH_LIST=$PACKAGES_PATH
+    PATH_LIST=${PATH_LIST//:/ }
+    for DIR in $PATH_LIST
     do
       if [ -f "$DIR/BaseTools/BuildEnv" ]
       then
@@ -103,16 +105,81 @@ SetupEnv()
   fi
 }
 
-SetupPython3()
+function SetupPython3()
 {
-  export PYTHON_COMMAND=python3
+  if [ $origin_version ];then
+    origin_version=
+  fi
+  for python in $(whereis python3)
+  do
+    python=$(echo $python | grep "[[:digit:]]$" || true)
+    python_version=${python##*python}
+    if [ -z "${python_version}" ] || (! command -v $python >/dev/null 2>&1);then
+      continue
+    fi
+    if [ -z $origin_version ];then
+      origin_version=$python_version
+      export PYTHON_COMMAND=$python
+      continue
+    fi
+      if [[ "$origin_version" < "$python_version" ]]; then
+      origin_version=$python_version
+      export PYTHON_COMMAND=$python
+    fi
+  done
+  return 0
 }
 
-SourceEnv()
+function SetupPython()
 {
+  if [ $PYTHON_COMMAND ] && [ -z $PYTHON3_ENABLE ];then
+    if ( command -v $PYTHON_COMMAND >/dev/null 2>&1 );then
+      return 0
+    else
+      echo $PYTHON_COMMAND Cannot be used to build or execute the python tools.
+      return 1
+    fi
+  fi
+
+  if [ $PYTHON3_ENABLE ] && [ $PYTHON3_ENABLE == TRUE ]
+  then
+    SetupPython3
+  fi
+
+  if [ $PYTHON3_ENABLE ] && [ $PYTHON3_ENABLE != TRUE ]
+  then
+    if [ $origin_version ];then
+      origin_version=
+    fi
+    for python in $(whereis python2)
+    do
+      python=$(echo $python | grep "[[:digit:]]$" || true)
+      python_version=${python##*python}
+      if [ -z "${python_version}" ] || (! command -v $python >/dev/null 2>&1);then
+        continue
+      fi
+      if [ -z $origin_version ]
+      then
+        origin_version=$python_version
+        export PYTHON_COMMAND=$python
+        continue
+      fi
+      if [[ "$origin_version" < "$python_version" ]]; then
+        origin_version=$python_version
+        export PYTHON_COMMAND=$python
+      fi
+    done
+    return 0
+  fi
+
   SetupPython3
-  SetWorkspace
+}
+
+function SourceEnv()
+{
+  SetWorkspace &&
   SetupEnv
+  SetupPython
 }
 
 I=$#

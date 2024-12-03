@@ -78,7 +78,7 @@ _start_hang:
 	wfi
 	j	_start_hang
 
-	.section .data
+	.section .entry, "ax", %progbits
 	.align	3
 _hart_lottery:
 	RISCV_PTR	0

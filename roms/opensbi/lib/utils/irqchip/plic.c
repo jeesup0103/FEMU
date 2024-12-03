@@ -10,9 +10,7 @@
 
 #include <sbi/riscv_io.h>
 #include <sbi/riscv_encoding.h>
-#include <sbi/sbi_bitops.h>
 #include <sbi/sbi_console.h>
-#include <sbi/sbi_domain.h>
 #include <sbi/sbi_error.h>
 #include <sbi/sbi_string.h>
 #include <sbi_utils/irqchip/plic.h>
@@ -173,7 +171,5 @@ int plic_cold_irqchip_init(const struct plic_data *plic)
 	for (i = 1; i <= plic->num_src; i++)
 		plic_set_priority(plic, i, 0);
 
-	return sbi_domain_root_add_memrange(plic->addr, plic->size, BIT(20),
-					(SBI_DOMAIN_MEMREGION_MMIO |
-					 SBI_DOMAIN_MEMREGION_SHARED_SURW_MRW));
+	return 0;
 }

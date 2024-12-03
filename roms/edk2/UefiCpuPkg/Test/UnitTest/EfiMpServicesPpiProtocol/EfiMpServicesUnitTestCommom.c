@@ -45,7 +45,7 @@ InitUTContext (
 
   Status = MpServicesUnitTestWhoAmI (LocalContext->MpServices, &BspNumber);
   UT_ASSERT_NOT_EFI_ERROR (Status);
-  DEBUG ((DEBUG_INFO, "%a: BspNumber = 0x%x\n", __func__, BspNumber));
+  DEBUG ((DEBUG_INFO, "%a: BspNumber = 0x%x\n", __FUNCTION__, BspNumber));
 
   Status = MpServicesUnitTestGetNumberOfProcessors (
              LocalContext->MpServices,
@@ -56,7 +56,7 @@ InitUTContext (
   DEBUG ((
     DEBUG_INFO,
     "%a: NumberOfProcessors = 0x%x, NumberOfEnabledProcessors = 0x%x\n",
-    __func__,
+    __FUNCTION__,
     NumberOfProcessors,
     NumberOfEnabledProcessors
     ));
@@ -89,7 +89,7 @@ InitUTContext (
         LocalContext->DisabledApNumber[IndexOfDisabledAPs] = ProcessorNumber;
         IndexOfDisabledAPs++;
 
-        DEBUG ((DEBUG_INFO, "%a: AP(0x%x) is disabled and temporarily enable it.\n", __func__, ProcessorNumber));
+        DEBUG ((DEBUG_INFO, "%a: AP(0x%x) is disabled and temporarily enable it.\n", __FUNCTION__, ProcessorNumber));
         Status = MpServicesUnitTestEnableDisableAP (
                    LocalContext->MpServices,
                    ProcessorNumber,
@@ -134,7 +134,7 @@ CheckUTContext (
 
   if (BspNumber != LocalContext->BspNumber) {
     LocalContext->BspNumber = BspNumber;
-    DEBUG ((DEBUG_INFO, "%a: New BspNumber = 0x%x\n", __func__, BspNumber));
+    DEBUG ((DEBUG_INFO, "%a: New BspNumber = 0x%x\n", __FUNCTION__, BspNumber));
   }
 
   ASSERT (BspNumber == LocalContext->BspNumber);
@@ -148,11 +148,11 @@ CheckUTContext (
 
   if (NumberOfProcessors != LocalContext->NumberOfProcessors) {
     LocalContext->NumberOfProcessors = NumberOfProcessors;
-    DEBUG ((DEBUG_INFO, "%a: New NumberOfProcessors = 0x%x\n", __func__, NumberOfProcessors));
+    DEBUG ((DEBUG_INFO, "%a: New NumberOfProcessors = 0x%x\n", __FUNCTION__, NumberOfProcessors));
   }
 
   if (NumberOfEnabledProcessors != LocalContext->NumberOfProcessors) {
-    DEBUG ((DEBUG_INFO, "%a: New NumberOfEnabledProcessors = 0x%x\n", __func__, NumberOfEnabledProcessors));
+    DEBUG ((DEBUG_INFO, "%a: New NumberOfEnabledProcessors = 0x%x\n", __FUNCTION__, NumberOfEnabledProcessors));
 
     for (ProcessorNumber = 0; ProcessorNumber < LocalContext->NumberOfProcessors; ProcessorNumber++) {
       Status = MpServicesUnitTestGetProcessorInfo (
@@ -163,7 +163,7 @@ CheckUTContext (
       ASSERT_EFI_ERROR (Status);
 
       if (!(ProcessorInfoBuffer.StatusFlag & PROCESSOR_ENABLED_BIT)) {
-        DEBUG ((DEBUG_INFO, "%a: AP(0x%x) is disabled unexpectedly and reenable it.\n", __func__, ProcessorNumber));
+        DEBUG ((DEBUG_INFO, "%a: AP(0x%x) is disabled unexpectedly and reenable it.\n", __FUNCTION__, ProcessorNumber));
         Status = MpServicesUnitTestEnableDisableAP (
                    LocalContext->MpServices,
                    ProcessorNumber,
@@ -204,7 +204,7 @@ FreeUTContext (
       DEBUG ((
         DEBUG_INFO,
         "%a: Disable AP(0x%x) to restore its state.\n",
-        __func__,
+        __FUNCTION__,
         LocalContext->DisabledApNumber[IndexOfDisabledAPs]
         ));
 

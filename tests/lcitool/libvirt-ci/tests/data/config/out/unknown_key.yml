@@ -1,5 +1,5 @@
 gitlab:
-  runner_secret: NONE
+  runner_secret: null
   url: https://gitlab.com
 install:
   arch: x86_64

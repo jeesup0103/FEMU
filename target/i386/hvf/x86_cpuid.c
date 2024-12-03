@@ -25,7 +25,6 @@
 #include "x86.h"
 #include "vmx.h"
 #include "sysemu/hvf.h"
-#include "hvf-i386.h"
 
 static bool xgetbv(uint32_t cpuid_ecx, uint32_t idx, uint64_t *xcr)
 {

@@ -64,7 +64,7 @@ uint64_t *nvme_setup_discontig(FemuCtrl *n, uint64_t prp_addr, uint16_t
                                queue_depth, uint16_t entry_size)
 {
     uint16_t prps_per_page = n->page_size >> 3;
-    uint64_t *prp = g_malloc0(sizeof(uint64_t) * prps_per_page);
+    uint64_t prp[prps_per_page];
     uint16_t total_prps = DIV_ROUND_UP(queue_depth * entry_size, n->page_size);
     uint64_t *prp_list = g_malloc0(total_prps * sizeof(*prp_list));
     int i;
@@ -72,7 +72,6 @@ uint64_t *nvme_setup_discontig(FemuCtrl *n, uint64_t prp_addr, uint16_t
     for (i = 0; i < total_prps; i++) {
         if (i % prps_per_page == 0 && i < total_prps - 1) {
             if (!prp_addr || prp_addr & (n->page_size - 1)) {
-                g_free(prp);
                 g_free(prp_list);
                 return NULL;
             }
@@ -81,13 +80,11 @@ uint64_t *nvme_setup_discontig(FemuCtrl *n, uint64_t prp_addr, uint16_t
         }
         prp_list[i] = le64_to_cpu(prp[i % prps_per_page]);
         if (!prp_list[i] || prp_list[i] & (n->page_size - 1)) {
-            g_free(prp);
             g_free(prp_list);
             return NULL;
         }
     }
 
-    g_free(prp);
     return prp_list;
 }
 

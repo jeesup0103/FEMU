@@ -296,7 +296,6 @@ FspTempRamExitDone2 (
 
 **/
 VOID
-EFIAPI
 FspWaitForNotify (
   VOID
   )

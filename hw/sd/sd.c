@@ -87,14 +87,6 @@ enum SDCardStates {
     sd_disconnect_state,
 };
 
-typedef sd_rsp_type_t (*sd_cmd_handler)(SDState *sd, SDRequest req);
-
-typedef struct SDProto {
-    const char *name;
-    sd_cmd_handler cmd[SDMMC_CMD_MAX];
-    sd_cmd_handler acmd[SDMMC_CMD_MAX];
-} SDProto;
-
 struct SDState {
     DeviceState parent_obj;
 
@@ -115,6 +107,7 @@ struct SDState {
 
     uint8_t spec_version;
     BlockBackend *blk;
+    bool spi;
 
     /* Runtime changeables */
 
@@ -144,39 +137,13 @@ struct SDState {
     qemu_irq readonly_cb;
     qemu_irq inserted_cb;
     QEMUTimer *ocr_power_timer;
+    const char *proto_name;
     bool enable;
     uint8_t dat_lines;
     bool cmd_line;
 };
 
 static void sd_realize(DeviceState *dev, Error **errp);
-
-static const struct SDProto *sd_proto(SDState *sd)
-{
-    SDCardClass *sc = SD_CARD_GET_CLASS(sd);
-
-    return sc->proto;
-}
-
-static const SDProto sd_proto_spi;
-
-static bool sd_is_spi(SDState *sd)
-{
-    return sd_proto(sd) == &sd_proto_spi;
-}
-
-static const char *sd_version_str(enum SDPhySpecificationVersion version)
-{
-    static const char *sdphy_version[] = {
-        [SD_PHY_SPECv1_10_VERS]     = "v1.10",
-        [SD_PHY_SPECv2_00_VERS]     = "v2.00",
-        [SD_PHY_SPECv3_01_VERS]     = "v3.01",
-    };
-    if (version >= ARRAY_SIZE(sdphy_version)) {
-        return "unsupported version";
-    }
-    return sdphy_version[version];
-}
 
 static const char *sd_state_name(enum SDCardStates state)
 {
@@ -342,7 +309,7 @@ static void sd_set_ocr(SDState *sd)
     /* All voltages OK */
     sd->ocr = R_OCR_VDD_VOLTAGE_WIN_HI_MASK;
 
-    if (sd_is_spi(sd)) {
+    if (sd->spi) {
         /*
          * We don't need to emulate power up sequence in SPI-mode.
          * Thus, the card's power up status bit should be set to 1 when reset.
@@ -681,7 +648,7 @@ static const VMStateDescription sd_ocr_vmstate = {
     .version_id = 1,
     .minimum_version_id = 1,
     .needed = sd_ocr_vmstate_needed,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_UINT32(ocr, SDState),
         VMSTATE_TIMER_PTR(ocr_power_timer, SDState),
         VMSTATE_END_OF_LIST()
@@ -706,7 +673,7 @@ static const VMStateDescription sd_vmstate = {
     .version_id = 2,
     .minimum_version_id = 2,
     .pre_load = sd_vmstate_pre_load,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_UINT32(mode, SDState),
         VMSTATE_INT32(state, SDState),
         VMSTATE_UINT8_ARRAY(cid, SDState, 16),
@@ -733,7 +700,7 @@ static const VMStateDescription sd_vmstate = {
         VMSTATE_BOOL(enable, SDState),
         VMSTATE_END_OF_LIST()
     },
-    .subsections = (const VMStateDescription * const []) {
+    .subsections = (const VMStateDescription*[]) {
         &sd_ocr_vmstate,
         NULL
     },
@@ -747,12 +714,13 @@ SDState *sd_init(BlockBackend *blk, bool is_spi)
     SDState *sd;
     Error *err = NULL;
 
-    obj = object_new(is_spi ? TYPE_SD_CARD_SPI : TYPE_SD_CARD);
+    obj = object_new(TYPE_SD_CARD);
     dev = DEVICE(obj);
     if (!qdev_prop_set_drive_err(dev, "drive", blk, &err)) {
         error_reportf_err(err, "sd_init failed: ");
         return NULL;
     }
+    qdev_prop_set_bit(dev, "spi", is_spi);
 
     /*
      * Realizing the device properly would put it into the QOM
@@ -998,106 +966,6 @@ static bool address_in_range(SDState *sd, const char *desc,
     return true;
 }
 
-static sd_rsp_type_t sd_invalid_state_for_cmd(SDState *sd, SDRequest req)
-{
-    qemu_log_mask(LOG_GUEST_ERROR, "%s: CMD%i in a wrong state: %s (spec %s)\n",
-                  sd_proto(sd)->name, req.cmd, sd_state_name(sd->state),
-                  sd_version_str(sd->spec_version));
-
-    return sd_illegal;
-}
-
-static sd_rsp_type_t sd_cmd_illegal(SDState *sd, SDRequest req)
-{
-    qemu_log_mask(LOG_GUEST_ERROR, "%s: Unknown CMD%i for spec %s\n",
-                  sd_proto(sd)->name, req.cmd,
-                  sd_version_str(sd->spec_version));
-
-    return sd_illegal;
-}
-
-/* Commands that are recognised but not yet implemented. */
-static sd_rsp_type_t sd_cmd_unimplemented(SDState *sd, SDRequest req)
-{
-    qemu_log_mask(LOG_UNIMP, "%s: CMD%i not implemented\n",
-                  sd_proto(sd)->name, req.cmd);
-
-    return sd_illegal;
-}
-
-static sd_rsp_type_t sd_cmd_GO_IDLE_STATE(SDState *sd, SDRequest req)
-{
-    if (sd->state != sd_inactive_state) {
-        sd->state = sd_idle_state;
-        sd_reset(DEVICE(sd));
-    }
-
-    return sd_is_spi(sd) ? sd_r1 : sd_r0;
-}
-
-static sd_rsp_type_t sd_cmd_SEND_OP_CMD(SDState *sd, SDRequest req)
-{
-    sd->state = sd_transfer_state;
-
-    return sd_r1;
-}
-
-static sd_rsp_type_t sd_cmd_ALL_SEND_CID(SDState *sd, SDRequest req)
-{
-    if (sd->state != sd_ready_state) {
-        return sd_invalid_state_for_cmd(sd, req);
-    }
-
-    sd->state = sd_identification_state;
-
-    return sd_r2_i;
-}
-
-static sd_rsp_type_t sd_cmd_SEND_RELATIVE_ADDR(SDState *sd, SDRequest req)
-{
-    switch (sd->state) {
-    case sd_identification_state:
-    case sd_standby_state:
-        sd->state = sd_standby_state;
-        sd_set_rca(sd);
-        return sd_r6;
-
-    default:
-        return sd_invalid_state_for_cmd(sd, req);
-    }
-}
-
-static sd_rsp_type_t sd_cmd_SEND_TUNING_BLOCK(SDState *sd, SDRequest req)
-{
-        if (sd->spec_version < SD_PHY_SPECv3_01_VERS) {
-            return sd_cmd_illegal(sd, req);
-        }
-
-        if (sd->state != sd_transfer_state) {
-            return sd_invalid_state_for_cmd(sd, req);
-        }
-
-        sd->state = sd_sendingdata_state;
-        sd->data_offset = 0;
-
-        return sd_r1;
-}
-
-static sd_rsp_type_t sd_cmd_SET_BLOCK_COUNT(SDState *sd, SDRequest req)
-{
-        if (sd->spec_version < SD_PHY_SPECv3_01_VERS) {
-            return sd_cmd_illegal(sd, req);
-        }
-
-        if (sd->state != sd_transfer_state) {
-            return sd_invalid_state_for_cmd(sd, req);
-        }
-
-        sd->multi_blk_cnt = req.arg;
-
-        return sd_r1;
-}
-
 static sd_rsp_type_t sd_normal_command(SDState *sd, SDRequest req)
 {
     uint32_t rca = 0x0000;
@@ -1107,7 +975,7 @@ static sd_rsp_type_t sd_normal_command(SDState *sd, SDRequest req)
      * However there is no ACMD55, so we want to trace this particular case.
      */
     if (req.cmd != 55 || sd->expecting_acmd) {
-        trace_sdcard_normal_command(sd_proto(sd)->name,
+        trace_sdcard_normal_command(sd->proto_name,
                                     sd_cmd_name(req.cmd), req.cmd,
                                     req.arg, sd_state_name(sd->state));
     }
@@ -1131,13 +999,58 @@ static sd_rsp_type_t sd_normal_command(SDState *sd, SDRequest req)
         return sd_illegal;
     }
 
-    if (sd_proto(sd)->cmd[req.cmd]) {
-        return sd_proto(sd)->cmd[req.cmd](sd, req);
-    }
-
     switch (req.cmd) {
     /* Basic commands (Class 0 and Class 1) */
+    case 0:  /* CMD0:   GO_IDLE_STATE */
+        switch (sd->state) {
+        case sd_inactive_state:
+            return sd->spi ? sd_r1 : sd_r0;
+
+        default:
+            sd->state = sd_idle_state;
+            sd_reset(DEVICE(sd));
+            return sd->spi ? sd_r1 : sd_r0;
+        }
+        break;
+
+    case 1:  /* CMD1:   SEND_OP_CMD */
+        if (!sd->spi)
+            goto bad_cmd;
+
+        sd->state = sd_transfer_state;
+        return sd_r1;
+
+    case 2:  /* CMD2:   ALL_SEND_CID */
+        if (sd->spi)
+            goto bad_cmd;
+        switch (sd->state) {
+        case sd_ready_state:
+            sd->state = sd_identification_state;
+            return sd_r2_i;
+
+        default:
+            break;
+        }
+        break;
+
+    case 3:  /* CMD3:   SEND_RELATIVE_ADDR */
+        if (sd->spi)
+            goto bad_cmd;
+        switch (sd->state) {
+        case sd_identification_state:
+        case sd_standby_state:
+            sd->state = sd_standby_state;
+            sd_set_rca(sd);
+            return sd_r6;
+
+        default:
+            break;
+        }
+        break;
+
     case 4:  /* CMD4:   SEND_DSR */
+        if (sd->spi)
+            goto bad_cmd;
         switch (sd->state) {
         case sd_standby_state:
             break;
@@ -1146,6 +1059,9 @@ static sd_rsp_type_t sd_normal_command(SDState *sd, SDRequest req)
             break;
         }
         break;
+
+    case 5: /* CMD5: reserved for SDIO cards */
+        return sd_illegal;
 
     case 6:  /* CMD6:   SWITCH_FUNCTION */
         switch (sd->mode) {
@@ -1162,6 +1078,8 @@ static sd_rsp_type_t sd_normal_command(SDState *sd, SDRequest req)
         break;
 
     case 7:  /* CMD7:   SELECT/DESELECT_CARD */
+        if (sd->spi)
+            goto bad_cmd;
         switch (sd->state) {
         case sd_standby_state:
             if (sd->rca != rca)
@@ -1208,7 +1126,7 @@ static sd_rsp_type_t sd_normal_command(SDState *sd, SDRequest req)
 
         /* No response if not exactly one VHS bit is set.  */
         if (!(req.arg >> 8) || (req.arg >> (ctz32(req.arg & ~0xff) + 1))) {
-            return sd_is_spi(sd) ? sd_r7 : sd_r0;
+            return sd->spi ? sd_r7 : sd_r0;
         }
 
         /* Accept.  */
@@ -1224,9 +1142,8 @@ static sd_rsp_type_t sd_normal_command(SDState *sd, SDRequest req)
             return sd_r2_s;
 
         case sd_transfer_state:
-            if (!sd_is_spi(sd)) {
+            if (!sd->spi)
                 break;
-            }
             sd->state = sd_sendingdata_state;
             memcpy(sd->data, sd->csd, 16);
             sd->data_start = addr;
@@ -1247,9 +1164,8 @@ static sd_rsp_type_t sd_normal_command(SDState *sd, SDRequest req)
             return sd_r2_i;
 
         case sd_transfer_state:
-            if (!sd_is_spi(sd)) {
+            if (!sd->spi)
                 break;
-            }
             sd->state = sd_sendingdata_state;
             memcpy(sd->data, sd->cid, 16);
             sd->data_start = addr;
@@ -1281,7 +1197,7 @@ static sd_rsp_type_t sd_normal_command(SDState *sd, SDRequest req)
     case 13:  /* CMD13:  SEND_STATUS */
         switch (sd->mode) {
         case sd_data_transfer_mode:
-            if (!sd_is_spi(sd) && sd->rca != rca) {
+            if (!sd->spi && sd->rca != rca) {
                 return sd_r0;
             }
 
@@ -1293,6 +1209,8 @@ static sd_rsp_type_t sd_normal_command(SDState *sd, SDRequest req)
         break;
 
     case 15:  /* CMD15:  GO_INACTIVE_STATE */
+        if (sd->spi)
+            goto bad_cmd;
         switch (sd->mode) {
         case sd_data_transfer_mode:
             if (sd->rca != rca)
@@ -1306,7 +1224,7 @@ static sd_rsp_type_t sd_normal_command(SDState *sd, SDRequest req)
         }
         break;
 
-    /* Block read commands (Class 2) */
+    /* Block read commands (Classs 2) */
     case 16:  /* CMD16:  SET_BLOCKLEN */
         switch (sd->state) {
         case sd_transfer_state:
@@ -1336,6 +1254,31 @@ static sd_rsp_type_t sd_normal_command(SDState *sd, SDRequest req)
             sd->state = sd_sendingdata_state;
             sd->data_start = addr;
             sd->data_offset = 0;
+            return sd_r1;
+
+        default:
+            break;
+        }
+        break;
+
+    case 19:    /* CMD19: SEND_TUNING_BLOCK (SD) */
+        if (sd->spec_version < SD_PHY_SPECv3_01_VERS) {
+            break;
+        }
+        if (sd->state == sd_transfer_state) {
+            sd->state = sd_sendingdata_state;
+            sd->data_offset = 0;
+            return sd_r1;
+        }
+        break;
+
+    case 23:    /* CMD23: SET_BLOCK_COUNT */
+        if (sd->spec_version < SD_PHY_SPECv3_01_VERS) {
+            break;
+        }
+        switch (sd->state) {
+        case sd_transfer_state:
+            sd->multi_blk_cnt = req.arg;
             return sd_r1;
 
         default:
@@ -1374,6 +1317,8 @@ static sd_rsp_type_t sd_normal_command(SDState *sd, SDRequest req)
         break;
 
     case 26:  /* CMD26:  PROGRAM_CID */
+        if (sd->spi)
+            goto bad_cmd;
         switch (sd->state) {
         case sd_transfer_state:
             sd->state = sd_receivingdata_state;
@@ -1523,6 +1468,15 @@ static sd_rsp_type_t sd_normal_command(SDState *sd, SDRequest req)
         }
         break;
 
+    case 52 ... 54:
+        /* CMD52, CMD53, CMD54: reserved for SDIO cards
+         * (see the SDIO Simplified Specification V2.0)
+         * Handle as illegal command but do not complain
+         * on stderr, as some OSes may use these in their
+         * probing for presence of an SDIO card.
+         */
+        return sd_illegal;
+
     /* Application specific commands (Class 8) */
     case 55:  /* CMD55:  APP_CMD */
         switch (sd->state) {
@@ -1538,7 +1492,7 @@ static sd_rsp_type_t sd_normal_command(SDState *sd, SDRequest req)
         default:
             break;
         }
-        if (!sd_is_spi(sd)) {
+        if (!sd->spi) {
             if (sd->rca != rca) {
                 return sd_r0;
             }
@@ -1563,32 +1517,39 @@ static sd_rsp_type_t sd_normal_command(SDState *sd, SDRequest req)
         break;
 
     case 58:    /* CMD58:   READ_OCR (SPI) */
+        if (!sd->spi) {
+            goto bad_cmd;
+        }
         return sd_r3;
 
     case 59:    /* CMD59:   CRC_ON_OFF (SPI) */
+        if (!sd->spi) {
+            goto bad_cmd;
+        }
         return sd_r1;
 
     default:
+    bad_cmd:
         qemu_log_mask(LOG_GUEST_ERROR, "SD: Unknown CMD%i\n", req.cmd);
         return sd_illegal;
     }
 
-    return sd_invalid_state_for_cmd(sd, req);
+    qemu_log_mask(LOG_GUEST_ERROR, "SD: CMD%i in a wrong state: %s\n",
+                  req.cmd, sd_state_name(sd->state));
+    return sd_illegal;
 }
 
 static sd_rsp_type_t sd_app_command(SDState *sd,
                                     SDRequest req)
 {
-    trace_sdcard_app_command(sd_proto(sd)->name, sd_acmd_name(req.cmd),
+    trace_sdcard_app_command(sd->proto_name, sd_acmd_name(req.cmd),
                              req.cmd, req.arg, sd_state_name(sd->state));
     sd->card_status |= APP_CMD;
-
-    if (sd_proto(sd)->acmd[req.cmd]) {
-        return sd_proto(sd)->acmd[req.cmd](sd, req);
-    }
-
     switch (req.cmd) {
     case 6:  /* ACMD6:  SET_BUS_WIDTH */
+        if (sd->spi) {
+            goto unimplemented_spi_cmd;
+        }
         switch (sd->state) {
         case sd_transfer_state:
             sd->sd_status[0] &= 0x3f;
@@ -1639,6 +1600,11 @@ static sd_rsp_type_t sd_app_command(SDState *sd,
         break;
 
     case 41:  /* ACMD41: SD_APP_OP_COND */
+        if (sd->spi) {
+            /* SEND_OP_CMD */
+            sd->state = sd_transfer_state;
+            return sd_r1;
+        }
         if (sd->state != sd_idle_state) {
             break;
         }
@@ -1714,6 +1680,12 @@ static sd_rsp_type_t sd_app_command(SDState *sd,
     default:
         /* Fall back to standard commands.  */
         return sd_normal_command(sd, req);
+
+    unimplemented_spi_cmd:
+        /* Commands that are recognised but not yet implemented in SPI mode.  */
+        qemu_log_mask(LOG_UNIMP, "SD: CMD%i not implemented in SPI mode\n",
+                      req.cmd);
+        return sd_illegal;
     }
 
     qemu_log_mask(LOG_GUEST_ERROR, "SD: ACMD%i in a wrong state\n", req.cmd);
@@ -1864,7 +1836,7 @@ void sd_write_byte(SDState *sd, uint8_t value)
     if (sd->card_status & (ADDRESS_ERROR | WP_VIOLATION))
         return;
 
-    trace_sdcard_write_data(sd_proto(sd)->name,
+    trace_sdcard_write_data(sd->proto_name,
                             sd_acmd_name(sd->current_cmd),
                             sd->current_cmd, value);
     switch (sd->current_cmd) {
@@ -2020,7 +1992,7 @@ uint8_t sd_read_byte(SDState *sd)
 
     io_len = (sd->ocr & (1 << 30)) ? 512 : sd->blk_len;
 
-    trace_sdcard_read_data(sd_proto(sd)->name,
+    trace_sdcard_read_data(sd->proto_name,
                            sd_acmd_name(sd->current_cmd),
                            sd->current_cmd, io_len);
     switch (sd->current_cmd) {
@@ -2139,40 +2111,6 @@ void sd_enable(SDState *sd, bool enable)
     sd->enable = enable;
 }
 
-static const SDProto sd_proto_spi = {
-    .name = "SPI",
-    .cmd = {
-        [0]         = sd_cmd_GO_IDLE_STATE,
-        [1]         = sd_cmd_SEND_OP_CMD,
-        [2 ... 4]   = sd_cmd_illegal,
-        [5]         = sd_cmd_illegal,
-        [7]         = sd_cmd_illegal,
-        [15]        = sd_cmd_illegal,
-        [26]        = sd_cmd_illegal,
-        [52 ... 54] = sd_cmd_illegal,
-    },
-    .acmd = {
-        [6]         = sd_cmd_unimplemented,
-        [41]        = sd_cmd_SEND_OP_CMD,
-    },
-};
-
-static const SDProto sd_proto_sd = {
-    .name = "SD",
-    .cmd = {
-        [0]         = sd_cmd_GO_IDLE_STATE,
-        [1]         = sd_cmd_illegal,
-        [2]         = sd_cmd_ALL_SEND_CID,
-        [3]         = sd_cmd_SEND_RELATIVE_ADDR,
-        [5]         = sd_cmd_illegal,
-        [19]        = sd_cmd_SEND_TUNING_BLOCK,
-        [23]        = sd_cmd_SET_BLOCK_COUNT,
-        [52 ... 54] = sd_cmd_illegal,
-        [58]        = sd_cmd_illegal,
-        [59]        = sd_cmd_illegal,
-    },
-};
-
 static void sd_instance_init(Object *obj)
 {
     SDState *sd = SD_CARD(obj);
@@ -2192,6 +2130,8 @@ static void sd_realize(DeviceState *dev, Error **errp)
 {
     SDState *sd = SD_CARD(dev);
     int ret;
+
+    sd->proto_name = sd->spi ? "SPI" : "SD";
 
     switch (sd->spec_version) {
     case SD_PHY_SPECv1_10_VERS
@@ -2249,6 +2189,7 @@ static Property sd_properties[] = {
      * whether card should be in SSI or MMC/SD mode.  It is also up to the
      * board to ensure that ssi transfers only occur when the chip select
      * is asserted.  */
+    DEFINE_PROP_BOOL("spi", SDState, spi, false),
     DEFINE_PROP_END_OF_LIST()
 };
 
@@ -2275,39 +2216,21 @@ static void sd_class_init(ObjectClass *klass, void *data)
     sc->enable = sd_enable;
     sc->get_inserted = sd_get_inserted;
     sc->get_readonly = sd_get_readonly;
-    sc->proto = &sd_proto_sd;
 }
 
-/*
- * We do not model the chip select pin, so allow the board to select
- * whether card should be in SSI or MMC/SD mode.  It is also up to the
- * board to ensure that ssi transfers only occur when the chip select
- * is asserted.
- */
-static void sd_spi_class_init(ObjectClass *klass, void *data)
-{
-    DeviceClass *dc = DEVICE_CLASS(klass);
-    SDCardClass *sc = SD_CARD_CLASS(klass);
-
-    dc->desc = "SD SPI";
-    sc->proto = &sd_proto_spi;
-}
-
-static const TypeInfo sd_types[] = {
-    {
-        .name           = TYPE_SD_CARD,
-        .parent         = TYPE_DEVICE,
-        .instance_size  = sizeof(SDState),
-        .class_size     = sizeof(SDCardClass),
-        .class_init     = sd_class_init,
-        .instance_init  = sd_instance_init,
-        .instance_finalize = sd_instance_finalize,
-    },
-    {
-        .name           = TYPE_SD_CARD_SPI,
-        .parent         = TYPE_SD_CARD,
-        .class_init     = sd_spi_class_init,
-    },
+static const TypeInfo sd_info = {
+    .name = TYPE_SD_CARD,
+    .parent = TYPE_DEVICE,
+    .instance_size = sizeof(SDState),
+    .class_size = sizeof(SDCardClass),
+    .class_init = sd_class_init,
+    .instance_init = sd_instance_init,
+    .instance_finalize = sd_instance_finalize,
 };
 
-DEFINE_TYPES(sd_types)
+static void sd_register_types(void)
+{
+    type_register_static(&sd_info);
+}
+
+type_init(sd_register_types)

@@ -164,7 +164,7 @@ VirtioFsFuseSetAttr (
     DEBUG ((
       DEBUG_ERROR,
       "%a: Label=\"%s\" NodeId=%Lu",
-      __func__,
+      __FUNCTION__,
       VirtioFs->Label,
       NodeId
       ));

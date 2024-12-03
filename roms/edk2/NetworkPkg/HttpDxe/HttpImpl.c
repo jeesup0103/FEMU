@@ -3,7 +3,6 @@
 
   Copyright (c) 2015 - 2021, Intel Corporation. All rights reserved.<BR>
   (C) Copyright 2015-2016 Hewlett Packard Enterprise Development LP<BR>
-  Copyright (C) 2024 Advanced Micro Devices, Inc. All rights reserved.<BR>
 
   SPDX-License-Identifier: BSD-2-Clause-Patent
 
@@ -249,6 +248,7 @@ EfiHttpRequest (
   HTTP_TOKEN_WRAP        *Wrap;
   CHAR8                  *FileUrl;
   UINTN                  RequestMsgSize;
+  EFI_HANDLE             ImageHandle;
 
   //
   // Initializations
@@ -371,10 +371,23 @@ EfiHttpRequest (
     //
     // Check whether we need to create Tls child and open the TLS protocol.
     //
-    if (HttpInstance->UseHttps && !HttpInstance->TlsAlreadyCreated) {
-      // Create TLS child for this HTTP instance.
-      Status = TlsCreateChild (HttpInstance);
-      if (EFI_ERROR (Status)) {
+    if (HttpInstance->UseHttps && (HttpInstance->TlsChildHandle == NULL)) {
+      //
+      // Use TlsSb to create Tls child and open the TLS protocol.
+      //
+      if (HttpInstance->LocalAddressIsIPv6) {
+        ImageHandle = HttpInstance->Service->Ip6DriverBindingHandle;
+      } else {
+        ImageHandle = HttpInstance->Service->Ip4DriverBindingHandle;
+      }
+
+      HttpInstance->TlsChildHandle = TlsCreateChild (
+                                       ImageHandle,
+                                       &(HttpInstance->TlsSb),
+                                       &(HttpInstance->Tls),
+                                       &(HttpInstance->TlsConfiguration)
+                                       );
+      if (HttpInstance->TlsChildHandle == NULL) {
         return EFI_DEVICE_ERROR;
       }
 

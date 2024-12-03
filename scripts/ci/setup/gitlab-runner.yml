@@ -26,7 +26,6 @@
       user:
         user: gitlab-runner
         group: gitlab-runner
-        groups: kvm
         comment: GitLab Runner
         home: /home/gitlab-runner
         shell: /bin/bash

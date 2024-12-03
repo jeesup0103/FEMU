@@ -109,8 +109,6 @@ class BaseToolsTest(unittest.TestCase):
         else: logFile = None
 
         if toolName is None: toolName = self.toolName
-        if sys.platform == "win32":
-            toolName += ".exe"
         bin = self.FindToolBin(toolName)
         if logFile is not None:
             logFile = open(os.path.join(self.testDir, logFile), 'w')
@@ -137,7 +135,7 @@ class BaseToolsTest(unittest.TestCase):
         return open(os.path.join(self.testDir, fileName), mode)
 
     def ReadTmpFile(self, fileName):
-        f = open(self.GetTmpFilePath(fileName), 'rb')
+        f = open(self.GetTmpFilePath(fileName), 'r')
         data = f.read()
         f.close()
         return data

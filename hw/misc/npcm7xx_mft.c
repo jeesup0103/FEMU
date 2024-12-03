@@ -503,7 +503,7 @@ static const VMStateDescription vmstate_npcm7xx_mft = {
     .name = "npcm7xx-mft-module",
     .version_id = 0,
     .minimum_version_id = 0,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_CLOCK(clock_in, NPCM7xxMFTState),
         VMSTATE_CLOCK(clock_1, NPCM7xxMFTState),
         VMSTATE_CLOCK(clock_2, NPCM7xxMFTState),

@@ -10,11 +10,6 @@
 
 #include <IndustryStandard/Acpi30.h>
 
-///
-/// _PSD Revision for ACPI 4.0
-///
-#define EFI_ACPI_4_0_AML_PSD_REVISION  0
-
 //
 // Ensure proper structure formats
 //

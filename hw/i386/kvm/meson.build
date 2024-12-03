@@ -9,7 +9,6 @@ i386_kvm_ss.add(when: 'CONFIG_XEN_EMU', if_true: files(
   'xen_evtchn.c',
   'xen_gnttab.c',
   'xen_xenstore.c',
-  'xen_primary_console.c',
   'xenstore_impl.c',
   ))
 
@@ -20,4 +19,4 @@ xen_stubs_ss.add(when: 'CONFIG_XEN_EMU', if_false: files(
   'xen-stubs.c',
 ))
 
-specific_ss.add_all(when: 'CONFIG_SYSTEM_ONLY', if_true: xen_stubs_ss)
+specific_ss.add_all(when: 'CONFIG_SOFTMMU', if_true: xen_stubs_ss)

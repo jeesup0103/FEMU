@@ -26,7 +26,7 @@
 
 #include <nvmm.h>
 
-struct AccelCPUState {
+struct qemu_vcpu {
     struct nvmm_vcpu vcpu;
     uint8_t tpr;
     bool stop;
@@ -48,6 +48,12 @@ struct qemu_machine {
 
 static bool nvmm_allowed;
 static struct qemu_machine qemu_mach;
+
+static struct qemu_vcpu *
+get_qemu_vcpu(CPUState *cpu)
+{
+    return (struct qemu_vcpu *)cpu->hax_vcpu;
+}
 
 static struct nvmm_machine *
 get_nvmm_mach(void)
@@ -78,9 +84,9 @@ nvmm_set_segment(struct nvmm_x64_state_seg *nseg, const SegmentCache *qseg)
 static void
 nvmm_set_registers(CPUState *cpu)
 {
-    CPUX86State *env = cpu_env(cpu);
+    CPUX86State *env = cpu->env_ptr;
     struct nvmm_machine *mach = get_nvmm_mach();
-    AccelCPUState *qcpu = cpu->accel;
+    struct qemu_vcpu *qcpu = get_qemu_vcpu(cpu);
     struct nvmm_vcpu *vcpu = &qcpu->vcpu;
     struct nvmm_x64_state *state = vcpu->state;
     uint64_t bitmap;
@@ -215,9 +221,9 @@ nvmm_get_segment(SegmentCache *qseg, const struct nvmm_x64_state_seg *nseg)
 static void
 nvmm_get_registers(CPUState *cpu)
 {
-    CPUX86State *env = cpu_env(cpu);
+    CPUX86State *env = cpu->env_ptr;
     struct nvmm_machine *mach = get_nvmm_mach();
-    AccelCPUState *qcpu = cpu->accel;
+    struct qemu_vcpu *qcpu = get_qemu_vcpu(cpu);
     struct nvmm_vcpu *vcpu = &qcpu->vcpu;
     X86CPU *x86_cpu = X86_CPU(cpu);
     struct nvmm_x64_state *state = vcpu->state;
@@ -340,7 +346,8 @@ nvmm_get_registers(CPUState *cpu)
 static bool
 nvmm_can_take_int(CPUState *cpu)
 {
-    AccelCPUState *qcpu = cpu->accel;
+    CPUX86State *env = cpu->env_ptr;
+    struct qemu_vcpu *qcpu = get_qemu_vcpu(cpu);
     struct nvmm_vcpu *vcpu = &qcpu->vcpu;
     struct nvmm_machine *mach = get_nvmm_mach();
 
@@ -348,7 +355,7 @@ nvmm_can_take_int(CPUState *cpu)
         return false;
     }
 
-    if (qcpu->int_shadow || !(cpu_env(cpu)->eflags & IF_MASK)) {
+    if (qcpu->int_shadow || !(env->eflags & IF_MASK)) {
         struct nvmm_x64_state *state = vcpu->state;
 
         /* Exit on interrupt window. */
@@ -365,7 +372,7 @@ nvmm_can_take_int(CPUState *cpu)
 static bool
 nvmm_can_take_nmi(CPUState *cpu)
 {
-    AccelCPUState *qcpu = cpu->accel;
+    struct qemu_vcpu *qcpu = get_qemu_vcpu(cpu);
 
     /*
      * Contrary to INTs, NMIs always schedule an exit when they are
@@ -386,9 +393,9 @@ nvmm_can_take_nmi(CPUState *cpu)
 static void
 nvmm_vcpu_pre_run(CPUState *cpu)
 {
-    CPUX86State *env = cpu_env(cpu);
+    CPUX86State *env = cpu->env_ptr;
     struct nvmm_machine *mach = get_nvmm_mach();
-    AccelCPUState *qcpu = cpu->accel;
+    struct qemu_vcpu *qcpu = get_qemu_vcpu(cpu);
     struct nvmm_vcpu *vcpu = &qcpu->vcpu;
     X86CPU *x86_cpu = X86_CPU(cpu);
     struct nvmm_x64_state *state = vcpu->state;
@@ -398,7 +405,7 @@ nvmm_vcpu_pre_run(CPUState *cpu)
     uint8_t tpr;
     int ret;
 
-    bql_lock();
+    qemu_mutex_lock_iothread();
 
     tpr = cpu_get_apic_tpr(x86_cpu->apic_state);
     if (tpr != qcpu->tpr) {
@@ -461,7 +468,7 @@ nvmm_vcpu_pre_run(CPUState *cpu)
         }
     }
 
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
 }
 
 /*
@@ -471,9 +478,9 @@ nvmm_vcpu_pre_run(CPUState *cpu)
 static void
 nvmm_vcpu_post_run(CPUState *cpu, struct nvmm_vcpu_exit *exit)
 {
-    AccelCPUState *qcpu = cpu->accel;
+    struct qemu_vcpu *qcpu = get_qemu_vcpu(cpu);
+    CPUX86State *env = cpu->env_ptr;
     X86CPU *x86_cpu = X86_CPU(cpu);
-    CPUX86State *env = &x86_cpu->env;
     uint64_t tpr;
 
     env->eflags = exit->exitstate.rflags;
@@ -484,9 +491,9 @@ nvmm_vcpu_post_run(CPUState *cpu, struct nvmm_vcpu_exit *exit)
     tpr = exit->exitstate.cr8;
     if (qcpu->tpr != tpr) {
         qcpu->tpr = tpr;
-        bql_lock();
+        qemu_mutex_lock_iothread();
         cpu_set_apic_tpr(x86_cpu->apic_state, qcpu->tpr);
-        bql_unlock();
+        qemu_mutex_unlock_iothread();
     }
 }
 
@@ -558,7 +565,7 @@ static int
 nvmm_handle_rdmsr(struct nvmm_machine *mach, CPUState *cpu,
     struct nvmm_vcpu_exit *exit)
 {
-    AccelCPUState *qcpu = cpu->accel;
+    struct qemu_vcpu *qcpu = get_qemu_vcpu(cpu);
     struct nvmm_vcpu *vcpu = &qcpu->vcpu;
     X86CPU *x86_cpu = X86_CPU(cpu);
     struct nvmm_x64_state *state = vcpu->state;
@@ -603,7 +610,7 @@ static int
 nvmm_handle_wrmsr(struct nvmm_machine *mach, CPUState *cpu,
     struct nvmm_vcpu_exit *exit)
 {
-    AccelCPUState *qcpu = cpu->accel;
+    struct qemu_vcpu *qcpu = get_qemu_vcpu(cpu);
     struct nvmm_vcpu *vcpu = &qcpu->vcpu;
     X86CPU *x86_cpu = X86_CPU(cpu);
     struct nvmm_x64_state *state = vcpu->state;
@@ -644,19 +651,20 @@ static int
 nvmm_handle_halted(struct nvmm_machine *mach, CPUState *cpu,
     struct nvmm_vcpu_exit *exit)
 {
+    CPUX86State *env = cpu->env_ptr;
     int ret = 0;
 
-    bql_lock();
+    qemu_mutex_lock_iothread();
 
     if (!((cpu->interrupt_request & CPU_INTERRUPT_HARD) &&
-          (cpu_env(cpu)->eflags & IF_MASK)) &&
+          (env->eflags & IF_MASK)) &&
         !(cpu->interrupt_request & CPU_INTERRUPT_NMI)) {
         cpu->exception_index = EXCP_HLT;
         cpu->halted = true;
         ret = 1;
     }
 
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
 
     return ret;
 }
@@ -676,11 +684,11 @@ nvmm_inject_ud(struct nvmm_machine *mach, struct nvmm_vcpu *vcpu)
 static int
 nvmm_vcpu_loop(CPUState *cpu)
 {
+    CPUX86State *env = cpu->env_ptr;
     struct nvmm_machine *mach = get_nvmm_mach();
-    AccelCPUState *qcpu = cpu->accel;
+    struct qemu_vcpu *qcpu = get_qemu_vcpu(cpu);
     struct nvmm_vcpu *vcpu = &qcpu->vcpu;
     X86CPU *x86_cpu = X86_CPU(cpu);
-    CPUX86State *env = &x86_cpu->env;
     struct nvmm_vcpu_exit *exit = vcpu->exit;
     int ret;
 
@@ -719,7 +727,7 @@ nvmm_vcpu_loop(CPUState *cpu)
         return 0;
     }
 
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
     cpu_exec_start(cpu);
 
     /*
@@ -804,16 +812,16 @@ nvmm_vcpu_loop(CPUState *cpu)
             error_report("NVMM: Unexpected VM exit code 0x%lx [hw=0x%lx]",
                 exit->reason, exit->u.inv.hwcode);
             nvmm_get_registers(cpu);
-            bql_lock();
+            qemu_mutex_lock_iothread();
             qemu_system_guest_panicked(cpu_get_crash_info(cpu));
-            bql_unlock();
+            qemu_mutex_unlock_iothread();
             ret = -1;
             break;
         }
     } while (ret == 0);
 
     cpu_exec_end(cpu);
-    bql_lock();
+    qemu_mutex_lock_iothread();
 
     qatomic_set(&cpu->exit_request, false);
 
@@ -884,7 +892,7 @@ static void
 nvmm_ipi_signal(int sigcpu)
 {
     if (current_cpu) {
-        AccelCPUState *qcpu = current_cpu->accel;
+        struct qemu_vcpu *qcpu = get_qemu_vcpu(current_cpu);
 #if NVMM_USER_VERSION >= 2
         struct nvmm_vcpu *vcpu = &qcpu->vcpu;
         nvmm_vcpu_stop(vcpu);
@@ -918,7 +926,7 @@ nvmm_init_vcpu(CPUState *cpu)
     struct nvmm_vcpu_conf_cpuid cpuid;
     struct nvmm_vcpu_conf_tpr tpr;
     Error *local_error = NULL;
-    AccelCPUState *qcpu;
+    struct qemu_vcpu *qcpu;
     int ret, err;
 
     nvmm_init_cpu_signals();
@@ -927,13 +935,18 @@ nvmm_init_vcpu(CPUState *cpu)
         error_setg(&nvmm_migration_blocker,
             "NVMM: Migration not supported");
 
-        if (migrate_add_blocker(&nvmm_migration_blocker, &local_error) < 0) {
+        if (migrate_add_blocker(nvmm_migration_blocker, &local_error) < 0) {
             error_report_err(local_error);
+            error_free(nvmm_migration_blocker);
             return -EINVAL;
         }
     }
 
-    qcpu = g_new0(AccelCPUState, 1);
+    qcpu = g_malloc0(sizeof(*qcpu));
+    if (qcpu == NULL) {
+        error_report("NVMM: Failed to allocate VCPU context.");
+        return -ENOMEM;
+    }
 
     ret = nvmm_vcpu_create(mach, cpu->cpu_index, &qcpu->vcpu);
     if (ret == -1) {
@@ -982,7 +995,7 @@ nvmm_init_vcpu(CPUState *cpu)
     }
 
     cpu->vcpu_dirty = true;
-    cpu->accel = qcpu;
+    cpu->hax_vcpu = (struct hax_vcpu_state *)qcpu;
 
     return 0;
 }
@@ -1014,10 +1027,10 @@ void
 nvmm_destroy_vcpu(CPUState *cpu)
 {
     struct nvmm_machine *mach = get_nvmm_mach();
-    AccelCPUState *qcpu = cpu->accel;
+    struct qemu_vcpu *qcpu = get_qemu_vcpu(cpu);
 
     nvmm_vcpu_destroy(mach, &qcpu->vcpu);
-    g_free(cpu->accel);
+    g_free(cpu->hax_vcpu);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1125,7 +1138,7 @@ static MemoryListener nvmm_memory_listener = {
     .region_add = nvmm_region_add,
     .region_del = nvmm_region_del,
     .log_sync = nvmm_log_sync,
-    .priority = MEMORY_LISTENER_PRIORITY_ACCEL,
+    .priority = 10,
 };
 
 static void

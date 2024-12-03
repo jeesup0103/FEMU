@@ -157,7 +157,7 @@ void setup_rt_frame(int sig, struct target_sigaction *ka,
         return;
     }
 
-    frame->info = *info;
+    tswap_siginfo(&frame->info, info);
 
     /* Create the ucontext.  */
     __put_user(0, &frame->uc.tuc_flags);

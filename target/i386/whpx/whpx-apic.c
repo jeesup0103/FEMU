@@ -90,10 +90,9 @@ static void whpx_get_apic_state(APICCommonState *s,
     apic_next_timer(s, s->initial_count_load_time);
 }
 
-static int whpx_apic_set_base(APICCommonState *s, uint64_t val)
+static void whpx_apic_set_base(APICCommonState *s, uint64_t val)
 {
     s->apicbase = val;
-    return 0;
 }
 
 static void whpx_put_apic_base(CPUState *cpu, uint64_t val)

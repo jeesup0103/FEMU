@@ -66,7 +66,7 @@ TryRunningQemuKernel (
     DEBUG ((
       DEBUG_ERROR,
       "%a: QemuStartKernelImage(): %r\n",
-      __func__,
+      __FUNCTION__,
       Status
       ));
   }

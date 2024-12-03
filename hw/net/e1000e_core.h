@@ -98,6 +98,8 @@ struct E1000Core {
 
     E1000IntrDelayTimer eitr[E1000E_MSIX_VEC_NUM];
 
+    VMChangeStateEntry *vmstate;
+
     uint32_t itr_guest_value;
     uint32_t eitr_guest_value[E1000E_MSIX_VEC_NUM];
 
@@ -108,6 +110,8 @@ struct E1000Core {
     NICState *owner_nic;
     PCIDevice *owner;
     void (*owner_start_recv)(PCIDevice *d);
+
+    uint32_t msi_causes_pending;
 
     int64_t timadj;
 };

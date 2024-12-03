@@ -21,11 +21,3 @@
 ASM_FUNC (RiscVSetSupervisorAddressTranslationRegister)
     csrw  CSR_SATP, a0
     ret
-
-//
-// Get the value of Supervisor Address Translation and
-// Protection Register.
-//
-ASM_FUNC (RiscVGetSupervisorAddressTranslationRegister)
-    csrr  a0, CSR_SATP
-    ret

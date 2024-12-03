@@ -408,10 +408,7 @@ StrDecimalToUintn (
 {
   UINTN  Result;
 
-  if (RETURN_ERROR (StrDecimalToUintnS (String, (CHAR16 **)NULL, &Result))) {
-    return MAX_UINTN;
-  }
-
+  StrDecimalToUintnS (String, (CHAR16 **)NULL, &Result);
   return Result;
 }
 
@@ -457,10 +454,7 @@ StrDecimalToUint64 (
 {
   UINT64  Result;
 
-  if (RETURN_ERROR (StrDecimalToUint64S (String, (CHAR16 **)NULL, &Result))) {
-    return MAX_UINT64;
-  }
-
+  StrDecimalToUint64S (String, (CHAR16 **)NULL, &Result);
   return Result;
 }
 
@@ -507,10 +501,7 @@ StrHexToUintn (
 {
   UINTN  Result;
 
-  if (RETURN_ERROR (StrHexToUintnS (String, (CHAR16 **)NULL, &Result))) {
-    return MAX_UINTN;
-  }
-
+  StrHexToUintnS (String, (CHAR16 **)NULL, &Result);
   return Result;
 }
 
@@ -557,10 +548,7 @@ StrHexToUint64 (
 {
   UINT64  Result;
 
-  if (RETURN_ERROR (StrHexToUint64S (String, (CHAR16 **)NULL, &Result))) {
-    return MAX_UINT64;
-  }
-
+  StrHexToUint64S (String, (CHAR16 **)NULL, &Result);
   return Result;
 }
 
@@ -1001,10 +989,7 @@ AsciiStrDecimalToUintn (
 {
   UINTN  Result;
 
-  if (RETURN_ERROR (AsciiStrDecimalToUintnS (String, (CHAR8 **)NULL, &Result))) {
-    return MAX_UINTN;
-  }
-
+  AsciiStrDecimalToUintnS (String, (CHAR8 **)NULL, &Result);
   return Result;
 }
 
@@ -1046,10 +1031,7 @@ AsciiStrDecimalToUint64 (
 {
   UINT64  Result;
 
-  if (RETURN_ERROR (AsciiStrDecimalToUint64S (String, (CHAR8 **)NULL, &Result))) {
-    return MAX_UINT64;
-  }
-
+  AsciiStrDecimalToUint64S (String, (CHAR8 **)NULL, &Result);
   return Result;
 }
 
@@ -1095,10 +1077,7 @@ AsciiStrHexToUintn (
 {
   UINTN  Result;
 
-  if (RETURN_ERROR (AsciiStrHexToUintnS (String, (CHAR8 **)NULL, &Result))) {
-    return MAX_UINTN;
-  }
-
+  AsciiStrHexToUintnS (String, (CHAR8 **)NULL, &Result);
   return Result;
 }
 
@@ -1144,10 +1123,7 @@ AsciiStrHexToUint64 (
 {
   UINT64  Result;
 
-  if (RETURN_ERROR (AsciiStrHexToUint64S (String, (CHAR8 **)NULL, &Result))) {
-    return MAX_UINT64;
-  }
-
+  AsciiStrHexToUint64S (String, (CHAR8 **)NULL, &Result);
   return Result;
 }
 

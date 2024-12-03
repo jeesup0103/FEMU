@@ -373,7 +373,7 @@ static int ppce500_load_device_tree(PPCE500MachineState *pms,
     MachineState *machine = MACHINE(pms);
     unsigned int smp_cpus = machine->smp.cpus;
     const PPCE500MachineClass *pmc = PPCE500_MACHINE_GET_CLASS(pms);
-    CPUPPCState *env = cpu_env(first_cpu);
+    CPUPPCState *env = first_cpu->env_ptr;
     int ret = -1;
     uint64_t mem_reg_property[] = { 0, cpu_to_be64(machine->ram_size) };
     int fdt_size;
@@ -499,7 +499,7 @@ static int ppce500_load_device_tree(PPCE500MachineState *pms,
         if (cpu == NULL) {
             continue;
         }
-        env = cpu_env(cpu);
+        env = cpu->env_ptr;
 
         cpu_name = g_strdup_printf("/cpus/PowerPC,8544@%x", i);
         qemu_fdt_add_subnode(fdt, cpu_name);
@@ -712,7 +712,7 @@ static int ppce500_prep_device_tree(PPCE500MachineState *machine,
     p->kernel_base = kernel_base;
     p->kernel_size = kernel_size;
 
-    qemu_register_reset_nosnapshotload(ppce500_reset_device_tree, p);
+    qemu_register_reset(ppce500_reset_device_tree, p);
     p->notifier.notify = ppce500_init_notify;
     qemu_add_machine_init_done_notifier(&p->notifier);
 
@@ -765,9 +765,7 @@ static void mmubooke_create_initial_mapping(CPUPPCState *env)
     tlb->mas7_3 = 0;
     tlb->mas7_3 |= MAS3_UR | MAS3_UW | MAS3_UX | MAS3_SR | MAS3_SW | MAS3_SX;
 
-#ifdef CONFIG_KVM
     env->tlb_dirty = true;
-#endif
 }
 
 static void ppce500_cpu_reset_sec(void *opaque)
@@ -834,7 +832,6 @@ static DeviceState *ppce500_init_mpic_qemu(PPCE500MachineState *pms,
 static DeviceState *ppce500_init_mpic_kvm(const PPCE500MachineClass *pmc,
                                           IrqLines *irqs, Error **errp)
 {
-#ifdef CONFIG_KVM
     DeviceState *dev;
     CPUState *cs;
 
@@ -855,9 +852,6 @@ static DeviceState *ppce500_init_mpic_kvm(const PPCE500MachineClass *pmc,
     }
 
     return dev;
-#else
-    g_assert_not_reached();
-#endif
 }
 
 static DeviceState *ppce500_init_mpic(PPCE500MachineState *pms,
@@ -904,7 +898,6 @@ void ppce500_init(MachineState *machine)
     MemoryRegion *address_space_mem = get_system_memory();
     PPCE500MachineState *pms = PPCE500_MACHINE(machine);
     const PPCE500MachineClass *pmc = PPCE500_MACHINE_GET_CLASS(machine);
-    MachineClass *mc = MACHINE_CLASS(pmc);
     PCIBus *pci_bus;
     CPUPPCState *env = NULL;
     uint64_t loadaddr;
@@ -955,7 +948,7 @@ void ppce500_init(MachineState *machine)
          * when implementing non-kernel boot.
          */
         object_property_set_bool(OBJECT(cs), "start-powered-off", i != 0,
-                                 &error_abort);
+                                 &error_fatal);
         qdev_realize_and_unref(DEVICE(cs), NULL, &error_fatal);
 
         if (!firstenv) {
@@ -1079,7 +1072,9 @@ void ppce500_init(MachineState *machine)
 
     if (pci_bus) {
         /* Register network interfaces. */
-        pci_init_nic_devices(pci_bus, mc->default_nic);
+        for (i = 0; i < nb_nics; i++) {
+            pci_nic_init_nofail(&nd_table[i], pci_bus, "virtio-net-pci", NULL);
+        }
     }
 
     /* Register spinning region */

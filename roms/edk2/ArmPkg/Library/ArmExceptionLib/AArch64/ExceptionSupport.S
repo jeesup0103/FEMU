@@ -94,6 +94,7 @@
 
 GCC_ASM_EXPORT(ExceptionHandlersEnd)
 GCC_ASM_EXPORT(CommonCExceptionHandler)
+GCC_ASM_EXPORT(RegisterEl0Stack)
 
 .text
 
@@ -386,6 +387,6 @@ ASM_PFX(CommonExceptionEntry):
 
   eret
 
-ASM_FUNC(RegisterEl0Stack)
+ASM_PFX(RegisterEl0Stack):
   msr     sp_el0, x0
   ret

@@ -21,6 +21,7 @@
 #include <Library/MemoryAllocationLib.h>
 
 extern EFI_SYSTEM_RESOURCE_TABLE  *mEsrtTable;
+extern BOOLEAN                    mIsVirtualAddrConverted;
 EFI_EVENT                         mDxeRuntimeCapsuleLibVirtualAddressChangeEvent = NULL;
 EFI_EVENT                         mDxeRuntimeCapsuleLibReadyToBootEvent          = NULL;
 
@@ -39,6 +40,7 @@ DxeCapsuleLibVirtualAddressChangeEvent (
   )
 {
   gRT->ConvertPointer (EFI_OPTIONAL_PTR, (VOID **)&mEsrtTable);
+  mIsVirtualAddrConverted = TRUE;
 }
 
 /**

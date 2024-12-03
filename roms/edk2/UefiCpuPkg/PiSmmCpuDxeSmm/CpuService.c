@@ -1,7 +1,7 @@
 /** @file
 Implementation of SMM CPU Services Protocol.
 
-Copyright (c) 2011 - 2023, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2011 - 2022, Intel Corporation. All rights reserved.<BR>
 SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
@@ -169,16 +169,6 @@ SmmAddProcessor (
         &gSmmCpuPrivate->ProcessorInfo[Index].Location.Package,
         &gSmmCpuPrivate->ProcessorInfo[Index].Location.Core,
         &gSmmCpuPrivate->ProcessorInfo[Index].Location.Thread
-        );
-
-      GetProcessorLocation2ByApicId (
-        (UINT32)ProcessorId,
-        &gSmmCpuPrivate->ProcessorInfo[Index].ExtendedInformation.Location2.Package,
-        &gSmmCpuPrivate->ProcessorInfo[Index].ExtendedInformation.Location2.Die,
-        &gSmmCpuPrivate->ProcessorInfo[Index].ExtendedInformation.Location2.Tile,
-        &gSmmCpuPrivate->ProcessorInfo[Index].ExtendedInformation.Location2.Module,
-        &gSmmCpuPrivate->ProcessorInfo[Index].ExtendedInformation.Location2.Core,
-        &gSmmCpuPrivate->ProcessorInfo[Index].ExtendedInformation.Location2.Thread
         );
 
       *ProcessorNumber                 = Index;
@@ -431,18 +421,11 @@ SmmCpuRendezvous (
     goto ON_EXIT;
   }
 
-  if ((mSmmMpSyncData->EffectiveSyncMode != SmmCpuSyncModeTradition) && !SmmCpuFeaturesNeedConfigureMtrrs ()) {
-    //
-    // There are some APs outside SMM, Wait for all avaiable APs to arrive.
-    //
-    SmmWaitForApArrival ();
-    Status = mSmmMpSyncData->AllApArrivedWithException ? EFI_SUCCESS : EFI_TIMEOUT;
-  } else {
-    //
-    // BSP has already waitted for APs to arrive SMM if SmmCpuSyncMode selected or need config MTRR.
-    //
-    Status = EFI_TIMEOUT;
-  }
+  //
+  // There are some APs outside SMM, Wait for all avaiable APs to arrive.
+  //
+  SmmWaitForApArrival ();
+  Status = mSmmMpSyncData->AllApArrivedWithException ? EFI_SUCCESS : EFI_TIMEOUT;
 
 ON_EXIT:
   if (!mSmmMpSyncData->AllApArrivedWithException) {

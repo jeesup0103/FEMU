@@ -26,11 +26,6 @@
 
 #include "RngDxeInternals.h"
 
-//
-// Count of Rng algorithms.
-//
-#define RNG_ALGORITHM_COUNT  2
-
 /** Allocate and initialize mAvailableAlgoArray with the available
     Rng algorithms. Also update mAvailableAlgoArrayCount.
 
@@ -43,7 +38,6 @@ GetAvailableAlgorithms (
   VOID
   )
 {
-  mAvailableAlgoArrayCount = RNG_ALGORITHM_COUNT;
   return EFI_SUCCESS;
 }
 
@@ -55,7 +49,6 @@ FreeAvailableAlgorithms (
   VOID
   )
 {
-  mAvailableAlgoArrayCount = 0;
   return;
 }
 
@@ -171,7 +164,7 @@ RngGetInfo (
     return EFI_INVALID_PARAMETER;
   }
 
-  RequiredSize = RNG_ALGORITHM_COUNT * sizeof (EFI_RNG_ALGORITHM);
+  RequiredSize = 2 * sizeof (EFI_RNG_ALGORITHM);
 
   if (*RNGAlgorithmListSize < RequiredSize) {
     *RNGAlgorithmListSize = RequiredSize;

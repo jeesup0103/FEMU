@@ -69,8 +69,7 @@
 #include "hw/isa/isa.h"
 #include "sysemu/dma.h"
 #include "hw/ide/pci.h"
-#include "hw/ide/ahci-pci.h"
-#include "ahci-internal.h"
+#include "ahci_internal.h"
 
 #define ICH9_MSI_CAP_OFFSET     0x80
 #define ICH9_SATA_CAP_OFFSET    0xA8
@@ -84,7 +83,7 @@
 static const VMStateDescription vmstate_ich9_ahci = {
     .name = "ich9_ahci",
     .version_id = 1,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_PCI_DEVICE(parent_obj, AHCIPCIState),
         VMSTATE_AHCI(ahci, AHCIPCIState),
         VMSTATE_END_OF_LIST()
@@ -100,21 +99,20 @@ static void pci_ich9_reset(DeviceState *dev)
 
 static void pci_ich9_ahci_init(Object *obj)
 {
-    AHCIPCIState *d = ICH9_AHCI(obj);
+    struct AHCIPCIState *d = ICH9_AHCI(obj);
 
     ahci_init(&d->ahci, DEVICE(obj));
 }
 
 static void pci_ich9_ahci_realize(PCIDevice *dev, Error **errp)
 {
-    AHCIPCIState *d;
+    struct AHCIPCIState *d;
     int sata_cap_offset;
     uint8_t *sata_cap;
     d = ICH9_AHCI(dev);
     int ret;
 
-    d->ahci.ports = 6;
-    ahci_realize(&d->ahci, DEVICE(dev), pci_get_address_space(dev));
+    ahci_realize(&d->ahci, DEVICE(dev), pci_get_address_space(dev), 6);
 
     pci_config_set_prog_interface(dev->config, AHCI_PROGMODE_MAJOR_REV_1);
 
@@ -156,7 +154,7 @@ static void pci_ich9_ahci_realize(PCIDevice *dev, Error **errp)
 
 static void pci_ich9_uninit(PCIDevice *dev)
 {
-    AHCIPCIState *d;
+    struct AHCIPCIState *d;
     d = ICH9_AHCI(dev);
 
     msi_uninit(dev);

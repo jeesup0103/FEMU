@@ -10,9 +10,9 @@
 .align 3
 .section .text
 
-.global ASM_PFX(CpuSleep)
+.global ASM_PFX(_CpuSleep)
 
-ASM_PFX(CpuSleep):
+ASM_PFX(_CpuSleep):
     wfi
     ret
 

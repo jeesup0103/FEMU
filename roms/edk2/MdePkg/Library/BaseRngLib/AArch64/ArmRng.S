@@ -31,7 +31,6 @@ GCC_ASM_EXPORT(ArmRndr)
 #  );
 #
 ASM_PFX(ArmRndr):
-  AARCH64_BTI(c)
   mrs  x1, RNDR
   str  x1, [x0]
   cset x0, ne    // RNDR sets NZCV to 0b0100 on failure

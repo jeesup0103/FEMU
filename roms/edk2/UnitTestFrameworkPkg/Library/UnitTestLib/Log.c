@@ -118,7 +118,7 @@ UnitTestLogInit (
   // Make sure that you're cooking with gas.
   //
   if (Test == NULL) {
-    DEBUG ((DEBUG_ERROR, "%a called with invalid Test parameter\n", __func__));
+    DEBUG ((DEBUG_ERROR, "%a called with invalid Test parameter\n", __FUNCTION__));
     return;
   }
 
@@ -166,10 +166,6 @@ UnitTestLog (
   VA_LIST                     Marker;
 
   FrameworkHandle = GetActiveFrameworkHandle ();
-  if (FrameworkHandle == NULL) {
-    DEBUG ((DEBUG_ERROR, "%a - FrameworkHandle not initialized\n", __func__));
-    return;
-  }
 
   LogTypePrefix = NULL;
 

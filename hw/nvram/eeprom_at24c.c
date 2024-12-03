@@ -51,7 +51,7 @@ struct EEPROMState {
     bool writable;
     /* cells changed since last START? */
     bool changed;
-    /* during WRITE, # of address bytes transferred */
+    /* during WRITE, # of address bytes transfered */
     uint8_t haveaddr;
 
     uint8_t *mem;

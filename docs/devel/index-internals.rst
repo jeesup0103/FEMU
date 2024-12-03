@@ -11,12 +11,11 @@ Details about QEMU's various subsystems including how to add features to them.
    block-coroutine-wrapper
    clocks
    ebpf_rss
-   migration/index
+   migration
    multi-process
    reset
-   s390-cpu-topology
    s390-dasd-ipl
    tracing
-   vfio-iommufd
+   vfio-migration
    writing-monitor-commands
    virtio-backends

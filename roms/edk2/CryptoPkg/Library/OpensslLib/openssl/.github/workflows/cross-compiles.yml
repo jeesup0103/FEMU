@@ -1,11 +1,5 @@
-# Copyright 2021-2022 The OpenSSL Project Authors. All Rights Reserved.
-#
-# Licensed under the Apache License 2.0 (the "License").  You may not use
-# this file except in compliance with the License.  You can obtain a copy
-# in the file LICENSE in the source distribution or at
-# https://www.openssl.org/source/license.html
-
-name: Cross Compile
+---
+name: Cross Compile for 1.1.1
 
 on: [pull_request, push]
 
@@ -24,11 +18,9 @@ jobs:
         #   libs: the Debian package for the necessary link/runtime libraries.
         #   target: the OpenSSL configuration target to use, this is passed
         #           directly to the config command line.
-        #   fips:   set to "no" to disable building FIPS, leave unset to
-        #           build the FIPS provider.
         #   tests: omit this to run all the tests using QEMU, set it to "none"
-        #          to never run the tests, otherwise its value is passed to
-        #          the "make test" command to allow selective disabling of
+        #          to never run the tests, otherwise it's value is passed to
+        #          the "make test" command to allow selectiving disabling of
         #          tests.
         platform: [
           {
@@ -53,25 +45,21 @@ jobs:
             arch: hppa-linux-gnu,
             libs: libc6-dev-hppa-cross,
             target: -static linux-generic32,
-            fips: no,
             tests: -test_includes -test_store -test_x509_store
           }, {
             arch: m68k-linux-gnu,
             libs: libc6-dev-m68k-cross,
-            target: -static -m68040 linux-latomic -Wno-stringop-overflow,
-            fips: no,
+            target: -static -m68040 linux-generic32,
             tests: -test_includes -test_store -test_x509_store
           }, {
             arch: mips-linux-gnu,
             libs: libc6-dev-mips-cross,
             target: -static linux-mips32,
-            fips: no,
             tests: -test_includes -test_store -test_x509_store
           }, {
             arch: mips64-linux-gnuabi64,
             libs: libc6-dev-mips64-cross,
             target: -static linux64-mips64,
-            fips: no
           }, {
             arch: mipsel-linux-gnu,
             libs: libc6-dev-mipsel-cross,
@@ -88,11 +76,11 @@ jobs:
           }, {
             arch: s390x-linux-gnu,
             libs: libc6-dev-s390x-cross,
-            target: linux64-s390x -Wno-stringop-overflow
+            target: linux64-s390x
           }, {
             arch: sh4-linux-gnu,
             libs: libc6-dev-sh4-cross,
-            target: no-async linux-latomic,
+            target: no-async linux-generic32,
             tests: -test_includes -test_store -test_x509_store
           },
 
@@ -107,7 +95,7 @@ jobs:
           }, {
             arch: m68k-linux-gnu,
             libs: libc6-dev-m68k-cross,
-            target: -mcfv4e linux-latomic -Wno-stringop-overflow,
+            target: -mcfv4e linux-generic32,
             tests: none
           }, {
             arch: mips-linux-gnu,
@@ -137,18 +125,11 @@ jobs:
         sudo apt-get -yq --force-yes install \
             gcc-${{ matrix.platform.arch }} \
             ${{ matrix.platform.libs }}
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v2
 
-    - name: config with FIPS
-      if: matrix.platform.fips != 'no'
+    - name: config
       run: |
-        ./config --banner=Configured --strict-warnings enable-fips \
-                 --cross-compile-prefix=${{ matrix.platform.arch }}- \
-                 ${{ matrix.platform.target }}
-    - name: config without FIPS
-      if: matrix.platform.fips == 'no'
-      run: |
-        ./config --banner=Configured --strict-warnings \
+        ./Configure --strict-warnings \
                  --cross-compile-prefix=${{ matrix.platform.arch }}- \
                  ${{ matrix.platform.target }}
     - name: config dump
@@ -164,11 +145,11 @@ jobs:
     - name: make all tests
       if: github.event_name == 'push' && matrix.platform.tests == ''
       run: |
-        make test HARNESS_JOBS=${HARNESS_JOBS:-4} \
+        make test \
                   QEMU_LD_PREFIX=/usr/${{ matrix.platform.arch }}
     - name: make some tests
       if: github.event_name == 'push' && matrix.platform.tests != 'none' && matrix.platform.tests != ''
       run: |
-        make test HARNESS_JOBS=${HARNESS_JOBS:-4} \
+        make test \
                   TESTS="${{ matrix.platform.tests }}" \
                   QEMU_LD_PREFIX=/usr/${{ matrix.platform.arch }}

@@ -88,13 +88,15 @@ static QCryptoAkCipherRSAKey *qcrypto_builtin_rsa_public_key_parse(
         goto error;
     }
     if (seq_length != 0) {
-        error_setg(errp, "Invalid RSA public key");
         goto error;
     }
 
     return rsa;
 
 error:
+    if (errp && !*errp) {
+        error_setg(errp, "Invalid RSA public key");
+    }
     qcrypto_akcipher_rsakey_free(rsa);
     return NULL;
 }
@@ -167,13 +169,15 @@ static QCryptoAkCipherRSAKey *qcrypto_builtin_rsa_private_key_parse(
         return rsa;
     }
     if (seq_length != 0) {
-        error_setg(errp, "Invalid RSA private key");
         goto error;
     }
 
     return rsa;
 
 error:
+    if (errp && !*errp) {
+        error_setg(errp, "Invalid RSA private key");
+    }
     qcrypto_akcipher_rsakey_free(rsa);
     return NULL;
 }

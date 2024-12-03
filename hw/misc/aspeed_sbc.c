@@ -130,7 +130,7 @@ static const VMStateDescription vmstate_aspeed_sbc = {
     .name = TYPE_ASPEED_SBC,
     .version_id = 1,
     .minimum_version_id = 1,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_UINT32_ARRAY(regs, AspeedSBCState, ASPEED_SBC_NR_REGS),
         VMSTATE_END_OF_LIST(),
     }

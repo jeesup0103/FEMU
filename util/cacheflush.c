@@ -237,18 +237,11 @@ static void __attribute__((constructor)) init_cache_info(void)
 
 #ifdef CONFIG_DARWIN
 /* Apple does not expose CTR_EL0, so we must use system interfaces. */
-#include <libkern/OSCacheControl.h>
-
+extern void sys_icache_invalidate(void *start, size_t len);
+extern void sys_dcache_flush(void *start, size_t len);
 void flush_idcache_range(uintptr_t rx, uintptr_t rw, size_t len)
 {
-    if (rx == rw) {
-        /*
-         * sys_icache_invalidate() syncs the dcache and icache,
-         * so no need to call sys_dcache_flush().
-         */
-    } else {
-        sys_dcache_flush((void *)rw, len);
-    }
+    sys_dcache_flush((void *)rw, len);
     sys_icache_invalidate((void *)rx, len);
 }
 #else

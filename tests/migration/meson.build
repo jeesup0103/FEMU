@@ -1,11 +1,9 @@
-sysprof = dependency('sysprof-capture-4', method: 'pkg-config', required: false)
-glib_static = dependency('glib-2.0', version: glib_req_ver, required: false,
-                         method: 'pkg-config', static: true)
+sysprof = dependency('sysprof-capture-4', required: false)
 
 stress = executable(
   'stress',
   files('stress.c'),
-  dependencies: [glib_static, sysprof],
+  dependencies: [glib, sysprof],
   link_args: ['-static'],
   build_by_default: false,
 )

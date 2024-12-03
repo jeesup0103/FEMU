@@ -82,9 +82,9 @@ InitializePlatform (
 
   VariableStore                                  = PlatformReserveEmuVariableNvStore ();
   PlatformInfoHob->PcdEmuVariableNvStoreReserved = (UINT64)(UINTN)VariableStore;
-  if (FeaturePcdGet (PcdSecureBootSupported)) {
-    PlatformInitEmuVariableNvStore (VariableStore);
-  }
+ #ifdef SECURE_BOOT_FEATURE_ENABLED
+  PlatformInitEmuVariableNvStore (VariableStore);
+ #endif
 
   if (TdIsEnabled ()) {
     PlatformTdxPublishRamRegions ();

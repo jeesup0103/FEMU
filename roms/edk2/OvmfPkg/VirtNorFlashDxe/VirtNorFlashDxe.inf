@@ -34,7 +34,6 @@
   DxeServicesTableLib
   HobLib
   IoLib
-  SafeIntLib
   UefiBootServicesTableLib
   UefiDriverEntryPoint
   UefiLib

@@ -10,8 +10,9 @@
  */
 REGS('e', ALL_GENERAL_REGS & 0x5555) /* even regs */
 REGS('r', ALL_GENERAL_REGS)
-REGS('q', ALL_QLDST_REGS)
-REGS('Q', ALL_QLDST_REGS & 0x5555)   /* even qldst */
+REGS('l', ALL_QLOAD_REGS)
+REGS('s', ALL_QSTORE_REGS)
+REGS('S', ALL_QSTORE_REGS & 0x5555)  /* even qstore */
 REGS('w', ALL_VECTOR_REGS)
 
 /*

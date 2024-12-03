@@ -41,8 +41,6 @@ void spapr_cpu_set_entry_state(PowerPCCPU *cpu, target_ulong nip,
                                target_ulong r1, target_ulong r3,
                                target_ulong r4);
 
-struct nested_ppc_state;
-
 typedef struct SpaprCpuState {
     uint64_t vpa_addr;
     uint64_t slb_shadow_addr, slb_shadow_size;
@@ -53,7 +51,8 @@ typedef struct SpaprCpuState {
 
     /* Fields for nested-HV support */
     bool in_nested; /* true while the L2 is executing */
-    struct nested_ppc_state *nested_host_state; /* holds the L1 state while L2 executes */
+    CPUPPCState *nested_host_state; /* holds the L1 state while L2 executes */
+    int64_t nested_tb_offset; /* L1->L2 TB offset */
 } SpaprCpuState;
 
 static inline SpaprCpuState *spapr_cpu_state(PowerPCCPU *cpu)

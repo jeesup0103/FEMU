@@ -135,27 +135,11 @@ ASM_PFX(LoadMicrocodeDefault):
    ;
    LOAD_RBP
 
-   test   rsp, rsp
+   cmp    rsp, 0
    jz     ParamError
-   test   rcx, rcx
+   cmp    rcx, 0
    jz     ParamError
    mov    rsp, rcx
-
-   ;
-   ; If microcode already loaded before this function, exit this function with SUCCESS.
-   ;
-   mov   ecx, MSR_IA32_BIOS_SIGN_ID
-   xor   eax, eax               ; Clear EAX
-   xor   edx, edx               ; Clear EDX
-   wrmsr                        ; Load 0 to MSR at 8Bh
-
-   mov   eax, 1
-   cpuid
-   mov   ecx, MSR_IA32_BIOS_SIGN_ID
-   rdmsr                         ; Get current microcode signature
-   xor   rax, rax
-   test  edx, edx
-   jnz   Exit2
 
    ; skip loading Microcode if the MicrocodeCodeSize is zero
    ; and report error if size is less than 2k
@@ -167,13 +151,13 @@ ASM_PFX(LoadMicrocodeDefault):
 
    ; UPD structure is compliant with FSP spec 2.4
    mov    rax, qword [rsp + LoadMicrocodeParamsFsp24.MicrocodeCodeSize]
-   test   rax, rax
+   cmp    rax, 0
    jz     Exit2
    cmp    rax, 0800h
    jl     ParamError
 
    mov    rsi, qword [rsp + LoadMicrocodeParamsFsp24.MicrocodeCodeAddr]
-   test   rsi, rsi
+   cmp    rsi, 0
    jnz    CheckMainHeader
 
 ParamError:
@@ -214,7 +198,7 @@ CheckMainHeader:
    cmp   ebx, dword [esi + MicrocodeHdr.MicrocodeHdrProcessor]
    jne   LoadMicrocodeDefault1
    test  edx, dword [esi + MicrocodeHdr.MicrocodeHdrFlags ]
-   jnz   LoadMicrocode  ; Jif signature and platform ID match
+   jnz   LoadCheck  ; Jif signature and platform ID match
 
 LoadMicrocodeDefault1:
    ; Check if extended header exists
@@ -247,7 +231,7 @@ CheckExtSig:
    cmp   dword [edi + ExtSig.ExtSigProcessor], ebx
    jne   LoadMicrocodeDefault2
    test  dword [edi + ExtSig.ExtSigFlags], edx
-   jnz   LoadMicrocode      ; Jif signature and platform ID match
+   jnz   LoadCheck      ; Jif signature and platform ID match
 LoadMicrocodeDefault2:
    ; Check if any more extended signatures exist
    add   edi, ExtSig.size
@@ -292,7 +276,22 @@ LoadMicrocodeDefault4:
    ; Is valid Microcode start point ?
    cmp   dword [esi + MicrocodeHdr.MicrocodeHdrVersion], 0ffffffffh
    jz    Done
-   jmp   CheckMainHeader
+
+LoadCheck:
+   ; Get the revision of the current microcode update loaded
+   mov   ecx, MSR_IA32_BIOS_SIGN_ID
+   xor   eax, eax               ; Clear EAX
+   xor   edx, edx               ; Clear EDX
+   wrmsr                        ; Load 0 to MSR at 8Bh
+
+   mov   eax, 1
+   cpuid
+   mov   ecx, MSR_IA32_BIOS_SIGN_ID
+   rdmsr                        ; Get current microcode signature
+
+   ; Verify this microcode update is not already loaded
+   cmp   dword [esi + MicrocodeHdr.MicrocodeHdrRevision], edx
+   je    Continue
 
 LoadMicrocode:
    ; EAX contains the linear address of the start of the Update Data
@@ -307,20 +306,18 @@ LoadMicrocode:
    mov   eax, 1
    cpuid
 
-Done:
-   mov   ecx, MSR_IA32_BIOS_SIGN_ID
-   xor   eax, eax               ; Clear EAX
-   xor   edx, edx               ; Clear EDX
-   wrmsr                        ; Load 0 to MSR at 8Bh
+Continue:
+   jmp   NextMicrocode
 
+Done:
    mov   eax, 1
    cpuid
    mov   ecx, MSR_IA32_BIOS_SIGN_ID
    rdmsr                         ; Get current microcode signature
    xor   eax, eax
-   test  edx, edx
+   cmp   edx, 0
    jnz   Exit2
-   mov   rax, 0800000000000000Eh
+   mov   eax, 0800000000000000Eh
 
 Exit2:
    jmp   rbp
@@ -467,7 +464,7 @@ ParamValid:
   ; Sec Platform Init
   ;
   CALL_YMM  ASM_PFX(SecPlatformInit)
-  test      rax, rax
+  cmp       eax, 0
   jnz       TempRamInitExit
 
   ; Load microcode
@@ -479,12 +476,12 @@ ParamValid:
   ; Call Sec CAR Init
   LOAD_RCX
   CALL_YMM  ASM_PFX(SecCarInit)
-  test      rax, rax
+  cmp       rax, 0
   jnz       TempRamInitExit
 
   LOAD_RCX
   CALL_YMM  ASM_PFX(EstablishStackFsp)
-  test      rax, rax
+  cmp       rax, 0
   jnz       TempRamInitExit
 
   LOAD_UCODE_STATUS rax             ; Restore microcode status if no CAR init error from SLOT 0 in YMM9 (upper 128bits).

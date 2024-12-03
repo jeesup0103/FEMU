@@ -65,7 +65,6 @@ struct QEMUBH {
     void *opaque;
     QSLIST_ENTRY(QEMUBH) next;
     unsigned flags;
-    MemReentrancyGuard *reentrancy_guard;
 };
 
 /* Called concurrently from any thread */
@@ -94,15 +93,13 @@ static void aio_bh_enqueue(QEMUBH *bh, unsigned new_flags)
     }
 
     aio_notify(ctx);
-    if (unlikely(icount_enabled())) {
-        /*
-         * Workaround for record/replay.
-         * vCPU execution should be suspended when new BH is set.
-         * This is needed to avoid guest timeouts caused
-         * by the long cycles of the execution.
-         */
-        icount_notify_exit();
-    }
+    /*
+     * Workaround for record/replay.
+     * vCPU execution should be suspended when new BH is set.
+     * This is needed to avoid guest timeouts caused
+     * by the long cycles of the execution.
+     */
+    icount_notify_exit();
 }
 
 /* Only called from aio_bh_poll() and aio_ctx_finalize() */
@@ -140,7 +137,7 @@ void aio_bh_schedule_oneshot_full(AioContext *ctx, QEMUBHFunc *cb,
 }
 
 QEMUBH *aio_bh_new_full(AioContext *ctx, QEMUBHFunc *cb, void *opaque,
-                        const char *name, MemReentrancyGuard *reentrancy_guard)
+                        const char *name)
 {
     QEMUBH *bh;
     bh = g_new(QEMUBH, 1);
@@ -149,30 +146,13 @@ QEMUBH *aio_bh_new_full(AioContext *ctx, QEMUBHFunc *cb, void *opaque,
         .cb = cb,
         .opaque = opaque,
         .name = name,
-        .reentrancy_guard = reentrancy_guard,
     };
     return bh;
 }
 
 void aio_bh_call(QEMUBH *bh)
 {
-    bool last_engaged_in_io = false;
-
-    /* Make a copy of the guard-pointer as cb may free the bh */
-    MemReentrancyGuard *reentrancy_guard = bh->reentrancy_guard;
-    if (reentrancy_guard) {
-        last_engaged_in_io = reentrancy_guard->engaged_in_io;
-        if (reentrancy_guard->engaged_in_io) {
-            trace_reentrant_aio(bh->ctx, bh->name);
-        }
-        reentrancy_guard->engaged_in_io = true;
-    }
-
     bh->cb(bh->opaque);
-
-    if (reentrancy_guard) {
-        reentrancy_guard->engaged_in_io = last_engaged_in_io;
-    }
 }
 
 /* Multiple occurrences of aio_bh_poll cannot be called concurrently. */
@@ -184,21 +164,7 @@ int aio_bh_poll(AioContext *ctx)
 
     /* Synchronizes with QSLIST_INSERT_HEAD_ATOMIC in aio_bh_enqueue().  */
     QSLIST_MOVE_ATOMIC(&slice.bh_list, &ctx->bh_list);
-
-    /*
-     * GCC13 [-Werror=dangling-pointer=] complains that the local variable
-     * 'slice' is being stored in the global 'ctx->bh_slice_list' but the
-     * list is emptied before this function returns.
-     */
-#if !defined(__clang__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpragmas"
-#pragma GCC diagnostic ignored "-Wdangling-pointer="
-#endif
     QSIMPLEQ_INSERT_TAIL(&ctx->bh_slice_list, &slice, next);
-#if !defined(__clang__)
-#pragma GCC diagnostic pop
-#endif
 
     while ((s = QSIMPLEQ_FIRST(&ctx->bh_slice_list))) {
         QEMUBH *bh;
@@ -411,7 +377,7 @@ aio_ctx_finalize(GSource     *source)
         g_free(bh);
     }
 
-    aio_set_event_notifier(ctx, &ctx->notifier, NULL, NULL, NULL);
+    aio_set_event_notifier(ctx, &ctx->notifier, false, NULL, NULL, NULL);
     event_notifier_cleanup(&ctx->notifier);
     qemu_rec_mutex_destroy(&ctx->lock);
     qemu_lockcnt_destroy(&ctx->list_lock);
@@ -564,10 +530,12 @@ static void co_schedule_bh_cb(void *opaque)
         Coroutine *co = QSLIST_FIRST(&straight);
         QSLIST_REMOVE_HEAD(&straight, co_scheduled_next);
         trace_aio_co_schedule_bh_cb(ctx, co);
+        aio_context_acquire(ctx);
 
         /* Protected by write barrier in qemu_aio_coroutine_enter */
         qatomic_set(&co->scheduled, NULL);
         qemu_aio_coroutine_enter(ctx, co);
+        aio_context_release(ctx);
     }
 }
 
@@ -593,6 +561,7 @@ AioContext *aio_context_new(Error **errp)
     QSLIST_INIT(&ctx->scheduled_coroutines);
 
     aio_set_event_notifier(ctx, &ctx->notifier,
+                           false,
                            aio_context_notifier_cb,
                            aio_context_notifier_poll,
                            aio_context_notifier_poll_ready);
@@ -707,7 +676,9 @@ void aio_co_enter(AioContext *ctx, Coroutine *co)
         assert(self != co);
         QSIMPLEQ_INSERT_TAIL(&self->co_queue_wakeup, co, co_queue_next);
     } else {
+        aio_context_acquire(ctx);
         qemu_aio_coroutine_enter(ctx, co);
+        aio_context_release(ctx);
     }
 }
 
@@ -721,6 +692,16 @@ void aio_context_unref(AioContext *ctx)
     g_source_unref(&ctx->source);
 }
 
+void aio_context_acquire(AioContext *ctx)
+{
+    qemu_rec_mutex_lock(&ctx->lock);
+}
+
+void aio_context_release(AioContext *ctx)
+{
+    qemu_rec_mutex_unlock(&ctx->lock);
+}
+
 QEMU_DEFINE_STATIC_CO_TLS(AioContext *, my_aiocontext)
 
 AioContext *qemu_get_current_aio_context(void)
@@ -729,7 +710,7 @@ AioContext *qemu_get_current_aio_context(void)
     if (ctx) {
         return ctx;
     }
-    if (bql_locked()) {
+    if (qemu_mutex_iothread_locked()) {
         /* Possibly in a vCPU thread.  */
         return qemu_get_aio_context();
     }

@@ -109,7 +109,7 @@ VirtioFsFuseRemoveFileOrDir (
       DEBUG_ERROR,
       "%a: Label=\"%s\" ParentNodeId=%Lu Name=\"%a\" "
       "IsDir=%d Errno=%d\n",
-      __func__,
+      __FUNCTION__,
       VirtioFs->Label,
       ParentNodeId,
       Name,

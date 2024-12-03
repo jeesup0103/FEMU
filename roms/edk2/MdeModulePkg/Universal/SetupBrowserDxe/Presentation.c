@@ -2145,15 +2145,6 @@ ProcessCallBackFunction (
               gCallbackReconnect = TRUE;
               break;
 
-            case EFI_BROWSER_ACTION_REQUEST_QUESTION_APPLY:
-              Status = SetQuestionValue (
-                         gCurrentSelection->FormSet,
-                         gCurrentSelection->Form,
-                         Statement,
-                         GetSetValueWithHiiDriver
-                         );
-              break;
-
             default:
               break;
           }

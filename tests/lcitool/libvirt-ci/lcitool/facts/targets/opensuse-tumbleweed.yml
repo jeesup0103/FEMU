@@ -2,7 +2,6 @@
 os:
   name: 'OpenSUSE'
   version: 'Tumbleweed'
-  libosinfo_id: 'http://opensuse.org/opensuse/tumbleweed'
 
 packaging:
   format: 'rpm'
@@ -22,7 +21,6 @@ ansible_python_package: python3
 ansible_python_interpreter: /usr/bin/python3
 
 install:
-  unattended_scheme: autoyast
   url: http://download.opensuse.org/tumbleweed/repo/oss
 
 containers:

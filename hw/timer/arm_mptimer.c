@@ -281,7 +281,7 @@ static const VMStateDescription vmstate_timerblock = {
     .name = "arm_mptimer_timerblock",
     .version_id = 3,
     .minimum_version_id = 3,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_UINT32(control, TimerBlock),
         VMSTATE_UINT32(status, TimerBlock),
         VMSTATE_PTIMER(timer, TimerBlock),
@@ -293,7 +293,7 @@ static const VMStateDescription vmstate_arm_mptimer = {
     .name = "arm_mptimer",
     .version_id = 3,
     .minimum_version_id = 3,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_STRUCT_VARRAY_UINT32(timerblock, ARMMPTimerState, num_cpu,
                                      3, vmstate_timerblock, TimerBlock),
         VMSTATE_END_OF_LIST()

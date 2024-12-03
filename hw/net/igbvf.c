@@ -50,7 +50,14 @@
 #include "trace.h"
 #include "qapi/error.h"
 
+#define TYPE_IGBVF "igbvf"
 OBJECT_DECLARE_SIMPLE_TYPE(IgbVfState, IGBVF)
+
+#define IGBVF_MMIO_BAR_IDX  (0)
+#define IGBVF_MSIX_BAR_IDX  (3)
+
+#define IGBVF_MMIO_SIZE     (16 * 1024)
+#define IGBVF_MSIX_SIZE     (16 * 1024)
 
 struct IgbVfState {
     PCIDevice parent_obj;
@@ -204,10 +211,6 @@ static void igbvf_write_config(PCIDevice *dev, uint32_t addr, uint32_t val,
 {
     trace_igbvf_write_config(addr, val, len);
     pci_default_write_config(dev, addr, val, len);
-    if (object_property_get_bool(OBJECT(pcie_sriov_get_pf(dev)),
-                                 "x-pcie-flr-init", &error_abort)) {
-        pcie_cap_flr_write_config(dev, addr, val, len);
-    }
 }
 
 static uint64_t igbvf_mmio_read(void *opaque, hwaddr addr, unsigned size)
@@ -270,23 +273,11 @@ static void igbvf_pci_realize(PCIDevice *dev, Error **errp)
         hw_error("Failed to initialize PCIe capability");
     }
 
-    if (object_property_get_bool(OBJECT(pcie_sriov_get_pf(dev)),
-                                 "x-pcie-flr-init", &error_abort)) {
-        pcie_cap_flr_init(dev);
-    }
-
     if (pcie_aer_init(dev, 1, 0x100, 0x40, errp) < 0) {
         hw_error("Failed to initialize AER capability");
     }
 
-    pcie_ari_init(dev, 0x150);
-}
-
-static void igbvf_qdev_reset_hold(Object *obj)
-{
-    PCIDevice *vf = PCI_DEVICE(obj);
-
-    igb_vf_reset(pcie_sriov_get_pf(vf), pcie_sriov_vf_number(vf));
+    pcie_ari_init(dev, 0x150, 1);
 }
 
 static void igbvf_pci_uninit(PCIDevice *dev)
@@ -303,7 +294,6 @@ static void igbvf_class_init(ObjectClass *class, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(class);
     PCIDeviceClass *c = PCI_DEVICE_CLASS(class);
-    ResettableClass *rc = RESETTABLE_CLASS(class);
 
     c->realize = igbvf_pci_realize;
     c->exit = igbvf_pci_uninit;
@@ -311,8 +301,6 @@ static void igbvf_class_init(ObjectClass *class, void *data)
     c->device_id = E1000_DEV_ID_82576_VF;
     c->revision = 1;
     c->class_id = PCI_CLASS_NETWORK_ETHERNET;
-
-    rc->phases.hold = igbvf_qdev_reset_hold;
 
     dc->desc = "Intel 82576 Virtual Function";
     dc->user_creatable = false;

@@ -91,11 +91,7 @@ Tpm12GetPtpInterface (
     return PtpInterfaceFifo;
   }
 
-  if (InterfaceId.Bits.InterfaceType == PTP_INTERFACE_IDENTIFIER_INTERFACE_TYPE_TIS) {
-    return PtpInterfaceTis;
-  }
-
-  return PtpInterfaceMax;
+  return PtpInterfaceTis;
 }
 
 /**

@@ -46,7 +46,6 @@ libqos_srcs = files(
         'virtio-serial.c',
         'virtio-iommu.c',
         'virtio-gpio.c',
-        'virtio-scmi.c',
         'generic-pcihost.c',
 
         # qgraph machines:
@@ -60,7 +59,6 @@ libqos_srcs = files(
         'arm-xilinx-zynq-a9-machine.c',
         'ppc64_pseries-machine.c',
         'x86_64_pc-machine.c',
-        'riscv-virt-machine.c',
 )
 
 if have_virtfs

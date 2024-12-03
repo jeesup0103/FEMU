@@ -12,7 +12,6 @@
 #include <Library/MemEncryptSevLib.h>
 #include <Library/MemEncryptTdxLib.h>
 #include <Library/PcdLib.h>
-#include <Library/SynchronizationLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 #include "IoMmuInternal.h"
 
@@ -154,7 +153,7 @@ IoMmuInitReservedSharedMem (
   DEBUG ((
     DEBUG_VERBOSE,
     "%a: ReservedMem (%d pages) address = 0x%llx\n",
-    __func__,
+    __FUNCTION__,
     TotalPages,
     PhysicalAddress
     ));
@@ -269,17 +268,16 @@ InternalAllocateBuffer (
   IN  EFI_ALLOCATE_TYPE        Type,
   IN  EFI_MEMORY_TYPE          MemoryType,
   IN  UINTN                    Pages,
-  OUT UINT32                   *ReservedMemBit,
+  IN OUT UINT32                *ReservedMemBitmap,
   IN OUT EFI_PHYSICAL_ADDRESS  *PhysicalAddress
   )
 {
   UINT32                    MemBitmap;
-  UINT32                    ReservedMemBitmap;
   UINT8                     Index;
   IOMMU_RESERVED_MEM_RANGE  *MemRange;
   UINTN                     PagesOfLastMemRange;
 
-  *ReservedMemBit = 0;
+  *ReservedMemBitmap = 0;
 
   if (Pages == 0) {
     ASSERT (FALSE);
@@ -311,49 +309,41 @@ InternalAllocateBuffer (
 
   MemRange = &mReservedMemRanges[Index];
 
-  do {
-    ReservedMemBitmap = mReservedMemBitmap;
+  if ((mReservedMemBitmap & MemRange->BitmapMask) == MemRange->BitmapMask) {
+    // The reserved memory is exausted. Turn to legacy allocate.
+    goto LegacyAllocateBuffer;
+  }
 
-    if ((ReservedMemBitmap & MemRange->BitmapMask) == MemRange->BitmapMask) {
-      // The reserved memory is exhausted. Turn to legacy allocate.
-      goto LegacyAllocateBuffer;
+  MemBitmap = (mReservedMemBitmap & MemRange->BitmapMask) >> MemRange->Shift;
+
+  for (Index = 0; Index < MemRange->Slots; Index++) {
+    if ((MemBitmap & (UINT8)(1<<Index)) == 0) {
+      break;
     }
+  }
 
-    MemBitmap = (ReservedMemBitmap & MemRange->BitmapMask) >> MemRange->Shift;
+  ASSERT (Index != MemRange->Slots);
 
-    for (Index = 0; Index < MemRange->Slots; Index++) {
-      if ((MemBitmap & (UINT8)(1<<Index)) == 0) {
-        break;
-      }
-    }
-
-    ASSERT (Index != MemRange->Slots);
-
-    *PhysicalAddress = MemRange->StartAddressOfMemRange + Index * SIZE_OF_MEM_RANGE (MemRange) + MemRange->HeaderSize;
-    *ReservedMemBit  = (UINT32)(1 << (Index + MemRange->Shift));
-  } while (ReservedMemBitmap != InterlockedCompareExchange32 (
-                                  &mReservedMemBitmap,
-                                  ReservedMemBitmap,
-                                  ReservedMemBitmap | *ReservedMemBit
-                                  ));
+  *PhysicalAddress   = MemRange->StartAddressOfMemRange + Index * SIZE_OF_MEM_RANGE (MemRange) + MemRange->HeaderSize;
+  *ReservedMemBitmap = (UINT32)(1 << (Index + MemRange->Shift));
 
   DEBUG ((
     DEBUG_VERBOSE,
     "%a: range-size: %lx, start-address=0x%llx, pages=0x%llx, bits=0x%lx, bitmap: %lx => %lx\n",
-    __func__,
+    __FUNCTION__,
     MemRange->DataSize,
     *PhysicalAddress,
     Pages,
-    *ReservedMemBit,
-    ReservedMemBitmap,
-    ReservedMemBitmap | *ReservedMemBit
+    *ReservedMemBitmap,
+    mReservedMemBitmap,
+    mReservedMemBitmap | *ReservedMemBitmap
     ));
 
   return EFI_SUCCESS;
 
 LegacyAllocateBuffer:
 
-  *ReservedMemBit = 0;
+  *ReservedMemBitmap = 0;
   return gBS->AllocatePages (Type, MemoryType, Pages, PhysicalAddress);
 }
 
@@ -376,39 +366,22 @@ IoMmuAllocateBounceBuffer (
   )
 {
   EFI_STATUS  Status;
+  UINT32      ReservedMemBitmap;
 
-  Status = InternalAllocateBuffer (
-             Type,
-             MemoryType,
-             MapInfo->NumberOfPages,
-             &MapInfo->ReservedMemBitmap,
-             &MapInfo->PlainTextAddress
-             );
+  ReservedMemBitmap = 0;
+  Status            = InternalAllocateBuffer (
+                        Type,
+                        MemoryType,
+                        MapInfo->NumberOfPages,
+                        &ReservedMemBitmap,
+                        &MapInfo->PlainTextAddress
+                        );
+  MapInfo->ReservedMemBitmap = ReservedMemBitmap;
+  mReservedMemBitmap        |= ReservedMemBitmap;
+
   ASSERT (Status == EFI_SUCCESS);
 
   return Status;
-}
-
-/**
- * Clear a bit in the reserved memory bitmap in a thread safe manner
- *
- * @param ReservedMemBit  The bit to clear
- */
-STATIC
-VOID
-ClearReservedMemBit (
-  IN  UINT32  ReservedMemBit
-  )
-{
-  UINT32  ReservedMemBitmap;
-
-  do {
-    ReservedMemBitmap = mReservedMemBitmap;
-  } while (ReservedMemBitmap != InterlockedCompareExchange32 (
-                                  &mReservedMemBitmap,
-                                  ReservedMemBitmap,
-                                  ReservedMemBitmap & ~ReservedMemBit
-                                  ));
 }
 
 /**
@@ -428,14 +401,14 @@ IoMmuFreeBounceBuffer (
     DEBUG ((
       DEBUG_VERBOSE,
       "%a: PlainTextAddress=0x%Lx, bits=0x%Lx, bitmap: %Lx => %Lx\n",
-      __func__,
+      __FUNCTION__,
       MapInfo->PlainTextAddress,
       MapInfo->ReservedMemBitmap,
       mReservedMemBitmap,
       mReservedMemBitmap & ((UINT32)(~MapInfo->ReservedMemBitmap))
       ));
-    ClearReservedMemBit (MapInfo->ReservedMemBitmap);
     MapInfo->PlainTextAddress  = 0;
+    mReservedMemBitmap        &= (UINT32)(~MapInfo->ReservedMemBitmap);
     MapInfo->ReservedMemBitmap = 0;
   }
 
@@ -472,6 +445,8 @@ IoMmuAllocateCommonBuffer (
              );
   ASSERT (Status == EFI_SUCCESS);
 
+  mReservedMemBitmap |= *ReservedMemBitmap;
+
   if (*ReservedMemBitmap != 0) {
     *PhysicalAddress -= SIZE_4KB;
   }
@@ -505,14 +480,14 @@ IoMmuFreeCommonBuffer (
   DEBUG ((
     DEBUG_VERBOSE,
     "%a: CommonBuffer=0x%Lx, bits=0x%Lx, bitmap: %Lx => %Lx\n",
-    __func__,
+    __FUNCTION__,
     (UINT64)(UINTN)CommonBufferHeader + SIZE_4KB,
     CommonBufferHeader->ReservedMemBitmap,
     mReservedMemBitmap,
     mReservedMemBitmap & ((UINT32)(~CommonBufferHeader->ReservedMemBitmap))
     ));
 
-  ClearReservedMemBit (CommonBufferHeader->ReservedMemBitmap);
+  mReservedMemBitmap &= (UINT32)(~CommonBufferHeader->ReservedMemBitmap);
   return EFI_SUCCESS;
 
 LegacyFreeCommonBuffer:

@@ -16,7 +16,11 @@
 #ifndef HVF_I386_H
 #define HVF_I386_H
 
-uint32_t hvf_get_supported_cpuid(uint32_t func, uint32_t idx, int reg);
+#include "qemu/accel.h"
+#include "sysemu/hvf.h"
+#include "sysemu/hvf_int.h"
+#include "cpu.h"
+#include "x86.h"
 
 void hvf_handle_io(CPUArchState *, uint16_t, void *, int, int, int);
 

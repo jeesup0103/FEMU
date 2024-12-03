@@ -228,9 +228,10 @@ hwaddr mb_cpu_get_phys_page_attrs_debug(CPUState *cs, vaddr addr,
                                         MemTxAttrs *attrs)
 {
     MicroBlazeCPU *cpu = MICROBLAZE_CPU(cs);
+    CPUMBState *env = &cpu->env;
     target_ulong vaddr, paddr = 0;
     MicroBlazeMMULookup lu;
-    int mmu_idx = cpu_mmu_index(cs, false);
+    int mmu_idx = cpu_mmu_index(env, false);
     unsigned int hit;
 
     /* Caller doesn't initialize */
@@ -252,7 +253,8 @@ hwaddr mb_cpu_get_phys_page_attrs_debug(CPUState *cs, vaddr addr,
 
 bool mb_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 {
-    CPUMBState *env = cpu_env(cs);
+    MicroBlazeCPU *cpu = MICROBLAZE_CPU(cs);
+    CPUMBState *env = &cpu->env;
 
     if ((interrupt_request & CPU_INTERRUPT_HARD)
         && (env->msr & MSR_IE)

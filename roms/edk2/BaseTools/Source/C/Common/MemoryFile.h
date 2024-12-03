@@ -27,53 +27,79 @@ typedef struct {
 // Functions declarations
 //
 
-/**
-  This opens a file, reads it into memory and returns a memory file
-  object.
-
-  @param InputFile          Memory file image.
-  @param OutputMemoryFile   Handle to memory file
-
-  @return EFI_STATUS
-  OutputMemoryFile is valid if !EFI_ERROR
-**/
 EFI_STATUS
 GetMemoryFile (
   IN CHAR8       *InputFileName,
   OUT EFI_HANDLE *OutputMemoryFile
   )
 ;
-
 /**
-  Frees all memory associated with the input memory file.
 
-  @param InputMemoryFile   Handle to memory file
+Routine Description:
 
-  @return EFI_STATUS
+  This opens a file, reads it into memory and returns a memory file
+  object.
+
+Arguments:
+
+  InputFile          Memory file image.
+  OutputMemoryFile   Handle to memory file
+
+Returns:
+
+  EFI_STATUS
+  OutputMemoryFile is valid if !EFI_ERROR
+
 **/
+
+
 EFI_STATUS
 FreeMemoryFile (
   IN EFI_HANDLE InputMemoryFile
   )
 ;
-
 /**
+
+Routine Description:
+
+  Frees all memory associated with the input memory file.
+
+Arguments:
+
+  InputMemoryFile   Handle to memory file
+
+Returns:
+
+  EFI_STATUS
+
+**/
+
+
+CHAR8 *
+ReadMemoryFileLine (
+  IN EFI_HANDLE     InputMemoryFile
+  )
+;
+/**
+
+Routine Description:
+
   This function reads a line from the memory file.  The newline characters
   are stripped and a null terminated string is returned.
 
   If the string pointer returned is non-NULL, then the caller must free the
   memory associated with this string.
 
-  @param InputMemoryFile   Handle to memory file
+Arguments:
 
-  @retval NULL if error or EOF
-  @retval NULL character termincated string otherwise (MUST BE FREED BY CALLER)
+  InputMemoryFile   Handle to memory file
+
+Returns:
+
+  NULL if error or EOF
+  NULL character termincated string otherwise (MUST BE FREED BY CALLER)
+
 **/
-CHAR8 *
-ReadMemoryFileLine (
-  IN EFI_HANDLE     InputMemoryFile
-  )
-;
 
 
 #endif

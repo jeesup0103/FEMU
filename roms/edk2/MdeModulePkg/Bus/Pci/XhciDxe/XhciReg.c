@@ -2,7 +2,6 @@
 
   The XHCI register operation routines.
 
-(C) Copyright 2023 Hewlett Packard Enterprise Development LP<BR>
 Copyright (c) 2011 - 2017, Intel Corporation. All rights reserved.<BR>
 SPDX-License-Identifier: BSD-2-Clause-Patent
 
@@ -418,14 +417,15 @@ XhcClearOpRegBit (
   Wait the operation register's bit as specified by Bit
   to become set (or clear).
 
-  @param  Xhc          The XHCI Instance.
-  @param  Offset       The offset of the operation register.
-  @param  Bit          The bit of the register to wait for.
-  @param  WaitToSet    Wait the bit to set or clear.
-  @param  Timeout      The time to wait before abort (in millisecond, ms).
+  @param  Xhc                    The XHCI Instance.
+  @param  Offset                 The offset of the operation register.
+  @param  Bit                    The bit of the register to wait for.
+  @param  WaitToSet              Wait the bit to set or clear.
+  @param  Timeout                The time to wait before abort (in millisecond, ms).
 
-  @retval EFI_SUCCESS  The bit successfully changed by host controller.
-  @retval EFI_TIMEOUT  The time out occurred.
+  @retval EFI_SUCCESS            The bit successfully changed by host controller.
+  @retval EFI_TIMEOUT            The time out occurred.
+  @retval EFI_OUT_OF_RESOURCES   Memory for the timer event could not be allocated.
 
 **/
 EFI_STATUS
@@ -437,34 +437,54 @@ XhcWaitOpRegBit (
   IN UINT32             Timeout
   )
 {
-  UINT64  TimeoutTicks;
-  UINT64  ElapsedTicks;
-  UINT64  TicksDelta;
-  UINT64  CurrentTick;
+  EFI_STATUS  Status;
+  EFI_EVENT   TimeoutEvent;
+
+  TimeoutEvent = NULL;
 
   if (Timeout == 0) {
     return EFI_TIMEOUT;
   }
 
-  TimeoutTicks = XhcConvertTimeToTicks (XHC_MICROSECOND_TO_NANOSECOND (Timeout * XHC_1_MILLISECOND));
-  ElapsedTicks = 0;
-  CurrentTick  = GetPerformanceCounter ();
+  Status = gBS->CreateEvent (
+                  EVT_TIMER,
+                  TPL_CALLBACK,
+                  NULL,
+                  NULL,
+                  &TimeoutEvent
+                  );
+
+  if (EFI_ERROR (Status)) {
+    goto DONE;
+  }
+
+  Status = gBS->SetTimer (
+                  TimeoutEvent,
+                  TimerRelative,
+                  EFI_TIMER_PERIOD_MILLISECONDS (Timeout)
+                  );
+
+  if (EFI_ERROR (Status)) {
+    goto DONE;
+  }
+
   do {
     if (XHC_REG_BIT_IS_SET (Xhc, Offset, Bit) == WaitToSet) {
-      return EFI_SUCCESS;
+      Status = EFI_SUCCESS;
+      goto DONE;
     }
 
     gBS->Stall (XHC_1_MICROSECOND);
-    TicksDelta = XhcGetElapsedTicks (&CurrentTick);
-    // Ensure that ElapsedTicks is always incremented to avoid indefinite hangs
-    if (TicksDelta == 0) {
-      TicksDelta = XhcConvertTimeToTicks (XHC_MICROSECOND_TO_NANOSECOND (XHC_1_MICROSECOND));
-    }
+  } while (EFI_ERROR (gBS->CheckEvent (TimeoutEvent)));
 
-    ElapsedTicks += TicksDelta;
-  } while (ElapsedTicks < TimeoutTicks);
+  Status = EFI_TIMEOUT;
 
-  return EFI_TIMEOUT;
+DONE:
+  if (TimeoutEvent != NULL) {
+    gBS->CloseEvent (TimeoutEvent);
+  }
+
+  return Status;
 }
 
 /**

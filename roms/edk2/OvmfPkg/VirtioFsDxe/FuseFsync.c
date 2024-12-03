@@ -116,7 +116,7 @@ VirtioFsFuseFsyncFileOrDir (
       DEBUG_ERROR,
       "%a: Label=\"%s\" NodeId=%Lu FuseHandle=%Lu "
       "IsDir=%d Errno=%d\n",
-      __func__,
+      __FUNCTION__,
       VirtioFs->Label,
       NodeId,
       FuseHandle,

@@ -39,7 +39,6 @@ exports available: 1
  export: ''
   size:  67108864
   min block: 1
-  transaction size: 64-bit
 
 == check TLS fail over TCP with mismatched hostname ==
 qemu-img: Could not open 'driver=nbd,host=localhost,port=PORT,tls-creds=tls0': Certificate does not match the hostname localhost
@@ -54,7 +53,6 @@ exports available: 1
  export: ''
   size:  67108864
   min block: 1
-  transaction size: 64-bit
 
 == check TLS with different CA fails ==
 qemu-img: Could not open 'driver=nbd,host=127.0.0.1,port=PORT,tls-creds=tls0': The certificate hasn't got a known issuer
@@ -85,7 +83,6 @@ exports available: 1
  export: ''
   size:  67108864
   min block: 1
-  transaction size: 64-bit
 
 == check TLS works over UNIX with PSK ==
 image: nbd+unix://?socket=SOCK_DIR/qemu-nbd.sock
@@ -96,7 +93,6 @@ exports available: 1
  export: ''
   size:  67108864
   min block: 1
-  transaction size: 64-bit
 
 == check TLS fails over UNIX with mismatch PSK ==
 qemu-img: Could not open 'driver=nbd,path=SOCK_DIR/qemu-nbd.sock,tls-creds=tls0': TLS handshake failed: The TLS connection was non-properly terminated.

@@ -1,20 +1,20 @@
 # THIS FILE WAS AUTO-GENERATED
 #
-#  $ lcitool dockerfile --layers all fedora-38 qemu
+#  $ lcitool dockerfile --layers all fedora-37 qemu
 #
 # https://gitlab.com/libvirt/libvirt-ci
 
-FROM registry.fedoraproject.org/fedora:38
+FROM registry.fedoraproject.org/fedora:37
 
 RUN dnf install -y nosync && \
-    printf '#!/bin/sh\n\
+    echo -e '#!/bin/sh\n\
 if test -d /usr/lib64\n\
 then\n\
     export LD_PRELOAD=/usr/lib64/nosync/nosync.so\n\
 else\n\
     export LD_PRELOAD=/usr/lib/nosync/nosync.so\n\
 fi\n\
-exec "$@"\n' > /usr/bin/nosync && \
+exec "$@"' > /usr/bin/nosync && \
     chmod +x /usr/bin/nosync && \
     nosync dnf update -y && \
     nosync dnf install -y \
@@ -43,6 +43,7 @@ exec "$@"\n' > /usr/bin/nosync && \
                gcc \
                gcc-c++ \
                gcovr \
+               genisoimage \
                gettext \
                git \
                glib2-devel \
@@ -82,7 +83,6 @@ exec "$@"\n' > /usr/bin/nosync && \
                libubsan \
                liburing-devel \
                libusbx-devel \
-               libxdp-devel \
                libzstd-devel \
                llvm \
                lttng-ust-devel \
@@ -90,7 +90,6 @@ exec "$@"\n' > /usr/bin/nosync && \
                make \
                mesa-libgbm-devel \
                meson \
-               mtools \
                ncurses-devel \
                nettle-devel \
                ninja-build \
@@ -99,7 +98,6 @@ exec "$@"\n' > /usr/bin/nosync && \
                openssh-clients \
                pam-devel \
                pcre-static \
-               pipewire-devel \
                pixman-devel \
                pkgconfig \
                pulseaudio-libs-devel \
@@ -112,13 +110,13 @@ exec "$@"\n' > /usr/bin/nosync && \
                python3-sphinx \
                python3-sphinx_rtd_theme \
                rdma-core-devel \
+               rpm \
                sed \
                snappy-devel \
                socat \
                sparse \
                spice-protocol \
                spice-server-devel \
-               swtpm \
                systemd-devel \
                systemtap-sdt-devel \
                tar \
@@ -131,7 +129,6 @@ exec "$@"\n' > /usr/bin/nosync && \
                which \
                xen-devel \
                xfsprogs-devel \
-               xorriso \
                zlib-devel \
                zlib-static \
                zstd && \

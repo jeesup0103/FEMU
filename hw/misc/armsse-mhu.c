@@ -157,7 +157,7 @@ static const VMStateDescription armsse_mhu_vmstate = {
     .name = "armsse-mhu",
     .version_id = 1,
     .minimum_version_id = 1,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_UINT32(cpu0intr, ARMSSEMHU),
         VMSTATE_UINT32(cpu1intr, ARMSSEMHU),
         VMSTATE_END_OF_LIST()

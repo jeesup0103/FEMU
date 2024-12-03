@@ -1,7 +1,7 @@
 /** @file
   SMM Core Main Entry Point
 
-  Copyright (c) 2009 - 2023, Intel Corporation. All rights reserved.<BR>
+  Copyright (c) 2009 - 2019, Intel Corporation. All rights reserved.<BR>
   SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
@@ -305,8 +305,6 @@ SmmReadyToBootHandler (
   EFI_STATUS  Status;
   EFI_HANDLE  SmmHandle;
 
-  PERF_CALLBACK_BEGIN (&gEfiEventReadyToBootGuid);
-
   //
   // Install SMM Ready To Boot protocol.
   //
@@ -320,7 +318,6 @@ SmmReadyToBootHandler (
 
   SmiHandlerUnRegister (DispatchHandle);
 
-  PERF_CALLBACK_END (&gEfiEventReadyToBootGuid);
   return Status;
 }
 
@@ -354,8 +351,6 @@ SmmReadyToLockHandler (
   UINTN       Index;
   EFI_HANDLE  SmmHandle;
   VOID        *Interface;
-
-  PERF_CALLBACK_BEGIN (&gEfiDxeSmmReadyToLockProtocolGuid);
 
   //
   // Unregister SMI Handlers that are no required after the SMM driver dispatch is stopped
@@ -413,7 +408,6 @@ SmmReadyToLockHandler (
 
   SmramProfileReadyToLock ();
 
-  PERF_CALLBACK_END (&gEfiDxeSmmReadyToLockProtocolGuid);
   return Status;
 }
 
@@ -447,8 +441,6 @@ SmmEndOfDxeHandler (
   EFI_HANDLE                     S3EntryHandle;
 
   DEBUG ((DEBUG_INFO, "SmmEndOfDxeHandler\n"));
-
-  PERF_CALLBACK_BEGIN (&gEfiEndOfDxeEventGroupGuid);
 
   //
   // Install SMM EndOfDxe protocol
@@ -487,7 +479,6 @@ SmmEndOfDxeHandler (
     }
   }
 
-  PERF_CALLBACK_END (&gEfiEndOfDxeEventGroupGuid);
   return EFI_SUCCESS;
 }
 
@@ -678,8 +669,6 @@ SmmEntryPoint (
   VOID                        *CommunicationBuffer;
   UINTN                       BufferSize;
 
-  PERF_FUNCTION_BEGIN ();
-
   //
   // Update SMST with contents of the SmmEntryContext structure
   //
@@ -692,9 +681,7 @@ SmmEntryPoint (
   //
   // Call platform hook before Smm Dispatch
   //
-  PERF_START (NULL, "PlatformHookBeforeSmmDispatch", NULL, 0);
   PlatformHookBeforeSmmDispatch ();
-  PERF_END (NULL, "PlatformHookBeforeSmmDispatch", NULL, 0);
 
   //
   // Call memory management hook function
@@ -771,9 +758,7 @@ SmmEntryPoint (
   //
   // Call platform hook after Smm Dispatch
   //
-  PERF_START (NULL, "PlatformHookAfterSmmDispatch", NULL, 0);
   PlatformHookAfterSmmDispatch ();
-  PERF_END (NULL, "PlatformHookAfterSmmDispatch", NULL, 0);
 
   //
   // If a legacy boot has occurred, then make sure gSmmCorePrivate is not accessed
@@ -784,8 +769,6 @@ SmmEntryPoint (
     //
     gSmmCorePrivate->InSmm = FALSE;
   }
-
-  PERF_FUNCTION_END ();
 }
 
 /**

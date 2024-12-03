@@ -30,11 +30,7 @@ static void pch_pic_update_irq(LoongArchPCHPIC *s, uint64_t mask, int level)
             qemu_set_irq(s->parent_irq[s->htmsi_vector[irq]], 1);
         }
     } else {
-        /*
-         * intirr means requested pending irq
-         * do not clear pending irq for edge-triggered on lowering edge
-         */
-        val = mask & s->intisr & ~s->intirr;
+        val = mask & s->intisr;
         if (val) {
             irq = ctz64(val);
             s->intisr &= ~MAKE_64BIT_MASK(irq, 1);
@@ -55,7 +51,6 @@ static void pch_pic_irq_handler(void *opaque, int irq, int level)
         /* Edge triggered */
         if (level) {
             if ((s->last_intirr & mask) == 0) {
-                /* marked pending on a rising edge */
                 s->intirr |= mask;
             }
             s->last_intirr |= mask;
@@ -420,7 +415,7 @@ static const VMStateDescription vmstate_loongarch_pch_pic = {
     .name = TYPE_LOONGARCH_PCH_PIC,
     .version_id = 1,
     .minimum_version_id = 1,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_UINT64(int_mask, LoongArchPCHPIC),
         VMSTATE_UINT64(htmsi_en, LoongArchPCHPIC),
         VMSTATE_UINT64(intedge, LoongArchPCHPIC),

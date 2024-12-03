@@ -2,7 +2,6 @@
   Emulator Thunk to abstract OS services from pure EFI code
 
   Copyright (c) 2008 - 2011, Apple Inc. All rights reserved.<BR>
-  Copyright (c) 2023, Intel Corporation. All rights reserved.<BR>
 
   SPDX-License-Identifier: BSD-2-Clause-Patent
 
@@ -149,12 +148,12 @@ VOID
 typedef
 VOID
 (EFIAPI *EMU_GET_TIME)(
-  OUT EFI_TIME                *Time,
+  OUT  EFI_TIME               *Time,
   OUT EFI_TIME_CAPABILITIES   *Capabilities OPTIONAL
   );
 
 typedef
-EFI_STATUS
+VOID
 (EFIAPI *EMU_SET_TIME)(
   IN   EFI_TIME               *Time
   );

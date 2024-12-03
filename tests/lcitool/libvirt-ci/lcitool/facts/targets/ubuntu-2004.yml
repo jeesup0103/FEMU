@@ -2,7 +2,6 @@
 os:
   name: 'Ubuntu'
   version: '2004'
-  libosinfo_id: 'http://ubuntu.com/ubuntu/20.04'
 
 packaging:
   format: 'deb'

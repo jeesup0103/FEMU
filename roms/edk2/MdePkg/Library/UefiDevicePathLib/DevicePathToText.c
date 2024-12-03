@@ -418,41 +418,23 @@ DevPathToTextAcpiEx (
   )
 {
   ACPI_EXTENDED_HID_DEVICE_PATH  *AcpiEx;
+  CHAR8                          *HIDStr;
+  CHAR8                          *UIDStr;
+  CHAR8                          *CIDStr;
   CHAR16                         HIDText[11];
   CHAR16                         CIDText[11];
-  UINTN                          CurrentLength;
-  CHAR8                          *CurrentPos;
-  UINTN                          NextStringOffset;
-  CHAR8                          *Strings[3];
-  UINT8                          HidStrIndex;
-  UINT8                          UidStrIndex;
-  UINT8                          CidStrIndex;
-  UINT8                          StrIndex;
 
-  HidStrIndex          = 0;
-  UidStrIndex          = 1;
-  CidStrIndex          = 2;
-  AcpiEx               = DevPath;
-  Strings[HidStrIndex] = NULL;
-  Strings[UidStrIndex] = NULL;
-  Strings[CidStrIndex] = NULL;
-  CurrentLength        = sizeof (ACPI_EXTENDED_HID_DEVICE_PATH);
-  CurrentPos           = (CHAR8 *)(((UINT8 *)AcpiEx) + sizeof (ACPI_EXTENDED_HID_DEVICE_PATH));
-  StrIndex             = 0;
-  while (CurrentLength < AcpiEx->Header.Length[0] && StrIndex < ARRAY_SIZE (Strings)) {
-    Strings[StrIndex] = CurrentPos;
-    NextStringOffset  = AsciiStrLen (CurrentPos) + 1;
-    CurrentLength    += NextStringOffset;
-    CurrentPos       += NextStringOffset;
-    StrIndex++;
-  }
+  AcpiEx = DevPath;
+  HIDStr = (CHAR8 *)(((UINT8 *)AcpiEx) + sizeof (ACPI_EXTENDED_HID_DEVICE_PATH));
+  UIDStr = HIDStr + AsciiStrLen (HIDStr) + 1;
+  CIDStr = UIDStr + AsciiStrLen (UIDStr) + 1;
 
   if (DisplayOnly) {
     if ((EISA_ID_TO_NUM (AcpiEx->HID) == 0x0A03) ||
         ((EISA_ID_TO_NUM (AcpiEx->CID) == 0x0A03) && (EISA_ID_TO_NUM (AcpiEx->HID) != 0x0A08)))
     {
-      if (Strings[UidStrIndex] != NULL) {
-        UefiDevicePathLibCatPrint (Str, L"PciRoot(%a)", Strings[UidStrIndex]);
+      if (AcpiEx->UID == 0) {
+        UefiDevicePathLibCatPrint (Str, L"PciRoot(%a)", UIDStr);
       } else {
         UefiDevicePathLibCatPrint (Str, L"PciRoot(0x%x)", AcpiEx->UID);
       }
@@ -461,8 +443,8 @@ DevPathToTextAcpiEx (
     }
 
     if ((EISA_ID_TO_NUM (AcpiEx->HID) == 0x0A08) || (EISA_ID_TO_NUM (AcpiEx->CID) == 0x0A08)) {
-      if (Strings[UidStrIndex] != NULL) {
-        UefiDevicePathLibCatPrint (Str, L"PcieRoot(%a)", Strings[UidStrIndex]);
+      if (AcpiEx->UID == 0) {
+        UefiDevicePathLibCatPrint (Str, L"PcieRoot(%a)", UIDStr);
       } else {
         UefiDevicePathLibCatPrint (Str, L"PcieRoot(0x%x)", AcpiEx->UID);
       }
@@ -493,10 +475,7 @@ DevPathToTextAcpiEx (
     (AcpiEx->CID >> 16) & 0xFFFF
     );
 
-  if (((Strings[HidStrIndex] != NULL) && (*Strings[HidStrIndex] == '\0')) &&
-      ((Strings[CidStrIndex] != NULL) && (*Strings[CidStrIndex] == '\0')) &&
-      ((Strings[UidStrIndex] != NULL) && (*Strings[UidStrIndex] != '\0')))
-  {
+  if ((*HIDStr == '\0') && (*CIDStr == '\0') && (*UIDStr != '\0')) {
     //
     // use AcpiExp()
     //
@@ -505,7 +484,7 @@ DevPathToTextAcpiEx (
         Str,
         L"AcpiExp(%s,0,%a)",
         HIDText,
-        Strings[UidStrIndex]
+        UIDStr
         );
     } else {
       UefiDevicePathLibCatPrint (
@@ -513,25 +492,28 @@ DevPathToTextAcpiEx (
         L"AcpiExp(%s,%s,%a)",
         HIDText,
         CIDText,
-        Strings[UidStrIndex]
+        UIDStr
         );
     }
   } else {
     if (DisplayOnly) {
-      if (Strings[HidStrIndex] != NULL) {
-        UefiDevicePathLibCatPrint (Str, L"AcpiEx(%a,", Strings[HidStrIndex]);
+      //
+      // display only
+      //
+      if (AcpiEx->HID == 0) {
+        UefiDevicePathLibCatPrint (Str, L"AcpiEx(%a,", HIDStr);
       } else {
         UefiDevicePathLibCatPrint (Str, L"AcpiEx(%s,", HIDText);
       }
 
-      if (Strings[CidStrIndex] != NULL) {
-        UefiDevicePathLibCatPrint (Str, L"%a,", Strings[CidStrIndex]);
+      if (AcpiEx->CID == 0) {
+        UefiDevicePathLibCatPrint (Str, L"%a,", CIDStr);
       } else {
         UefiDevicePathLibCatPrint (Str, L"%s,", CIDText);
       }
 
-      if (Strings[UidStrIndex] != NULL) {
-        UefiDevicePathLibCatPrint (Str, L"%a)", Strings[UidStrIndex]);
+      if (AcpiEx->UID == 0) {
+        UefiDevicePathLibCatPrint (Str, L"%a)", UIDStr);
       } else {
         UefiDevicePathLibCatPrint (Str, L"0x%x)", AcpiEx->UID);
       }
@@ -542,9 +524,9 @@ DevPathToTextAcpiEx (
         HIDText,
         CIDText,
         AcpiEx->UID,
-        Strings[HidStrIndex] != NULL ? Strings[HidStrIndex] : '\0',
-        Strings[CidStrIndex] != NULL ? Strings[CidStrIndex] : '\0',
-        Strings[UidStrIndex] != NULL ? Strings[UidStrIndex] : '\0'
+        HIDStr,
+        CIDStr,
+        UIDStr
         );
     }
   }

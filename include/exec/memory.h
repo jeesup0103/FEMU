@@ -24,7 +24,6 @@
 #include "qemu/bswap.h"
 #include "qemu/queue.h"
 #include "qemu/int128.h"
-#include "qemu/range.h"
 #include "qemu/notify.h"
 #include "qom/object.h"
 #include "qemu/rcu.h"
@@ -43,7 +42,7 @@ typedef struct IOMMUMemoryRegionClass IOMMUMemoryRegionClass;
 DECLARE_OBJ_CHECKERS(IOMMUMemoryRegion, IOMMUMemoryRegionClass,
                      IOMMU_MEMORY_REGION, TYPE_IOMMU_MEMORY_REGION)
 
-#define TYPE_RAM_DISCARD_MANAGER "ram-discard-manager"
+#define TYPE_RAM_DISCARD_MANAGER "qemu:ram-discard-manager"
 typedef struct RamDiscardManagerClass RamDiscardManagerClass;
 typedef struct RamDiscardManager RamDiscardManager;
 DECLARE_OBJ_CHECKERS(RamDiscardManager, RamDiscardManagerClass,
@@ -80,7 +79,8 @@ extern unsigned int global_dirty_tracking;
 typedef struct MemoryRegionOps MemoryRegionOps;
 
 struct ReservedRegion {
-    Range range;
+    hwaddr low;
+    hwaddr high;
     unsigned type;
 };
 
@@ -95,7 +95,6 @@ struct ReservedRegion {
  *     relative to the region's address space
  * @readonly: writes to this section are ignored
  * @nonvolatile: this section is non-volatile
- * @unmergeable: this section should not get merged with adjacent sections
  */
 struct MemoryRegionSection {
     Int128 size;
@@ -105,7 +104,6 @@ struct MemoryRegionSection {
     hwaddr offset_within_address_space;
     bool readonly;
     bool nonvolatile;
-    bool unmergeable;
 };
 
 typedef struct IOMMUTLBEntry IOMMUTLBEntry;
@@ -233,15 +231,6 @@ typedef struct IOMMUTLBEvent {
 
 /* RAM that isn't accessible through normal means. */
 #define RAM_PROTECTED (1 << 8)
-
-/* RAM is an mmap-ed named file */
-#define RAM_NAMED_FILE (1 << 9)
-
-/* RAM is mmap-ed read-only */
-#define RAM_READONLY (1 << 10)
-
-/* RAM FD is opened read-only */
-#define RAM_READONLY_FD (1 << 11)
 
 static inline void iommu_notifier_init(IOMMUNotifier *n, IOMMUNotify fn,
                                        IOMMUNotifierFlag flags,
@@ -527,26 +516,6 @@ struct IOMMUMemoryRegionClass {
      int (*iommu_set_page_size_mask)(IOMMUMemoryRegion *iommu,
                                      uint64_t page_size_mask,
                                      Error **errp);
-    /**
-     * @iommu_set_iova_ranges:
-     *
-     * Propagate information about the usable IOVA ranges for a given IOMMU
-     * memory region. Used for example to propagate host physical device
-     * reserved memory region constraints to the virtual IOMMU.
-     *
-     * Optional method: if this method is not provided, then the default IOVA
-     * aperture is used.
-     *
-     * @iommu: the IOMMUMemoryRegion
-     *
-     * @iova_ranges: list of ordered IOVA ranges (at least one range)
-     *
-     * Returns 0 on success, or a negative error. In case of failure, the error
-     * object must be created.
-     */
-     int (*iommu_set_iova_ranges)(IOMMUMemoryRegion *iommu,
-                                  GList *iova_ranges,
-                                  Error **errp);
 };
 
 typedef struct RamDiscardListener RamDiscardListener;
@@ -621,9 +590,8 @@ typedef void (*ReplayRamDiscard)(MemoryRegionSection *section, void *opaque);
  * populated (consuming memory), to be used/accessed by the VM.
  *
  * A #RamDiscardManager can only be set for a RAM #MemoryRegion while the
- * #MemoryRegion isn't mapped into an address space yet (either directly
- * or via an alias); it cannot change while the #MemoryRegion is
- * mapped into an address space.
+ * #MemoryRegion isn't mapped yet; it cannot change while the #MemoryRegion is
+ * mapped.
  *
  * The #RamDiscardManager is intended to be used by technologies that are
  * incompatible with discarding of RAM (e.g., VFIO, which may pin all
@@ -795,13 +763,10 @@ struct MemoryRegion {
     bool nonvolatile;
     bool rom_device;
     bool flush_coalesced_mmio;
-    bool unmergeable;
     uint8_t dirty_log_mask;
     bool is_iommu;
     RAMBlock *ram_block;
     Object *owner;
-    /* owner as TYPE_DEVICE. Used for re-entrancy checks in MR access hotpath */
-    DeviceState *dev;
 
     const MemoryRegionOps *ops;
     void *opaque;
@@ -826,9 +791,6 @@ struct MemoryRegion {
     unsigned ioeventfd_nb;
     MemoryRegionIoeventfd *ioeventfds;
     RamDiscardManager *rdm; /* Only for RAM */
-
-    /* For devices designed to perform re-entrant IO into their own IO MRs */
-    bool disable_reentrancy_guard;
 };
 
 struct IOMMUMemoryRegion {
@@ -840,10 +802,6 @@ struct IOMMUMemoryRegion {
 
 #define IOMMU_NOTIFIER_FOREACH(n, mr) \
     QLIST_FOREACH((n), &(mr)->iommu_notify, node)
-
-#define MEMORY_LISTENER_PRIORITY_MIN            0
-#define MEMORY_LISTENER_PRIORITY_ACCEL          10
-#define MEMORY_LISTENER_PRIORITY_DEV_BACKEND    10
 
 /**
  * struct MemoryListener: callbacks structure for updates to the physical memory map
@@ -971,11 +929,8 @@ struct MemoryListener {
      * its @log_sync must be NULL.  Vice versa.
      *
      * @listener: The #MemoryListener.
-     * @last_stage: The last stage to synchronize the log during migration.
-     * The caller should guarantee that the synchronization with true for
-     * @last_stage is triggered for once after all VCPUs have been stopped.
      */
-    void (*log_sync_global)(MemoryListener *listener, bool last_stage);
+    void (*log_sync_global)(MemoryListener *listener);
 
     /**
      * @log_clear:
@@ -1119,7 +1074,6 @@ struct AddressSpace {
     struct FlatView *current_map;
 
     int ioeventfd_nb;
-    int ioeventfd_notifiers;
     struct MemoryRegionIoeventfd *ioeventfds;
     QTAILQ_HEAD(, MemoryListener) listeners;
     QTAILQ_ENTRY(AddressSpace) address_spaces_link;
@@ -1288,10 +1242,8 @@ void memory_region_init_io(MemoryRegion *mr,
  *
  * Note that this function does not do anything to cause the data in the
  * RAM memory region to be migrated; that is the responsibility of the caller.
- *
- * Return: true on success, else false setting @errp with error.
  */
-bool memory_region_init_ram_nomigrate(MemoryRegion *mr,
+void memory_region_init_ram_nomigrate(MemoryRegion *mr,
                                       Object *owner,
                                       const char *name,
                                       uint64_t size,
@@ -1312,10 +1264,8 @@ bool memory_region_init_ram_nomigrate(MemoryRegion *mr,
  *
  * Note that this function does not do anything to cause the data in the
  * RAM memory region to be migrated; that is the responsibility of the caller.
- *
- * Return: true on success, else false setting @errp with error.
  */
-bool memory_region_init_ram_flags_nomigrate(MemoryRegion *mr,
+void memory_region_init_ram_flags_nomigrate(MemoryRegion *mr,
                                             Object *owner,
                                             const char *name,
                                             uint64_t size,
@@ -1342,10 +1292,8 @@ bool memory_region_init_ram_flags_nomigrate(MemoryRegion *mr,
  *
  * Note that this function does not do anything to cause the data in the
  * RAM memory region to be migrated; that is the responsibility of the caller.
- *
- * Return: true on success, else false setting @errp with error.
  */
-bool memory_region_init_resizeable_ram(MemoryRegion *mr,
+void memory_region_init_resizeable_ram(MemoryRegion *mr,
                                        Object *owner,
                                        const char *name,
                                        uint64_t size,
@@ -1368,25 +1316,22 @@ bool memory_region_init_resizeable_ram(MemoryRegion *mr,
  * @align: alignment of the region base address; if 0, the default alignment
  *         (getpagesize()) will be used.
  * @ram_flags: RamBlock flags. Supported flags: RAM_SHARED, RAM_PMEM,
- *             RAM_NORESERVE, RAM_PROTECTED, RAM_NAMED_FILE, RAM_READONLY,
- *             RAM_READONLY_FD
+ *             RAM_NORESERVE,
  * @path: the path in which to allocate the RAM.
- * @offset: offset within the file referenced by path
+ * @readonly: true to open @path for reading, false for read/write.
  * @errp: pointer to Error*, to store an error if it happens.
  *
  * Note that this function does not do anything to cause the data in the
  * RAM memory region to be migrated; that is the responsibility of the caller.
- *
- * Return: true on success, else false setting @errp with error.
  */
-bool memory_region_init_ram_from_file(MemoryRegion *mr,
+void memory_region_init_ram_from_file(MemoryRegion *mr,
                                       Object *owner,
                                       const char *name,
                                       uint64_t size,
                                       uint64_t align,
                                       uint32_t ram_flags,
                                       const char *path,
-                                      ram_addr_t offset,
+                                      bool readonly,
                                       Error **errp);
 
 /**
@@ -1398,18 +1343,15 @@ bool memory_region_init_ram_from_file(MemoryRegion *mr,
  * @name: the name of the region.
  * @size: size of the region.
  * @ram_flags: RamBlock flags. Supported flags: RAM_SHARED, RAM_PMEM,
- *             RAM_NORESERVE, RAM_PROTECTED, RAM_NAMED_FILE, RAM_READONLY,
- *             RAM_READONLY_FD
+ *             RAM_NORESERVE, RAM_PROTECTED.
  * @fd: the fd to mmap.
  * @offset: offset within the file referenced by fd
  * @errp: pointer to Error*, to store an error if it happens.
  *
  * Note that this function does not do anything to cause the data in the
  * RAM memory region to be migrated; that is the responsibility of the caller.
- *
- * Return: true on success, else false setting @errp with error.
  */
-bool memory_region_init_ram_from_fd(MemoryRegion *mr,
+void memory_region_init_ram_from_fd(MemoryRegion *mr,
                                     Object *owner,
                                     const char *name,
                                     uint64_t size,
@@ -1504,10 +1446,8 @@ void memory_region_init_alias(MemoryRegion *mr,
  *        must be unique within any device
  * @size: size of the region.
  * @errp: pointer to Error*, to store an error if it happens.
- *
- * Return: true on success, else false setting @errp with error.
  */
-bool memory_region_init_rom_nomigrate(MemoryRegion *mr,
+void memory_region_init_rom_nomigrate(MemoryRegion *mr,
                                       Object *owner,
                                       const char *name,
                                       uint64_t size,
@@ -1529,10 +1469,8 @@ bool memory_region_init_rom_nomigrate(MemoryRegion *mr,
  *        must be unique within any device
  * @size: size of the region.
  * @errp: pointer to Error*, to store an error if it happens.
- *
- * Return: true on success, else false setting @errp with error.
  */
-bool memory_region_init_rom_device_nomigrate(MemoryRegion *mr,
+void memory_region_init_rom_device_nomigrate(MemoryRegion *mr,
                                              Object *owner,
                                              const MemoryRegionOps *ops,
                                              void *opaque,
@@ -1590,10 +1528,8 @@ void memory_region_init_iommu(void *_iommu_mr,
  * give the RAM block a unique name for migration purposes.
  * We should lift this restriction and allow arbitrary Objects.
  * If you pass a non-NULL non-device @owner then we will assert.
- *
- * Return: true on success, else false setting @errp with error.
  */
-bool memory_region_init_ram(MemoryRegion *mr,
+void memory_region_init_ram(MemoryRegion *mr,
                             Object *owner,
                             const char *name,
                             uint64_t size,
@@ -1619,10 +1555,8 @@ bool memory_region_init_ram(MemoryRegion *mr,
  *        must be unique within any device
  * @size: size of the region.
  * @errp: pointer to Error*, to store an error if it happens.
- *
- * Return: true on success, else false setting @errp with error.
  */
-bool memory_region_init_rom(MemoryRegion *mr,
+void memory_region_init_rom(MemoryRegion *mr,
                             Object *owner,
                             const char *name,
                             uint64_t size,
@@ -1652,10 +1586,8 @@ bool memory_region_init_rom(MemoryRegion *mr,
  *        must be unique within any device
  * @size: size of the region.
  * @errp: pointer to Error*, to store an error if it happens.
- *
- * Return: true on success, else false setting @errp with error.
  */
-bool memory_region_init_rom_device(MemoryRegion *mr,
+void memory_region_init_rom_device(MemoryRegion *mr,
                                    Object *owner,
                                    const MemoryRegionOps *ops,
                                    void *opaque,
@@ -1897,18 +1829,6 @@ int memory_region_iommu_set_page_size_mask(IOMMUMemoryRegion *iommu_mr,
                                            Error **errp);
 
 /**
- * memory_region_iommu_set_iova_ranges - Set the usable IOVA ranges
- * for a given IOMMU MR region
- *
- * @iommu: IOMMU memory region
- * @iova_ranges: list of ordered IOVA ranges (at least one range)
- * @errp: pointer to Error*, to store an error if it happens.
- */
-int memory_region_iommu_set_iova_ranges(IOMMUMemoryRegion *iommu,
-                                        GList *iova_ranges,
-                                        Error **errp);
-
-/**
  * memory_region_name: get a memory region's name
  *
  * Returns the string that was used to initialize the memory region.
@@ -1982,7 +1902,7 @@ int memory_region_get_fd(MemoryRegion *mr);
  *
  * Use with care; by the time this function returns, the returned pointer is
  * not protected by RCU anymore.  If the caller is not within an RCU critical
- * section and does not hold the BQL, it must have other means of
+ * section and does not hold the iothread lock, it must have other means of
  * protecting the pointer, such as a reference to the region that includes
  * the incoming ram_addr_t.
  *
@@ -1999,7 +1919,7 @@ MemoryRegion *memory_region_from_host(void *ptr, ram_addr_t *offset);
  *
  * Use with care; by the time this function returns, the returned pointer is
  * not protected by RCU anymore.  If the caller is not within an RCU critical
- * section and does not hold the BQL, it must have other means of
+ * section and does not hold the iothread lock, it must have other means of
  * protecting the pointer, such as a reference to the region that includes
  * the incoming ram_addr_t.
  *
@@ -2406,25 +2326,6 @@ void memory_region_set_size(MemoryRegion *mr, uint64_t size);
 void memory_region_set_alias_offset(MemoryRegion *mr,
                                     hwaddr offset);
 
-/*
- * memory_region_set_unmergeable: Set a memory region unmergeable
- *
- * Mark a memory region unmergeable, resulting in the memory region (or
- * everything contained in a memory region container) not getting merged when
- * simplifying the address space and notifying memory listeners. Consequently,
- * memory listeners will never get notified about ranges that are larger than
- * the original memory regions.
- *
- * This is primarily useful when multiple aliases to a RAM memory region are
- * mapped into a memory region container, and updates (e.g., enable/disable or
- * map/unmap) of individual memory region aliases are not supposed to affect
- * other memory regions in the same container.
- *
- * @mr: the #MemoryRegion to be updated
- * @unmergeable: whether to mark the #MemoryRegion unmergeable
- */
-void memory_region_set_unmergeable(MemoryRegion *mr, bool unmergeable);
-
 /**
  * memory_region_present: checks if an address relative to a @container
  * translates into #MemoryRegion within @container
@@ -2516,10 +2417,8 @@ MemoryRegionSection memory_region_find(MemoryRegion *mr,
  * memory_global_dirty_log_sync: synchronize the dirty log for all memory
  *
  * Synchronizes the dirty page log for all address spaces.
- *
- * @last_stage: whether this is the last stage of live migration
  */
-void memory_global_dirty_log_sync(bool last_stage);
+void memory_global_dirty_log_sync(void);
 
 /**
  * memory_global_dirty_log_sync: synchronize the dirty log for all memory
@@ -2746,6 +2645,9 @@ struct MemoryRegionCache {
     bool is_write;
 };
 
+#define MEMORY_REGION_CACHE_INVALID ((MemoryRegionCache) { .mrs.mr = NULL })
+
+
 /* address_space_ld*_cached: load from a cached #MemoryRegion
  * address_space_st*_cached: store into a cached #MemoryRegion
  *
@@ -2833,21 +2735,6 @@ int64_t address_space_cache_init(MemoryRegionCache *cache,
                                  hwaddr addr,
                                  hwaddr len,
                                  bool is_write);
-
-/**
- * address_space_cache_init_empty: Initialize empty #MemoryRegionCache
- *
- * @cache: The #MemoryRegionCache to operate on.
- *
- * Initializes #MemoryRegionCache structure without memory region attached.
- * Cache initialized this way can only be safely destroyed, but not used.
- */
-static inline void address_space_cache_init_empty(MemoryRegionCache *cache)
-{
-    cache->mrs.mr = NULL;
-    /* There is no real need to initialize fv, but it makes Coverity happy. */
-    cache->fv = NULL;
-}
 
 /**
  * address_space_cache_invalidate: complete a write to a #MemoryRegionCache
@@ -3146,7 +3033,7 @@ int ram_block_discard_require(bool state);
 
 /*
  * See ram_block_discard_require(): only inhibit technologies that disable
- * uncoordinated discarding of pages in RAM blocks, allowing co-existence with
+ * uncoordinated discarding of pages in RAM blocks, allowing co-existance with
  * technologies that only inhibit uncoordinated discards (via the
  * RamDiscardManager).
  */

@@ -8,11 +8,8 @@
 #ifndef TARGET_MIPS_TRANSLATE_H
 #define TARGET_MIPS_TRANSLATE_H
 
-#include "cpu.h"
-#include "tcg/tcg-op.h"
-#include "exec/translator.h"
-#include "exec/helper-gen.h"
 #include "qemu/log.h"
+#include "exec/translator.h"
 
 #define MIPS_DEBUG_DISAS 0
 
@@ -49,6 +46,7 @@ typedef struct DisasContext {
     bool mrp;
     bool nan2008;
     bool abs2008;
+    bool saar;
     bool mi;
     int gi;
 } DisasContext;
@@ -122,15 +120,15 @@ enum {
 };
 
 #define gen_helper_0e1i(name, arg1, arg2) do { \
-    gen_helper_##name(tcg_env, arg1, tcg_constant_i32(arg2)); \
+    gen_helper_##name(cpu_env, arg1, tcg_constant_i32(arg2)); \
     } while (0)
 
 #define gen_helper_1e0i(name, ret, arg1) do { \
-    gen_helper_##name(ret, tcg_env, tcg_constant_i32(arg1)); \
+    gen_helper_##name(ret, cpu_env, tcg_constant_i32(arg1)); \
     } while (0)
 
 #define gen_helper_0e2i(name, arg1, arg2, arg3) do { \
-    gen_helper_##name(tcg_env, arg1, arg2, tcg_constant_i32(arg3));\
+    gen_helper_##name(cpu_env, arg1, arg2, tcg_constant_i32(arg3));\
     } while (0)
 
 void generate_exception(DisasContext *ctx, int excp);
@@ -201,8 +199,7 @@ extern TCGv bcond;
     do {                                                                      \
         if (MIPS_DEBUG_DISAS) {                                               \
             qemu_log_mask(CPU_LOG_TB_IN_ASM,                                  \
-                          "%016" VADDR_PRIx                                   \
-                          ": %08x Invalid %s %03x %03x %03x\n",               \
+                          TARGET_FMT_lx ": %08x Invalid %s %03x %03x %03x\n", \
                           ctx->base.pc_next, ctx->opcode, op,                 \
                           ctx->opcode >> 26, ctx->opcode & 0x3F,              \
                           ((ctx->opcode >> 16) & 0x1F));                      \
@@ -221,7 +218,6 @@ bool decode_isa_rel6(DisasContext *ctx, uint32_t insn);
 bool decode_ase_msa(DisasContext *ctx, uint32_t insn);
 bool decode_ext_txx9(DisasContext *ctx, uint32_t insn);
 #if defined(TARGET_MIPS64)
-bool decode_ase_lcsr(DisasContext *ctx, uint32_t insn);
 bool decode_ext_tx79(DisasContext *ctx, uint32_t insn);
 bool decode_ext_octeon(DisasContext *ctx, uint32_t insn);
 #endif

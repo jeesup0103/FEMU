@@ -24,7 +24,6 @@
   EmbeddedPkg/EmbeddedPkg.dec
   MdeModulePkg/MdeModulePkg.dec
   MdePkg/MdePkg.dec
-  OvmfPkg/OvmfPkg.dec
 
 [LibraryClasses]
   DebugLib
@@ -35,12 +34,12 @@
 
 [FixedPcd]
   gArmTokenSpaceGuid.PcdFvSize
-  gUefiOvmfPkgTokenSpaceGuid.PcdDeviceTreeAllocationPadding
+  gArmVirtTokenSpaceGuid.PcdDeviceTreeAllocationPadding
 
 [Pcd]
   gArmTokenSpaceGuid.PcdFvBaseAddress
+  gArmVirtTokenSpaceGuid.PcdDeviceTreeInitialBaseAddress
   gEfiMdeModulePkgTokenSpaceGuid.PcdSerialRegisterBase
-  gUefiOvmfPkgTokenSpaceGuid.PcdDeviceTreeInitialBaseAddress
 
 [Guids]
   gFdtHobGuid

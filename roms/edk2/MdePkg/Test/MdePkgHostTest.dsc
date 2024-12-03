@@ -20,9 +20,7 @@
 !include UnitTestFrameworkPkg/UnitTestFrameworkPkgHost.dsc.inc
 
 [LibraryClasses]
-  BaseLib|MdePkg/Library/BaseLib/BaseLib.inf
   SafeIntLib|MdePkg/Library/BaseSafeIntLib/BaseSafeIntLib.inf
-  DevicePathLib|MdePkg/Library/UefiDevicePathLib/UefiDevicePathLibBase.inf
 
 [Components]
   #
@@ -31,18 +29,8 @@
   MdePkg/Test/UnitTest/Library/BaseSafeIntLib/TestBaseSafeIntLibHost.inf
   MdePkg/Test/UnitTest/Library/BaseLib/BaseLibUnitTestsHost.inf
   MdePkg/Test/GoogleTest/Library/BaseSafeIntLib/GoogleTestBaseSafeIntLib.inf
-  MdePkg/Test/UnitTest/Library/DevicePathLib/TestDevicePathLibHost.inf
-  #
-  # BaseLib tests
-  #
-  MdePkg/Test/GoogleTest/Library/BaseLib/GoogleTestBaseLib.inf
 
   #
   # Build HOST_APPLICATION Libraries
   #
   MdePkg/Library/BaseLib/UnitTestHostBaseLib.inf
-  MdePkg/Test/Mock/Library/GoogleTest/MockUefiLib/MockUefiLib.inf
-  MdePkg/Test/Mock/Library/GoogleTest/MockUefiRuntimeServicesTableLib/MockUefiRuntimeServicesTableLib.inf
-  MdePkg/Test/Mock/Library/GoogleTest/MockPeiServicesLib/MockPeiServicesLib.inf
-  MdePkg/Test/Mock/Library/GoogleTest/MockHobLib/MockHobLib.inf
-  MdePkg/Test/Mock/Library/GoogleTest/MockFdtLib/MockFdtLib.inf

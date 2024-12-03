@@ -41,7 +41,6 @@ GCC_ASM_EXPORT(InternalSyncDecrement)
 //  IN      UINT16                    ExchangeValue
 //  )
 ASM_PFX(InternalSyncCompareExchange16):
-  AARCH64_BTI(c)
   uxth    w1, w1
   uxth    w2, w2
   dmb     sy
@@ -85,7 +84,6 @@ InternalSyncCompareExchange16Fail:
 //  IN      UINT32                    ExchangeValue
 //  )
 ASM_PFX(InternalSyncCompareExchange32):
-  AARCH64_BTI(c)
   dmb     sy
 
 InternalSyncCompareExchange32Again:
@@ -126,7 +124,6 @@ InternalSyncCompareExchange32Fail:
 //  IN      UINT64                    ExchangeValue
 //  )
 ASM_PFX(InternalSyncCompareExchange64):
-  AARCH64_BTI(c)
   dmb     sy
 
 InternalSyncCompareExchange64Again:
@@ -162,7 +159,6 @@ InternalSyncCompareExchange64Fail:
 //  IN      volatile UINT32           *Value
 //  )
 ASM_PFX(InternalSyncIncrement):
-  AARCH64_BTI(c)
   dmb     sy
 TryInternalSyncIncrement:
   ldxr    w1, [x0]
@@ -192,7 +188,6 @@ TryInternalSyncIncrement:
 //  IN      volatile UINT32           *Value
 //  )
 ASM_PFX(InternalSyncDecrement):
-  AARCH64_BTI(c)
   dmb     sy
 TryInternalSyncDecrement:
   ldxr    w1, [x0]

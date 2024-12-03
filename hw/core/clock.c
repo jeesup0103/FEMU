@@ -143,20 +143,14 @@ char *clock_display_freq(Clock *clk)
     return freq_to_str(clock_get_hz(clk));
 }
 
-bool clock_set_mul_div(Clock *clk, uint32_t multiplier, uint32_t divider)
+void clock_set_mul_div(Clock *clk, uint32_t multiplier, uint32_t divider)
 {
     assert(divider != 0);
-
-    if (clk->multiplier == multiplier && clk->divider == divider) {
-        return false;
-    }
 
     trace_clock_set_mul_div(CLOCK_PATH(clk), clk->multiplier, multiplier,
                             clk->divider, divider);
     clk->multiplier = multiplier;
     clk->divider = divider;
-
-    return true;
 }
 
 static void clock_initfn(Object *obj)

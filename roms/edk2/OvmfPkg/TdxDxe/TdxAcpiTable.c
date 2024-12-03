@@ -175,7 +175,7 @@ AlterAcpiTable (
       NewMadtTableLength = Table->Length + sizeof (EFI_ACPI_6_4_MULTIPROCESSOR_WAKEUP_STRUCTURE);
       NewMadtTable       = AllocatePool (NewMadtTableLength);
       if (NewMadtTable == NULL) {
-        DEBUG ((DEBUG_ERROR, "%a: OUT_OF_SOURCES error.\n", __func__));
+        DEBUG ((DEBUG_ERROR, "%a: OUT_OF_SOURCES error.\n", __FUNCTION__));
         break;
       }
 
@@ -186,7 +186,7 @@ AlterAcpiTable (
       MadtMpWk                 = (EFI_ACPI_6_4_MULTIPROCESSOR_WAKEUP_STRUCTURE *)(NewMadtTable + Table->Length);
       MadtMpWk->Type           = EFI_ACPI_6_4_MULTIPROCESSOR_WAKEUP;
       MadtMpWk->Length         = sizeof (EFI_ACPI_6_4_MULTIPROCESSOR_WAKEUP_STRUCTURE);
-      MadtMpWk->MailBoxVersion = 0;
+      MadtMpWk->MailBoxVersion = 1;
       MadtMpWk->Reserved       = 0;
       MadtMpWk->MailBoxAddress = RelocateMailboxAddress;
 

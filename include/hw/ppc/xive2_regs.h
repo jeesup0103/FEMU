@@ -10,7 +10,7 @@
 #ifndef PPC_XIVE2_REGS_H
 #define PPC_XIVE2_REGS_H
 
-#include "qemu/bswap.h"
+#include "cpu.h"
 
 /*
  * Thread Interrupt Management Area (TIMA)

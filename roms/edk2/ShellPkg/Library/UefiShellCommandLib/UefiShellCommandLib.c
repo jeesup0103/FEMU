@@ -155,7 +155,7 @@ CommandInit (
   @param ImageHandle    the image handle of the process
   @param SystemTable    the EFI System Table pointer
 
-  @retval EFI_SUCCESS   the initialization was complete successfully
+  @retval EFI_SUCCESS   the initialization was complete sucessfully
 **/
 RETURN_STATUS
 EFIAPI
@@ -1286,7 +1286,7 @@ ShellCommandCreateNewMappingName (
   @param[in] Flags              The Flags attribute for this map item.
   @param[in] Path               TRUE to update path, FALSE to skip this step (should only be TRUE during initialization).
 
-  @retval EFI_SUCCESS           The addition was successful.
+  @retval EFI_SUCCESS           The addition was sucessful.
   @retval EFI_OUT_OF_RESOURCES  A memory allocation failed.
   @retval EFI_INVALID_PARAMETER A parameter was invalid.
 **/
@@ -1374,7 +1374,7 @@ ShellCommandAddMapItemAndUpdatePath (
 
   Also sets up the default path environment variable if Type is FileSystem.
 
-  @retval EFI_SUCCESS           All map names were created successfully.
+  @retval EFI_SUCCESS           All map names were created sucessfully.
   @retval EFI_NOT_FOUND         No protocols were found in the system.
   @return                       Error returned from gBS->LocateHandle().
 
@@ -1399,11 +1399,10 @@ ShellCommandCreateInitialMappingsAndPaths (
   CHAR16                    *MapName;
   SHELL_MAP_LIST            *MapListItem;
 
-  ConsistMappingTable = NULL;
-  SplitCurDir         = NULL;
-  MapName             = NULL;
-  MapListItem         = NULL;
-  HandleList          = NULL;
+  SplitCurDir = NULL;
+  MapName     = NULL;
+  MapListItem = NULL;
+  HandleList  = NULL;
 
   //
   // Reset the static members back to zero
@@ -1459,35 +1458,32 @@ ShellCommandCreateInitialMappingsAndPaths (
     //
     PerformQuickSort (DevicePathList, Count, sizeof (EFI_DEVICE_PATH_PROTOCOL *), DevicePathCompare);
 
-    if (!EFI_ERROR (ShellCommandConsistMappingInitialize (&ConsistMappingTable))) {
+    ShellCommandConsistMappingInitialize (&ConsistMappingTable);
+    //
+    // Assign new Mappings to all...
+    //
+    for (Count = 0; HandleList[Count] != NULL; Count++) {
       //
-      // Assign new Mappings to all...
+      // Get default name first
       //
-      for (Count = 0; HandleList[Count] != NULL; Count++) {
-        //
-        // Get default name first
-        //
-        NewDefaultName = ShellCommandCreateNewMappingName (MappingTypeFileSystem);
-        ASSERT (NewDefaultName != NULL);
-        Status = ShellCommandAddMapItemAndUpdatePath (NewDefaultName, DevicePathList[Count], 0, TRUE);
-        ASSERT_EFI_ERROR (Status);
-        FreePool (NewDefaultName);
+      NewDefaultName = ShellCommandCreateNewMappingName (MappingTypeFileSystem);
+      ASSERT (NewDefaultName != NULL);
+      Status = ShellCommandAddMapItemAndUpdatePath (NewDefaultName, DevicePathList[Count], 0, TRUE);
+      ASSERT_EFI_ERROR (Status);
+      FreePool (NewDefaultName);
 
-        //
-        // Now do consistent name
-        //
-        NewConsistName = ShellCommandConsistMappingGenMappingName (DevicePathList[Count], ConsistMappingTable);
-        if (NewConsistName != NULL) {
-          Status = ShellCommandAddMapItemAndUpdatePath (NewConsistName, DevicePathList[Count], 0, FALSE);
-          ASSERT_EFI_ERROR (Status);
-          FreePool (NewConsistName);
-        }
+      //
+      // Now do consistent name
+      //
+      NewConsistName = ShellCommandConsistMappingGenMappingName (DevicePathList[Count], ConsistMappingTable);
+      if (NewConsistName != NULL) {
+        Status = ShellCommandAddMapItemAndUpdatePath (NewConsistName, DevicePathList[Count], 0, FALSE);
+        ASSERT_EFI_ERROR (Status);
+        FreePool (NewConsistName);
       }
     }
 
-    if (ConsistMappingTable != NULL) {
-      ShellCommandConsistMappingUnInitialize (ConsistMappingTable);
-    }
+    ShellCommandConsistMappingUnInitialize (ConsistMappingTable);
 
     SHELL_FREE_NON_NULL (HandleList);
     SHELL_FREE_NON_NULL (DevicePathList);
@@ -1630,12 +1626,12 @@ ShellCommandUpdateMapping (
     //
     PerformQuickSort (DevicePathList, Count, sizeof (EFI_DEVICE_PATH_PROTOCOL *), DevicePathCompare);
 
-    Status = ShellCommandConsistMappingInitialize (&ConsistMappingTable);
+    ShellCommandConsistMappingInitialize (&ConsistMappingTable);
 
     //
     // Assign new Mappings to remainders
     //
-    for (Count = 0; !EFI_ERROR (Status) && HandleList[Count] != NULL; Count++) {
+    for (Count = 0; !EFI_ERROR (Status) && HandleList[Count] != NULL && !EFI_ERROR (Status); Count++) {
       //
       // Skip ones that already have
       //

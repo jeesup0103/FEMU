@@ -572,7 +572,7 @@ GetResourcePadding (
   DEBUG ((
     DEBUG_VERBOSE,
     "%a: Address=%02x:%02x.%x DevicePath=%s\n",
-    __func__,
+    __FUNCTION__,
     Address->Bus,
     Address->Device,
     Address->Function,
@@ -589,7 +589,7 @@ GetResourcePadding (
     return EFI_INVALID_PARAMETER;
   }
 
-  DefaultIo       = FALSE;
+  DefaultIo       = TRUE;
   DefaultMmio     = TRUE;
   DefaultPrefMmio = TRUE;
 
@@ -613,11 +613,11 @@ GetResourcePadding (
       DEBUG_VERBOSE,
       "%a: BusNumbers=0x%x Io=0x%Lx NonPrefetchable32BitMmio=0x%x\n"
       "%a: Prefetchable32BitMmio=0x%x Prefetchable64BitMmio=0x%Lx\n",
-      __func__,
+      __FUNCTION__,
       ReservationHint.BusNumbers,
       ReservationHint.Io,
       ReservationHint.NonPrefetchable32BitMmio,
-      __func__,
+      __FUNCTION__,
       ReservationHint.Prefetchable32BitMmio,
       ReservationHint.Prefetchable64BitMmio
       ));
@@ -741,7 +741,7 @@ GetResourcePadding (
     //
     // Request defaults.
     //
-    SetIoPadding (--FirstResource, (UINTN)HighBitSetRoundUp64 (0x1000));
+    SetIoPadding (--FirstResource, (UINTN)HighBitSetRoundUp64 (512));
   }
 
   if (DefaultMmio) {

@@ -20,9 +20,20 @@
 #include "qemu/osdep.h"
 #include "tcg/tcg.h"
 #include "tcg/tcg-temp-internal.h"
-#include "tcg/tcg-op-common.h"
+#include "tcg/tcg-op.h"
 #include "tcg/tcg-mo.h"
 #include "tcg-internal.h"
+
+
+/* Reduce the number of ifdefs below.  This assumes that all uses of
+   TCGV_HIGH and TCGV_LOW are properly protected by a conditional that
+   the compiler can eliminate.  */
+#if TCG_TARGET_REG_BITS == 64
+extern TCGv_i32 TCGV_LOW_link_error(TCGv_i64);
+extern TCGv_i32 TCGV_HIGH_link_error(TCGv_i64);
+#define TCGV_LOW  TCGV_LOW_link_error
+#define TCGV_HIGH TCGV_HIGH_link_error
+#endif
 
 /*
  * Vector optional opcode tracking.
@@ -42,9 +53,9 @@
  * tcg_ctx->vec_opt_opc is non-NULL, the tcg_gen_*_vec expanders
  * will validate that their opcode is present in the list.
  */
-static void tcg_assert_listed_vecop(TCGOpcode op)
-{
 #ifdef CONFIG_DEBUG_TCG
+void tcg_assert_listed_vecop(TCGOpcode op)
+{
     const TCGOpcode *p = tcg_ctx->vecop_list;
     if (p) {
         for (; *p; ++p) {
@@ -54,8 +65,8 @@ static void tcg_assert_listed_vecop(TCGOpcode op)
         }
         g_assert_not_reached();
     }
-#endif
 }
+#endif
 
 bool tcg_can_emit_vecop_list(const TCGOpcode *list,
                              TCGType type, unsigned vece)
@@ -391,11 +402,12 @@ static bool do_op2(unsigned vece, TCGv_vec r, TCGv_vec a, TCGOpcode opc)
 
 void tcg_gen_not_vec(unsigned vece, TCGv_vec r, TCGv_vec a)
 {
-    if (TCG_TARGET_HAS_not_vec) {
-        vec_gen_op2(INDEX_op_not_vec, 0, r, a);
-    } else {
+    const TCGOpcode *hold_list = tcg_swap_vecop_list(NULL);
+
+    if (!TCG_TARGET_HAS_not_vec || !do_op2(vece, r, a, INDEX_op_not_vec)) {
         tcg_gen_xor_vec(0, r, a, tcg_constant_vec_matching(r, 0, -1));
     }
+    tcg_swap_vecop_list(hold_list);
 }
 
 void tcg_gen_neg_vec(unsigned vece, TCGv_vec r, TCGv_vec a)

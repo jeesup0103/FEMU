@@ -25,7 +25,7 @@
 #include "qemu/guest-random.h"
 
 /*
- * The initial FreeBSD stack is as follows:
+ * The inital FreeBSD stack is as follows:
  * (see kern/kern_exec.c exec_copyout_strings() )
  *
  *  Hi Address -> char **ps_argvstr  (struct ps_strings for ps, w, etc.)
@@ -59,7 +59,7 @@ static inline int setup_initial_stack(struct bsd_binprm *bprm,
     /* Save some space for ps_strings. */
     p -= sizeof(struct target_ps_strings);
 
-    /* Add machine dependent sigcode. */
+    /* Add machine depedent sigcode. */
     p -= TARGET_SZSIGCODE;
     if (setup_sigtramp(p, (unsigned)offsetof(struct target_sigframe, sf_uc),
             TARGET_FREEBSD_NR_sigreturn)) {

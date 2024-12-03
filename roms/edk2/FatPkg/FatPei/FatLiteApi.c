@@ -459,7 +459,7 @@ GetRecoveryCapsuleInfo (
       // Find corresponding physical block device
       //
       BlockDeviceNo = PrivateData->Volume[Index].BlockDeviceNo;
-      while (BlockDeviceNo < PrivateData->BlockDeviceCount && PrivateData->BlockDevice[BlockDeviceNo].Logical) {
+      while (PrivateData->BlockDevice[BlockDeviceNo].Logical && BlockDeviceNo < PrivateData->BlockDeviceCount) {
         BlockDeviceNo = PrivateData->BlockDevice[BlockDeviceNo].ParentDevNo;
       }
 

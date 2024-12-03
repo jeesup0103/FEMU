@@ -29,6 +29,5 @@ GCC_ASM_EXPORT(CpuSleep)
 #
 
 ASM_PFX(CpuSleep):
-    AARCH64_BTI(c)
     wfi
     ret

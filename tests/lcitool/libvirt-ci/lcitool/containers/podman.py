@@ -7,35 +7,34 @@
 import json
 import logging
 
-from .containers import Container
+from .containers import Container, ContainerError
 
 log = logging.getLogger()
+
+
+class PodmanBuildError(ContainerError):
+    """
+    Thrown whenever error occurs during
+    podman build operation.
+    """
+    pass
+
+
+class PodmanRunError(ContainerError):
+    """
+    Thrown whenever error occurs during
+    podman run operation.
+    """
+    pass
 
 
 class Podman(Container):
     """Podman container class"""
 
-    def run(self, image, container_cmd, user, tempdir, env=None, datadir=None,
-            script=None, **kwargs):
-        """
-        Prepares and runs the command inside a container.
-
-        See Container.run() for more information.
-        """
-
-        return super().run(image, container_cmd, user, tempdir, env, datadir,
-                           script, **kwargs)
-
-    def shell(self, image, user, tempdir, env=None, datadir=None, script=None,
-              **kwargs):
-        """
-        Spawns an interactive shell inside the container.
-
-        See Container.shell() for more information
-        """
-
-        return super().shell(image, user, tempdir, env, datadir,
-                             script, **kwargs)
+    def __init__(self):
+        super().__init__()
+        self._run_exception = PodmanRunError
+        self._build_exception = PodmanBuildError
 
     def _extra_args(self, user):
         """
@@ -86,12 +85,12 @@ class Podman(Container):
         gid_other_range = max_gid - gid
 
         podman_args_.extend([
-            ("--uidmap", f"0:1:{uid}"),
-            ("--uidmap", f"{uid}:0:1"),
-            ("--uidmap", f"{uid_other}:{uid_other}:{uid_other_range}"),
-            ("--gidmap", f"0:1:{gid}"),
-            ("--gidmap", f"{gid}:0:1"),
-            ("--gidmap", f"{gid_other}:{gid_other}:{gid_other_range}"),
+            "--uidmap", f"0:1:{uid}",
+            "--uidmap", f"{uid}:0:1",
+            "--uidmap", f"{uid_other}:{uid_other}:{uid_other_range}",
+            "--gidmap", f"0:1:{gid}",
+            "--gidmap", f"{gid}:0:1",
+            "--gidmap", f"{gid_other}:{gid_other}:{gid_other_range}"
         ])
         return podman_args_
 
@@ -129,16 +128,18 @@ class Podman(Container):
         log.debug(f"Deserialized {self.engine} images\n%s", images)
         return images
 
-    def image_exists(self, image_ref, image_tag):
+    def image_exists(self, image_ref):
         """
         Check if image exists in podman.
         :param image_ref: name/id/registry-path of image to check (str).
-        :param image_tag: image tag (str).
 
         :returns: boolean
         """
 
-        image_repository, _, image_name = image_ref.rpartition('/')
+        image_name, _, image_tag = image_ref.partition(':')
+        image_repository, _, image_name = image_name.rpartition('/')
+        if not image_tag:
+            image_tag = "latest"
 
         for img in self._images():
             id = img.get("Id")
@@ -152,7 +153,7 @@ class Podman(Container):
                 # parse `img_repository` just to get "<image_name>:<image_tag>"
                 repository_names = list(map(lambda x: x.split('/')[-1], img_repository))
 
-            if (image_ref and id.startswith(image_ref)) or (image_reference in repository_names):
+            if id.startswith(image_ref) or (image_reference in repository_names):
                 return True
 
         return False

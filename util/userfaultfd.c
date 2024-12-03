@@ -18,6 +18,7 @@
 #include <poll.h>
 #include <sys/syscall.h>
 #include <sys/ioctl.h>
+#include <fcntl.h>
 
 typedef enum {
     UFFD_UNINITIALIZED = 0,

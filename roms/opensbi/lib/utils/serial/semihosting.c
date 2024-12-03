@@ -15,7 +15,6 @@
 
 #define SYSOPEN     0x01
 #define SYSWRITEC   0x03
-#define SYSWRITE    0x05
 #define SYSREAD     0x06
 #define SYSREADC    0x07
 #define SYSERRNO	0x13
@@ -94,7 +93,6 @@ static int semihosting_errno(void)
 }
 
 static int semihosting_infd = SBI_ENODEV;
-static int semihosting_outfd = SBI_ENODEV;
 
 static long semihosting_open(const char *fname, enum semihosting_open_mode mode)
 {
@@ -143,39 +141,11 @@ static long semihosting_read(long fd, void *memp, size_t len)
 	return len - ret;
 }
 
-static long semihosting_write(long fd, const void *memp, size_t len)
-{
-	long ret;
-	struct semihosting_rdwr_s write;
-
-	write.fd = fd;
-	write.memp = (void *)memp;
-	write.len = len;
-
-	ret = semihosting_trap(SYSWRITE, &write);
-	if (ret < 0)
-		return semihosting_errno();
-	return len - ret;
-}
-
 /* clang-format on */
 
-static unsigned long semihosting_puts(const char *str, unsigned long len)
+static void semihosting_putc(char ch)
 {
-	char ch;
-	long ret;
-	unsigned long i;
-
-	if (semihosting_outfd < 0) {
-		for (i = 0; i < len; i++) {
-			ch = str[i];
-			semihosting_trap(SYSWRITEC, &ch);
-		}
-		ret = len;
-	} else
-		ret = semihosting_write(semihosting_outfd, str, len);
-
-	return (ret < 0) ? 0 : ret;
+	semihosting_trap(SYSWRITEC, &ch);
 }
 
 static int semihosting_getc(void)
@@ -194,14 +164,13 @@ static int semihosting_getc(void)
 
 static struct sbi_console_device semihosting_console = {
 	.name = "semihosting",
-	.console_puts = semihosting_puts,
+	.console_putc = semihosting_putc,
 	.console_getc = semihosting_getc
 };
 
 int semihosting_init(void)
 {
 	semihosting_infd = semihosting_open(":tt", MODE_READ);
-	semihosting_outfd = semihosting_open(":tt", MODE_WRITE);
 
 	sbi_console_set_device(&semihosting_console);
 

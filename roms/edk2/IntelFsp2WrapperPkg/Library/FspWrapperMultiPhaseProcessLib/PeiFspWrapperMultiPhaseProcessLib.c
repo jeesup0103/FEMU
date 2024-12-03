@@ -80,7 +80,6 @@ CallFspMultiPhaseEntry (
   BOOLEAN                 IsVariableServiceRequest;
   FSP_MULTI_PHASE_PARAMS  *FspMultiPhaseParamsPtr;
 
-  FspMultiPhaseApiOffset   = 0;
   FspMultiPhaseParamsPtr   = (FSP_MULTI_PHASE_PARAMS *)FspMultiPhaseParams;
   IsVariableServiceRequest = FALSE;
   if ((FspMultiPhaseParamsPtr->MultiPhaseAction == EnumMultiPhaseGetVariableRequestInfo) ||

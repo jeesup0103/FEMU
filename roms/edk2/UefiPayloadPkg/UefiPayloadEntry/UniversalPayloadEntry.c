@@ -111,12 +111,10 @@ AddNewHob (
   }
 
   NewHob.Header = CreateHob (Hob->Header->HobType, Hob->Header->HobLength);
-  ASSERT (NewHob.Header != NULL);
-  if (NewHob.Header == NULL) {
-    return;
-  }
 
-  CopyMem (NewHob.Header + 1, Hob->Header + 1, Hob->Header->HobLength - sizeof (EFI_HOB_GENERIC_HEADER));
+  if (NewHob.Header != NULL) {
+    CopyMem (NewHob.Header + 1, Hob->Header + 1, Hob->Header->HobLength - sizeof (EFI_HOB_GENERIC_HEADER));
+  }
 }
 
 /**
@@ -424,12 +422,9 @@ BuildHobs (
   //
   GuidHob = GetFirstGuidHob (&gUniversalPayloadAcpiTableGuid);
   if (GuidHob != NULL) {
-    AcpiTable = (UNIVERSAL_PAYLOAD_ACPI_TABLE *)GET_GUID_HOB_DATA (GuidHob);
-    GuidHob   = GetFirstGuidHob (&gUefiAcpiBoardInfoGuid);
-    if (GuidHob == NULL) {
-      AcpiBoardInfo = BuildHobFromAcpi ((UINT64)AcpiTable->Rsdp);
-      ASSERT (AcpiBoardInfo != NULL);
-    }
+    AcpiTable     = (UNIVERSAL_PAYLOAD_ACPI_TABLE *)GET_GUID_HOB_DATA (GuidHob);
+    AcpiBoardInfo = BuildHobFromAcpi ((UINT64)AcpiTable->Rsdp);
+    ASSERT (AcpiBoardInfo != NULL);
   }
 
   //

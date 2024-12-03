@@ -3,7 +3,6 @@
 
   Copyright (c) 2019, Intel Corporation. All rights reserved.<BR>
   (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP<BR>
-  Copyright (c) 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
   SPDX-License-Identifier: BSD-2-Clause-Patent
 
@@ -22,7 +21,6 @@
 #include <Library/HttpIoLib.h>
 #include <Library/MemoryAllocationLib.h>
 #include <Library/NetLib.h>
-#include <Library/RedfishDebugLib.h>
 #include <Library/UefiLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 #include <Library/UefiDriverEntryPoint.h>
@@ -53,20 +51,6 @@ EFI_STATUS
 RedfishCheckHttpReceiveStatus (
   IN RESTEX_INSTANCE  *Instance,
   IN EFI_STATUS       HttpIoReceiveStatus
-  );
-
-/**
-  Create a new TLS session because the previous one is closed.
-
-  @param[in]  Instance            Pointer to EFI_REST_EX_PROTOCOL instance for a particular
-                                  REST service.
-  @retval EFI_SUCCESS             operation succeeded.
-  @retval EFI_ERROR               Other errors.
-
-**/
-EFI_STATUS
-ResetHttpTslSession (
-  IN   RESTEX_INSTANCE  *Instance
   );
 
 /**

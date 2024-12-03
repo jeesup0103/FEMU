@@ -18,6 +18,7 @@
 #include <Library/PeiServicesLib.h>
 #include <Library/PcdLib.h>
 #include <Library/CpuLib.h>
+#include <Library/UefiCpuLib.h>
 #include <Library/DebugAgentLib.h>
 #include <Library/IoLib.h>
 #include <Library/PeCoffLib.h>
@@ -386,7 +387,7 @@ DecompressMemFvs (
     DEBUG_VERBOSE,
     "%a: OutputBuffer@%p+0x%x ScratchBuffer@%p+0x%x "
     "PcdOvmfDecompressionScratchEnd=0x%x\n",
-    __func__,
+    __FUNCTION__,
     OutputBuffer,
     OutputBufferSize,
     ScratchBuffer,

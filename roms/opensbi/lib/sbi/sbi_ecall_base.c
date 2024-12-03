@@ -33,36 +33,37 @@ static int sbi_ecall_base_probe(unsigned long extid, unsigned long *out_val)
 }
 
 static int sbi_ecall_base_handler(unsigned long extid, unsigned long funcid,
-				  struct sbi_trap_regs *regs,
-				  struct sbi_ecall_return *out)
+				  const struct sbi_trap_regs *regs,
+				  unsigned long *out_val,
+				  struct sbi_trap_info *out_trap)
 {
 	int ret = 0;
 
 	switch (funcid) {
 	case SBI_EXT_BASE_GET_SPEC_VERSION:
-		out->value = (SBI_ECALL_VERSION_MAJOR <<
-			      SBI_SPEC_VERSION_MAJOR_OFFSET) &
-			     (SBI_SPEC_VERSION_MAJOR_MASK <<
-			      SBI_SPEC_VERSION_MAJOR_OFFSET);
-		out->value = out->value | SBI_ECALL_VERSION_MINOR;
+		*out_val = (SBI_ECALL_VERSION_MAJOR <<
+			   SBI_SPEC_VERSION_MAJOR_OFFSET) &
+			   (SBI_SPEC_VERSION_MAJOR_MASK <<
+			    SBI_SPEC_VERSION_MAJOR_OFFSET);
+		*out_val = *out_val | SBI_ECALL_VERSION_MINOR;
 		break;
 	case SBI_EXT_BASE_GET_IMP_ID:
-		out->value = sbi_ecall_get_impid();
+		*out_val = sbi_ecall_get_impid();
 		break;
 	case SBI_EXT_BASE_GET_IMP_VERSION:
-		out->value = OPENSBI_VERSION;
+		*out_val = OPENSBI_VERSION;
 		break;
 	case SBI_EXT_BASE_GET_MVENDORID:
-		out->value = csr_read(CSR_MVENDORID);
+		*out_val = csr_read(CSR_MVENDORID);
 		break;
 	case SBI_EXT_BASE_GET_MARCHID:
-		out->value = csr_read(CSR_MARCHID);
+		*out_val = csr_read(CSR_MARCHID);
 		break;
 	case SBI_EXT_BASE_GET_MIMPID:
-		out->value = csr_read(CSR_MIMPID);
+		*out_val = csr_read(CSR_MIMPID);
 		break;
 	case SBI_EXT_BASE_PROBE_EXT:
-		ret = sbi_ecall_base_probe(regs->a0, &out->value);
+		ret = sbi_ecall_base_probe(regs->a0, out_val);
 		break;
 	default:
 		ret = SBI_ENOTSUPP;
@@ -71,16 +72,8 @@ static int sbi_ecall_base_handler(unsigned long extid, unsigned long funcid,
 	return ret;
 }
 
-struct sbi_ecall_extension ecall_base;
-
-static int sbi_ecall_base_register_extensions(void)
-{
-	return sbi_ecall_register_extension(&ecall_base);
-}
-
 struct sbi_ecall_extension ecall_base = {
-	.extid_start		= SBI_EXT_BASE,
-	.extid_end		= SBI_EXT_BASE,
-	.register_extensions	= sbi_ecall_base_register_extensions,
-	.handle			= sbi_ecall_base_handler,
+	.extid_start = SBI_EXT_BASE,
+	.extid_end = SBI_EXT_BASE,
+	.handle = sbi_ecall_base_handler,
 };

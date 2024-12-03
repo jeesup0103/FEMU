@@ -1024,12 +1024,12 @@ PciIoMap (
           return EFI_INVALID_PARAMETER;
       }
 
-      Status = mIoMmuProtocol->SetAttribute (
-                                 mIoMmuProtocol,
-                                 PciIoDevice->Handle,
-                                 *Mapping,
-                                 IoMmuAttribute
-                                 );
+      mIoMmuProtocol->SetAttribute (
+                        mIoMmuProtocol,
+                        PciIoDevice->Handle,
+                        *Mapping,
+                        IoMmuAttribute
+                        );
     }
   }
 
@@ -1407,7 +1407,6 @@ SupportPaletteSnoopAttributes (
   IN EFI_PCI_IO_PROTOCOL_ATTRIBUTE_OPERATION  Operation
   )
 {
-  EFI_STATUS     Status;
   PCI_IO_DEVICE  *Temp;
   UINT16         VGACommand;
 
@@ -1445,13 +1444,13 @@ SupportPaletteSnoopAttributes (
   // Check if they are on the same bus
   //
   if (Temp->Parent == PciIoDevice->Parent) {
-    Status = PCI_READ_COMMAND_REGISTER (Temp, &VGACommand);
+    PCI_READ_COMMAND_REGISTER (Temp, &VGACommand);
 
     //
     // If they are on the same bus, either one can
     // be set to snoop, the other set to decode
     //
-    if (!EFI_ERROR (Status) && ((VGACommand & EFI_PCI_COMMAND_VGA_PALETTE_SNOOP) != 0)) {
+    if ((VGACommand & EFI_PCI_COMMAND_VGA_PALETTE_SNOOP) != 0) {
       //
       // VGA has set to snoop, so GFX can be only set to disable snoop
       //

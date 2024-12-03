@@ -99,6 +99,7 @@ static bool aio_remove_fd_handler(AioContext *ctx, AioHandler *node)
 
 void aio_set_fd_handler(AioContext *ctx,
                         int fd,
+                        bool is_external,
                         IOHandler *io_read,
                         IOHandler *io_write,
                         AioPollFn *io_poll,
@@ -143,6 +144,7 @@ void aio_set_fd_handler(AioContext *ctx,
         new_node->io_poll = io_poll;
         new_node->io_poll_ready = io_poll_ready;
         new_node->opaque = opaque;
+        new_node->is_external = is_external;
 
         if (is_new) {
             new_node->pfd.fd = fd;
@@ -194,11 +196,12 @@ static void aio_set_fd_poll(AioContext *ctx, int fd,
 
 void aio_set_event_notifier(AioContext *ctx,
                             EventNotifier *notifier,
+                            bool is_external,
                             EventNotifierHandler *io_read,
                             AioPollFn *io_poll,
                             EventNotifierHandler *io_poll_ready)
 {
-    aio_set_fd_handler(ctx, event_notifier_get_fd(notifier),
+    aio_set_fd_handler(ctx, event_notifier_get_fd(notifier), is_external,
                        (IOHandler *)io_read, NULL, io_poll,
                        (IOHandler *)io_poll_ready, notifier);
 }
@@ -282,11 +285,13 @@ bool aio_pending(AioContext *ctx)
 
         /* TODO should this check poll ready? */
         revents = node->pfd.revents & node->pfd.events;
-        if (revents & (G_IO_IN | G_IO_HUP | G_IO_ERR) && node->io_read) {
+        if (revents & (G_IO_IN | G_IO_HUP | G_IO_ERR) && node->io_read &&
+            aio_node_check(ctx, node->is_external)) {
             result = true;
             break;
         }
-        if (revents & (G_IO_OUT | G_IO_ERR) && node->io_write) {
+        if (revents & (G_IO_OUT | G_IO_ERR) && node->io_write &&
+            aio_node_check(ctx, node->is_external)) {
             result = true;
             break;
         }
@@ -345,19 +350,10 @@ static bool aio_dispatch_handler(AioContext *ctx, AioHandler *node)
         QLIST_INSERT_HEAD(&ctx->poll_aio_handlers, node, node_poll);
     }
     if (!QLIST_IS_INSERTED(node, node_deleted) &&
-        poll_ready && revents == 0 && node->io_poll_ready) {
-        /*
-         * Remove temporarily to avoid infinite loops when ->io_poll_ready()
-         * calls aio_poll() before clearing the condition that made the poll
-         * handler become ready.
-         */
-        QLIST_SAFE_REMOVE(node, node_poll);
-
+        poll_ready && revents == 0 &&
+        aio_node_check(ctx, node->is_external) &&
+        node->io_poll_ready) {
         node->io_poll_ready(node->opaque);
-
-        if (!QLIST_IS_INSERTED(node, node_poll)) {
-            QLIST_INSERT_HEAD(&ctx->poll_aio_handlers, node, node_poll);
-        }
 
         /*
          * Return early since revents was zero. aio_notify() does not count as
@@ -368,6 +364,7 @@ static bool aio_dispatch_handler(AioContext *ctx, AioHandler *node)
 
     if (!QLIST_IS_INSERTED(node, node_deleted) &&
         (revents & (G_IO_IN | G_IO_HUP | G_IO_ERR)) &&
+        aio_node_check(ctx, node->is_external) &&
         node->io_read) {
         node->io_read(node->opaque);
 
@@ -378,6 +375,7 @@ static bool aio_dispatch_handler(AioContext *ctx, AioHandler *node)
     }
     if (!QLIST_IS_INSERTED(node, node_deleted) &&
         (revents & (G_IO_OUT | G_IO_ERR)) &&
+        aio_node_check(ctx, node->is_external) &&
         node->io_write) {
         node->io_write(node->opaque);
         progress = true;
@@ -438,7 +436,8 @@ static bool run_poll_handlers_once(AioContext *ctx,
     AioHandler *tmp;
 
     QLIST_FOREACH_SAFE(node, &ctx->poll_aio_handlers, node_poll, tmp) {
-        if (node->io_poll(node->opaque)) {
+        if (aio_node_check(ctx, node->is_external) &&
+            node->io_poll(node->opaque)) {
             aio_add_poll_ready_handler(ready_list, node);
 
             node->poll_idle_timeout = now + POLL_IDLE_INTERVAL_NS;
@@ -777,7 +776,8 @@ void aio_context_set_poll_params(AioContext *ctx, int64_t max_ns,
     aio_notify(ctx);
 }
 
-void aio_context_set_aio_params(AioContext *ctx, int64_t max_batch)
+void aio_context_set_aio_params(AioContext *ctx, int64_t max_batch,
+                                Error **errp)
 {
     /*
      * No thread synchronization here, it doesn't matter if an incorrect value

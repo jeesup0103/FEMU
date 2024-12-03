@@ -393,7 +393,7 @@ Out:
   if (EFI_ERROR (Status)) {
     AsciiPrint (
       "error: %a(\"%s\", %g): %r\n",
-      __func__,
+      __FUNCTION__,
       VariableName,
       VendorGuid,
       Status

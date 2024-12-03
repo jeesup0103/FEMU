@@ -42,10 +42,12 @@ GetMacAddressInformation (
   OUT EFI_MAC_ADDRESS  *MacAddress
   )
 {
+  MAC_ADDR_DEVICE_PATH              *Mac;
   REST_EX_SERVICE_DEVICE_PATH_DATA  *RestExServiceDevicePathData;
   EFI_DEVICE_PATH_PROTOCOL          *RestExServiceDevicePath;
   MAC_ADDR_DEVICE_PATH              *MacAddressDevicePath;
 
+  Mac                         = NULL;
   RestExServiceDevicePathData = NULL;
   RestExServiceDevicePath     = NULL;
 
@@ -536,7 +538,7 @@ RedfishPlatformHostInterfaceConstructor (
   EFI_STATUS  Status;
 
   Status = GetRedfishRecordFromVariable (&mRedfishOverIpProtocolData, &mRedfishProtocolDataSize);
-  DEBUG ((DEBUG_INFO, "%a: GetRedfishRecordFromVariable() - %r\n", __func__, Status));
+  DEBUG ((DEBUG_INFO, "%a: GetRedfishRecordFromVariable() - %r\n", __FUNCTION__, Status));
   if (!EFI_ERROR (Status)) {
     DumpRedfishIpProtocolData (mRedfishOverIpProtocolData, mRedfishProtocolDataSize);
   }

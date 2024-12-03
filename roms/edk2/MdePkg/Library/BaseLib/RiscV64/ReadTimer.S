@@ -21,10 +21,3 @@
 ASM_FUNC (RiscVReadTimer)
     csrr a0, CSR_TIME
     ret
-
-//
-// Set Supervisor Time Compare Register
-//
-ASM_FUNC (RiscVSetSupervisorTimeCompareRegister)
-    csrw  CSR_STIMECMP, a0
-    ret

@@ -1,7 +1,7 @@
 /** @file
    An instance of the NorFlashPlatformLib for Kvmtool platform.
 
- Copyright (c) 2020 - 2023, Arm Ltd. All rights reserved.<BR>
+ Copyright (c) 2020, ARM Ltd. All rights reserved.<BR>
 
  SPDX-License-Identifier: BSD-2-Clause-Patent
 
@@ -228,7 +228,7 @@ NorFlashPlatformLibConstructor (
   CONST CHAR8   *Label;
   UINT32        LabelLen;
 
-  if ((mNorFlashDeviceCount != 0) || PcdGetBool (PcdEmuVariableNvModeEnable)) {
+  if (mNorFlashDeviceCount != 0) {
     return EFI_SUCCESS;
   }
 
@@ -265,7 +265,7 @@ NorFlashPlatformLibConstructor (
       DEBUG ((
         DEBUG_ERROR,
         "%a: GetNodeProperty ('label') failed (Status == %r)\n",
-        __func__,
+        __FUNCTION__,
         Status
         ));
     } else if (AsciiStrCmp (Label, LABEL_UEFI_VAR_STORE) == 0) {
@@ -284,7 +284,7 @@ NorFlashPlatformLibConstructor (
       DEBUG ((
         DEBUG_ERROR,
         "%a: GetNodeProperty () failed (Status == %r)\n",
-        __func__,
+        __FUNCTION__,
         Status
         ));
       continue;
@@ -337,39 +337,9 @@ NorFlashPlatformLibConstructor (
     }
 
     if (mNorFlashDevices[UefiVarStoreIndex].DeviceBaseAddress != 0) {
-      Status = SetupVariableStore (&mNorFlashDevices[UefiVarStoreIndex]);
-      if (EFI_ERROR (Status)) {
-        DEBUG ((
-          DEBUG_ERROR,
-          "ERROR: Failed to setup variable store, Status = %r\n",
-          Status
-          ));
-        ASSERT (0);
-      }
-    } else {
-      DEBUG ((
-        DEBUG_ERROR,
-        "ERROR: Invalid Flash device Base address\n"
-        ));
-      ASSERT (0);
-      Status = EFI_NOT_FOUND;
-    }
-  } else {
-    // No Flash device found fallback to Runtime Variable Emulation.
-    DEBUG ((
-      DEBUG_INFO,
-      "INFO: No Flash device found fallback to Runtime Variable Emulation.\n"
-      ));
-    Status = PcdSetBoolS (PcdEmuVariableNvModeEnable, TRUE);
-    if (EFI_ERROR (Status)) {
-      DEBUG ((
-        DEBUG_ERROR,
-        "ERROR: Failed to set PcdEmuVariableNvModeEnable, Status = %r\n",
-        Status
-        ));
-      ASSERT (0);
+      return SetupVariableStore (&mNorFlashDevices[UefiVarStoreIndex]);
     }
   }
 
-  return Status;
+  return EFI_NOT_FOUND;
 }

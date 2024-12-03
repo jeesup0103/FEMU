@@ -17,7 +17,7 @@
   @param[in]  Alias             Points to the NULL-terminated shell alias.
                                 If this parameter is NULL, then all
                                 aliases will be returned in ReturnedData.
-  @retval     SHELL_SUCCESS     the printout was successful
+  @retval     SHELL_SUCCESS     the printout was sucessful
 **/
 SHELL_STATUS
 PrintSingleShellAlias (
@@ -47,7 +47,7 @@ PrintSingleShellAlias (
 /**
   Print out each alias registered with the Shell.
 
-  @retval STATUS_SUCCESS  the printout was successful
+  @retval STATUS_SUCCESS  the printout was sucessful
   @return any return code from GetNextVariableName except EFI_NOT_FOUND
 **/
 SHELL_STATUS

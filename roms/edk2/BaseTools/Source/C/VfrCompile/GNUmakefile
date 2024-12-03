@@ -16,11 +16,10 @@ TOOL_INCLUDE = -I Pccts/h
 #OBJECTS = VfrSyntax.o VfrServices.o DLGLexer.o EfiVfrParser.o ATokenBuffer.o DLexerBase.o AParser.o
 OBJECTS = AParser.o DLexerBase.o ATokenBuffer.o EfiVfrParser.o VfrLexer.o VfrSyntax.o \
           VfrFormPkg.o VfrError.o VfrUtilityLib.o VfrCompiler.o
-CLANG:=$(shell $(CC) --version | grep clang)
-ifneq ($(CLANG),)
-VFR_CPPFLAGS = -Wno-deprecated-register -std=c++14 -DPCCTS_USE_NAMESPACE_STD $(CPPFLAGS)
+ifeq ($(CXX), llvm)
+VFR_CPPFLAGS = -Wno-deprecated-register -DPCCTS_USE_NAMESPACE_STD $(BUILD_CPPFLAGS)
 else
-VFR_CPPFLAGS = -DPCCTS_USE_NAMESPACE_STD $(CPPFLAGS)
+VFR_CPPFLAGS = -DPCCTS_USE_NAMESPACE_STD $(BUILD_CPPFLAGS)
 endif
 # keep BUILD_OPTFLAGS last
 VFR_CXXFLAGS = $(BUILD_OPTFLAGS)
@@ -28,7 +27,7 @@ VFR_CXXFLAGS = $(BUILD_OPTFLAGS)
 # keep EXTRA_LDFLAGS last
 VFR_LFLAGS = $(EXTRA_LDFLAGS)
 
-LINKER = $(CXX)
+LINKER = $(BUILD_CXX)
 
 EXTRA_CLEAN_OBJECTS = EfiVfrParser.cpp EfiVfrParser.h VfrParser.dlg VfrTokens.h VfrLexer.cpp VfrLexer.h VfrSyntax.cpp tokens.h
 
@@ -61,16 +60,16 @@ Pccts/dlg/dlg:
 	BIN_DIR='.' $(MAKE) -C Pccts/dlg
 
 ATokenBuffer.o: Pccts/h/ATokenBuffer.cpp
-	$(CXX) -c $(VFR_CPPFLAGS) $(INC) $(VFR_CXXFLAGS) $? -o $@
+	$(BUILD_CXX) -c $(VFR_CPPFLAGS) $(INC) $(VFR_CXXFLAGS) $? -o $@
 
 DLexerBase.o: Pccts/h/DLexerBase.cpp
-	$(CXX) -c $(VFR_CPPFLAGS) $(INC) $(VFR_CXXFLAGS) $? -o $@
+	$(BUILD_CXX) -c $(VFR_CPPFLAGS) $(INC) $(VFR_CXXFLAGS) $? -o $@
 
 AParser.o: Pccts/h/AParser.cpp
-	$(CXX) -c $(VFR_CPPFLAGS) $(INC) $(VFR_CXXFLAGS) $? -o $@
+	$(BUILD_CXX) -c $(VFR_CPPFLAGS) $(INC) $(VFR_CXXFLAGS) $? -o $@
 
 VfrSyntax.o: VfrSyntax.cpp
-	$(CXX) -c $(VFR_CPPFLAGS) $(INC) $(VFR_CXXFLAGS) $? -o $@
+	$(BUILD_CXX) -c $(VFR_CPPFLAGS) $(INC) $(VFR_CXXFLAGS) $? -o $@
 
 clean: localClean
 

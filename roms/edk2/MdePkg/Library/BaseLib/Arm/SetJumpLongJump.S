@@ -19,6 +19,7 @@ GCC_ASM_EXPORT(InternalLongJump)
 #  value to be returned by SetJump().
 #
 #  If JumpBuffer is NULL, then ASSERT().
+#  For IPF CPUs, if JumpBuffer is not aligned on a 16-byte boundary, then ASSERT().
 #
 #  @param  JumpBuffer    A pointer to CPU context buffer.
 #
@@ -33,7 +34,7 @@ GCC_ASM_EXPORT(InternalLongJump)
 ASM_PFX(SetJump):
   mov   r3, r13
   stmia r0, {r3-r12,r14}
-  mov   r0, #0
+  eor   r0, r0, r0
   bx    lr
 
 #/**
@@ -41,7 +42,7 @@ ASM_PFX(SetJump):
 #
 #  Restores the CPU context from the buffer specified by JumpBuffer.
 #  This function never returns to the caller.
-#  Instead it resumes execution based on the state of JumpBuffer.
+#  Instead is resumes execution based on the state of JumpBuffer.
 #
 #  @param  JumpBuffer    A pointer to CPU context buffer.
 #  @param  Value         The value to return when the SetJump() context is restored.
@@ -57,8 +58,6 @@ ASM_PFX(SetJump):
 ASM_PFX(InternalLongJump):
   ldmia  r0, {r3-r12,r14}
   mov    r13, r3
-  cmp    r1, #0
-  moveq  r1, #1
   mov    r0, r1
   bx     lr
 

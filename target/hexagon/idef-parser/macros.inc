@@ -127,5 +127,5 @@
 /* Include fHIDE macros which hide type declarations */
 #define fHIDE(A) A
 
-/* Purge non-relevant parts */
+/* Purge non-relavant parts */
 #define fBRANCH_SPECULATE_STALL(A, B, C, D, E)

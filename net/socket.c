@@ -446,21 +446,31 @@ static NetSocketState *net_socket_fd_init_stream(NetClientState *peer,
     return s;
 }
 
-static int net_socket_fd_check(int fd, Error **errp)
+static NetSocketState *net_socket_fd_init(NetClientState *peer,
+                                          const char *model, const char *name,
+                                          int fd, int is_connected,
+                                          const char *mc, Error **errp)
 {
-    int so_type, optlen = sizeof(so_type);
+    int so_type = -1, optlen=sizeof(so_type);
 
-    if (getsockopt(fd, SOL_SOCKET, SO_TYPE, (char *)&so_type,
-        (socklen_t *)&optlen) < 0) {
+    if(getsockopt(fd, SOL_SOCKET, SO_TYPE, (char *)&so_type,
+        (socklen_t *)&optlen)< 0) {
         error_setg(errp, "can't get socket option SO_TYPE");
-        return -1;
+        close(fd);
+        return NULL;
     }
-    if (so_type != SOCK_DGRAM && so_type != SOCK_STREAM) {
+    switch(so_type) {
+    case SOCK_DGRAM:
+        return net_socket_fd_init_dgram(peer, model, name, fd, is_connected,
+                                        mc, errp);
+    case SOCK_STREAM:
+        return net_socket_fd_init_stream(peer, model, name, fd, is_connected);
+    default:
         error_setg(errp, "socket type=%d for fd=%d must be either"
                    " SOCK_DGRAM or SOCK_STREAM", so_type, fd);
-        return -1;
+        close(fd);
     }
-    return so_type;
+    return NULL;
 }
 
 static void net_socket_accept(void *opaque)
@@ -577,7 +587,7 @@ static int net_socket_connect_init(NetClientState *peer,
             break;
         }
     }
-    s = net_socket_fd_init_stream(peer, model, name, fd, connected);
+    s = net_socket_fd_init(peer, model, name, fd, connected, NULL, errp);
     if (!s) {
         return -1;
     }
@@ -619,7 +629,7 @@ static int net_socket_mcast_init(NetClientState *peer,
         return -1;
     }
 
-    s = net_socket_fd_init_dgram(peer, model, name, fd, 0, NULL, errp);
+    s = net_socket_fd_init(peer, model, name, fd, 0, NULL, errp);
     if (!s) {
         return -1;
     }
@@ -673,7 +683,7 @@ static int net_socket_udp_init(NetClientState *peer,
     }
     qemu_socket_set_nonblock(fd);
 
-    s = net_socket_fd_init_dgram(peer, model, name, fd, 0, NULL, errp);
+    s = net_socket_fd_init(peer, model, name, fd, 0, NULL, errp);
     if (!s) {
         return -1;
     }
@@ -706,14 +716,10 @@ int net_init_socket(const Netdev *netdev, const char *name,
     }
 
     if (sock->fd) {
-        int fd, ret, so_type;
+        int fd, ret;
 
         fd = monitor_fd_param(monitor_cur(), sock->fd, errp);
         if (fd == -1) {
-            return -1;
-        }
-        so_type = net_socket_fd_check(fd, errp);
-        if (so_type < 0) {
             return -1;
         }
         ret = qemu_socket_try_set_nonblock(fd);
@@ -722,18 +728,9 @@ int net_init_socket(const Netdev *netdev, const char *name,
                              name, fd);
             return -1;
         }
-        switch (so_type) {
-        case SOCK_DGRAM:
-            if (!net_socket_fd_init_dgram(peer, "socket", name, fd, 1,
-                                          sock->mcast, errp)) {
-                return -1;
-            }
-            break;
-        case SOCK_STREAM:
-            if (!net_socket_fd_init_stream(peer, "socket", name, fd, 1)) {
-                return -1;
-            }
-            break;
+        if (!net_socket_fd_init(peer, "socket", name, fd, 1, sock->mcast,
+                                errp)) {
+            return -1;
         }
         return 0;
     }

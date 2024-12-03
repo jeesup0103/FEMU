@@ -84,8 +84,7 @@ class X86CPUModelAliases(avocado_qemu.QemuSystemTest):
         # with older QEMU versions that didn't have the versioned CPU model
         self.vm.add_args('-S')
         self.vm.launch()
-        cpus = dict((m['name'], m) for m in
-                    self.vm.cmd('query-cpu-definitions'))
+        cpus = dict((m['name'], m) for m in self.vm.command('query-cpu-definitions'))
 
         self.assertFalse(cpus['Cascadelake-Server']['static'],
                          'unversioned Cascadelake-Server CPU model must not be static')
@@ -116,100 +115,98 @@ class X86CPUModelAliases(avocado_qemu.QemuSystemTest):
         self.vm.add_args('-S')
         self.vm.launch()
 
-        cpus = dict((m['name'], m) for m in
-                    self.vm.cmd('query-cpu-definitions'))
+        cpus = dict((m['name'], m) for m in self.vm.command('query-cpu-definitions'))
 
         self.assertFalse(cpus['Cascadelake-Server']['static'],
                          'unversioned Cascadelake-Server CPU model must not be static')
-        self.assertEqual(cpus['Cascadelake-Server'].get('alias-of'),
-                         'Cascadelake-Server-v1',
-                         'Cascadelake-Server must be an alias of Cascadelake-Server-v1')
+        self.assertEquals(cpus['Cascadelake-Server'].get('alias-of'), 'Cascadelake-Server-v1',
+                          'Cascadelake-Server must be an alias of Cascadelake-Server-v1')
         self.assertNotIn('alias-of', cpus['Cascadelake-Server-v1'],
                          'Cascadelake-Server-v1 must not be an alias')
 
         self.assertFalse(cpus['qemu64']['static'],
                          'unversioned qemu64 CPU model must not be static')
-        self.assertEqual(cpus['qemu64'].get('alias-of'), 'qemu64-v1',
-                         'qemu64 must be an alias of qemu64-v1')
+        self.assertEquals(cpus['qemu64'].get('alias-of'), 'qemu64-v1',
+                          'qemu64 must be an alias of qemu64-v1')
         self.assertNotIn('alias-of', cpus['qemu64-v1'],
                          'qemu64-v1 must not be an alias')
 
         self.validate_variant_aliases(cpus)
 
         # On pc-*-4.1, -noTSX and -IBRS models should be aliases:
-        self.assertEqual(cpus["Haswell"].get('alias-of'),
-                         "Haswell-v1",
+        self.assertEquals(cpus["Haswell"].get('alias-of'),
+                          "Haswell-v1",
                          "Haswell must be an alias")
-        self.assertEqual(cpus["Haswell-noTSX"].get('alias-of'),
-                         "Haswell-v2",
+        self.assertEquals(cpus["Haswell-noTSX"].get('alias-of'),
+                          "Haswell-v2",
                          "Haswell-noTSX must be an alias")
-        self.assertEqual(cpus["Haswell-IBRS"].get('alias-of'),
-                         "Haswell-v3",
+        self.assertEquals(cpus["Haswell-IBRS"].get('alias-of'),
+                          "Haswell-v3",
                          "Haswell-IBRS must be an alias")
-        self.assertEqual(cpus["Haswell-noTSX-IBRS"].get('alias-of'),
-                         "Haswell-v4",
+        self.assertEquals(cpus["Haswell-noTSX-IBRS"].get('alias-of'),
+                          "Haswell-v4",
                          "Haswell-noTSX-IBRS must be an alias")
 
-        self.assertEqual(cpus["Broadwell"].get('alias-of'),
-                         "Broadwell-v1",
+        self.assertEquals(cpus["Broadwell"].get('alias-of'),
+                          "Broadwell-v1",
                          "Broadwell must be an alias")
-        self.assertEqual(cpus["Broadwell-noTSX"].get('alias-of'),
-                         "Broadwell-v2",
+        self.assertEquals(cpus["Broadwell-noTSX"].get('alias-of'),
+                          "Broadwell-v2",
                          "Broadwell-noTSX must be an alias")
-        self.assertEqual(cpus["Broadwell-IBRS"].get('alias-of'),
-                         "Broadwell-v3",
+        self.assertEquals(cpus["Broadwell-IBRS"].get('alias-of'),
+                          "Broadwell-v3",
                          "Broadwell-IBRS must be an alias")
-        self.assertEqual(cpus["Broadwell-noTSX-IBRS"].get('alias-of'),
-                         "Broadwell-v4",
+        self.assertEquals(cpus["Broadwell-noTSX-IBRS"].get('alias-of'),
+                          "Broadwell-v4",
                          "Broadwell-noTSX-IBRS must be an alias")
 
-        self.assertEqual(cpus["Nehalem"].get('alias-of'),
-                         "Nehalem-v1",
+        self.assertEquals(cpus["Nehalem"].get('alias-of'),
+                          "Nehalem-v1",
                          "Nehalem must be an alias")
-        self.assertEqual(cpus["Nehalem-IBRS"].get('alias-of'),
-                         "Nehalem-v2",
+        self.assertEquals(cpus["Nehalem-IBRS"].get('alias-of'),
+                          "Nehalem-v2",
                          "Nehalem-IBRS must be an alias")
 
-        self.assertEqual(cpus["Westmere"].get('alias-of'),
-                         "Westmere-v1",
+        self.assertEquals(cpus["Westmere"].get('alias-of'),
+                          "Westmere-v1",
                          "Westmere must be an alias")
-        self.assertEqual(cpus["Westmere-IBRS"].get('alias-of'),
-                         "Westmere-v2",
+        self.assertEquals(cpus["Westmere-IBRS"].get('alias-of'),
+                          "Westmere-v2",
                          "Westmere-IBRS must be an alias")
 
-        self.assertEqual(cpus["SandyBridge"].get('alias-of'),
-                         "SandyBridge-v1",
+        self.assertEquals(cpus["SandyBridge"].get('alias-of'),
+                          "SandyBridge-v1",
                          "SandyBridge must be an alias")
-        self.assertEqual(cpus["SandyBridge-IBRS"].get('alias-of'),
-                         "SandyBridge-v2",
+        self.assertEquals(cpus["SandyBridge-IBRS"].get('alias-of'),
+                          "SandyBridge-v2",
                          "SandyBridge-IBRS must be an alias")
 
-        self.assertEqual(cpus["IvyBridge"].get('alias-of'),
-                         "IvyBridge-v1",
+        self.assertEquals(cpus["IvyBridge"].get('alias-of'),
+                          "IvyBridge-v1",
                          "IvyBridge must be an alias")
-        self.assertEqual(cpus["IvyBridge-IBRS"].get('alias-of'),
-                         "IvyBridge-v2",
+        self.assertEquals(cpus["IvyBridge-IBRS"].get('alias-of'),
+                          "IvyBridge-v2",
                          "IvyBridge-IBRS must be an alias")
 
-        self.assertEqual(cpus["Skylake-Client"].get('alias-of'),
-                         "Skylake-Client-v1",
+        self.assertEquals(cpus["Skylake-Client"].get('alias-of'),
+                          "Skylake-Client-v1",
                          "Skylake-Client must be an alias")
-        self.assertEqual(cpus["Skylake-Client-IBRS"].get('alias-of'),
-                         "Skylake-Client-v2",
+        self.assertEquals(cpus["Skylake-Client-IBRS"].get('alias-of'),
+                          "Skylake-Client-v2",
                          "Skylake-Client-IBRS must be an alias")
 
-        self.assertEqual(cpus["Skylake-Server"].get('alias-of'),
-                         "Skylake-Server-v1",
+        self.assertEquals(cpus["Skylake-Server"].get('alias-of'),
+                          "Skylake-Server-v1",
                          "Skylake-Server must be an alias")
-        self.assertEqual(cpus["Skylake-Server-IBRS"].get('alias-of'),
-                         "Skylake-Server-v2",
+        self.assertEquals(cpus["Skylake-Server-IBRS"].get('alias-of'),
+                          "Skylake-Server-v2",
                          "Skylake-Server-IBRS must be an alias")
 
-        self.assertEqual(cpus["EPYC"].get('alias-of'),
-                         "EPYC-v1",
+        self.assertEquals(cpus["EPYC"].get('alias-of'),
+                          "EPYC-v1",
                          "EPYC must be an alias")
-        self.assertEqual(cpus["EPYC-IBPB"].get('alias-of'),
-                         "EPYC-v2",
+        self.assertEquals(cpus["EPYC-IBPB"].get('alias-of'),
+                          "EPYC-v2",
                          "EPYC-IBPB must be an alias")
 
         self.validate_aliases(cpus)
@@ -223,8 +220,7 @@ class X86CPUModelAliases(avocado_qemu.QemuSystemTest):
         self.vm.add_args('-S')
         self.vm.launch()
 
-        cpus = dict((m['name'], m) for m in
-                    self.vm.cmd('query-cpu-definitions'))
+        cpus = dict((m['name'], m) for m in self.vm.command('query-cpu-definitions'))
 
         self.assertFalse(cpus['Cascadelake-Server']['static'],
                          'unversioned Cascadelake-Server CPU model must not be static')
@@ -250,8 +246,8 @@ class CascadelakeArchCapabilities(avocado_qemu.QemuSystemTest):
     :avocado: tags=arch:x86_64
     """
     def get_cpu_prop(self, prop):
-        cpu_path = self.vm.cmd('query-cpus-fast')[0].get('qom-path')
-        return self.vm.cmd('qom-get', path=cpu_path, property=prop)
+        cpu_path = self.vm.command('query-cpus-fast')[0].get('qom-path')
+        return self.vm.command('qom-get', path=cpu_path, property=prop)
 
     def test_4_1(self):
         """

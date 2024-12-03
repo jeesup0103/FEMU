@@ -157,20 +157,13 @@
     smp_read_barrier_depends();
 #endif
 
-/*
- * Preprocessor sorcery ahead: use a different identifier for the
- * local variable in each expansion, so we can nest macro calls
- * without shadowing variables.
- */
-#define qatomic_rcu_read_internal(ptr, _val)            \
-    ({                                                  \
+#define qatomic_rcu_read(ptr)                          \
+    ({                                                 \
     qemu_build_assert(sizeof(*ptr) <= ATOMIC_REG_SIZE); \
-    typeof_strip_qual(*ptr) _val;                       \
-    qatomic_rcu_read__nocheck(ptr, &_val);              \
-    _val;                                               \
+    typeof_strip_qual(*ptr) _val;                      \
+    qatomic_rcu_read__nocheck(ptr, &_val);             \
+    _val;                                              \
     })
-#define qatomic_rcu_read(ptr) \
-    qatomic_rcu_read_internal((ptr), MAKE_IDENTFIER(_val))
 
 #define qatomic_rcu_set(ptr, i) do {                   \
     qemu_build_assert(sizeof(*ptr) <= ATOMIC_REG_SIZE); \
@@ -202,7 +195,7 @@
     qatomic_xchg__nocheck(ptr, i);                          \
 })
 
-/* Returns the old value of '*ptr' (whether the cmpxchg failed or not) */
+/* Returns the eventual value, failed or not */
 #define qatomic_cmpxchg__nocheck(ptr, old, new)    ({                   \
     typeof_strip_qual(*ptr) _old = (old);                               \
     (void)__atomic_compare_exchange_n(ptr, &_old, new, false,           \
@@ -266,17 +259,24 @@
 # define smp_mb__after_rmw() smp_mb()
 #endif
 
-/*
- * On some architectures, qatomic_set_mb is more efficient than a store
- * plus a fence.
+/* qatomic_mb_read/set semantics map Java volatile variables. They are
+ * less expensive on some platforms (notably POWER) than fully
+ * sequentially consistent operations.
+ *
+ * As long as they are used as paired operations they are safe to
+ * use. See docs/devel/atomics.rst for more discussion.
  */
+
+#define qatomic_mb_read(ptr)                             \
+    qatomic_load_acquire(ptr)
 
 #if !defined(QEMU_SANITIZE_THREAD) && \
     (defined(__i386__) || defined(__x86_64__) || defined(__s390x__))
-# define qatomic_set_mb(ptr, i) \
+/* This is more efficient than a store plus a fence.  */
+# define qatomic_mb_set(ptr, i) \
     ({ (void)qatomic_xchg(ptr, i); smp_mb__after_rmw(); })
 #else
-# define qatomic_set_mb(ptr, i) \
+# define qatomic_mb_set(ptr, i) \
    ({ qatomic_store_release(ptr, i); smp_mb(); })
 #endif
 

@@ -227,7 +227,7 @@ CreateExtraRootBusMap (
     DEBUG ((
       DEBUG_VERBOSE,
       "%a: extra bus position 0x%Lx maps to bus number (UID) 0x%x\n",
-      __func__,
+      __FUNCTION__,
       (UINT64)(Idx + 1),
       Acpi->UID
       ));

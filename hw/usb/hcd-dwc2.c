@@ -1364,8 +1364,7 @@ static void dwc2_realize(DeviceState *dev, Error **errp)
     s->fi = USB_FRMINTVL - 1;
     s->eof_timer = timer_new_ns(QEMU_CLOCK_VIRTUAL, dwc2_frame_boundary, s);
     s->frame_timer = timer_new_ns(QEMU_CLOCK_VIRTUAL, dwc2_work_timer, s);
-    s->async_bh = qemu_bh_new_guarded(dwc2_work_bh, s,
-                                      &dev->mem_reentrancy_guard);
+    s->async_bh = qemu_bh_new(dwc2_work_bh, s);
 
     sysbus_init_irq(sbd, &s->irq);
 }
@@ -1391,7 +1390,7 @@ static const VMStateDescription vmstate_dwc2_state_packet = {
     .name = "dwc2/packet",
     .version_id = 1,
     .minimum_version_id = 1,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_UINT32(devadr, DWC2Packet),
         VMSTATE_UINT32(epnum, DWC2Packet),
         VMSTATE_UINT32(epdir, DWC2Packet),
@@ -1411,7 +1410,7 @@ const VMStateDescription vmstate_dwc2_state = {
     .name = "dwc2",
     .version_id = 1,
     .minimum_version_id = 1,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_UINT32_ARRAY(glbreg, DWC2State,
                              DWC2_GLBREG_SIZE / sizeof(uint32_t)),
         VMSTATE_UINT32_ARRAY(fszreg, DWC2State,

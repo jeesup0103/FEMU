@@ -33,9 +33,7 @@ EDKII_VARIABLE_POLICY_PROTOCOL  mVariablePolicyProtocol      = {
   ProtocolIsVariablePolicyEnabled,
   RegisterVariablePolicy,
   DumpVariablePolicy,
-  LockVariablePolicy,
-  GetVariablePolicyInfo,
-  GetLockOnVariableStateVariablePolicyInfo
+  LockVariablePolicy
 };
 EDKII_VAR_CHECK_PROTOCOL        mVarCheck = {
   VarCheckRegisterSetVariableCheckHandler,

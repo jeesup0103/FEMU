@@ -11,6 +11,13 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 
 #include <Common/UefiBaseTypes.h>
 
+EFI_STATUS
+EfiGetInfo (
+  IN      VOID    *Source,
+  IN      UINT32  SrcSize,
+  OUT     UINT32  *DstSize,
+  OUT     UINT32  *ScratchSize
+  );
 /**
 
 Routine Description:
@@ -30,27 +37,7 @@ Returns:
   EFI_INVALID_PARAMETER - The source data is corrupted
 
 **/
-EFI_STATUS
-EfiGetInfo (
-  IN      VOID    *Source,
-  IN      UINT32  SrcSize,
-  OUT     UINT32  *DstSize,
-  OUT     UINT32  *ScratchSize
-  );
 
-/**
-  The implementation of Efi Decompress().
-
-  @param Source      The source buffer containing the compressed data.
-  @param SrcSize     The size of source buffer
-  @param Destination The destination buffer to store the decompressed data
-  @param DstSize     The size of destination buffer.
-  @param Scratch     The buffer used internally by the decompress routine. This  buffer is needed to store intermediate data.
-  @param ScratchSize The size of scratch buffer.
-
-  @retval EFI_SUCCESS           Decompression is successful
-  @retval EFI_INVALID_PARAMETER The source data is corrupted
-**/
 EFI_STATUS
 EfiDecompress (
   IN      VOID    *Source,
@@ -60,18 +47,28 @@ EfiDecompress (
   IN OUT  VOID    *Scratch,
   IN      UINT32  ScratchSize
   );
-
 /**
-  The implementation Tiano Decompress GetInfo().
 
-  @param Source      The source buffer containing the compressed data.
-  @param SrcSize     The size of source buffer
-  @param DstSize     The size of destination buffer.
-  @param ScratchSize The size of scratch buffer.
+Routine Description:
 
-  @retval EFI_SUCCESS           The size of destination buffer and the size of scratch buffer are successfully retrieved.
-  @retval EFI_INVALID_PARAMETER The source data is corrupted
+  The implementation of Efi Decompress().
+
+Arguments:
+
+  Source      - The source buffer containing the compressed data.
+  SrcSize     - The size of source buffer
+  Destination - The destination buffer to store the decompressed data
+  DstSize     - The size of destination buffer.
+  Scratch     - The buffer used internally by the decompress routine. This  buffer is needed to store intermediate data.
+  ScratchSize - The size of scratch buffer.
+
+Returns:
+
+  EFI_SUCCESS           - Decompression is successful
+  EFI_INVALID_PARAMETER - The source data is corrupted
+
 **/
+
 EFI_STATUS
 TianoGetInfo (
   IN      VOID    *Source,
@@ -79,20 +76,26 @@ TianoGetInfo (
   OUT     UINT32  *DstSize,
   OUT     UINT32  *ScratchSize
   );
-
 /**
-  The implementation of Tiano Decompress().
 
-  @param Source      The source buffer containing the compressed data.
-  @param SrcSize     The size of source buffer
-  @param Destination The destination buffer to store the decompressed data
-  @param DstSize     The size of destination buffer.
-  @param Scratch     The buffer used internally by the decompress routine. This  buffer is needed to store intermediate data.
-  @param ScratchSize The size of scratch buffer.
+Routine Description:
 
-  @retval EFI_SUCCESS           Decompression is successful
-  @retval EFI_INVALID_PARAMETER The source data is corrupted
+  The implementation Tiano Decompress GetInfo().
+
+Arguments:
+
+  Source      - The source buffer containing the compressed data.
+  SrcSize     - The size of source buffer
+  DstSize     - The size of destination buffer.
+  ScratchSize - The size of scratch buffer.
+
+Returns:
+
+  EFI_SUCCESS           - The size of destination buffer and the size of scratch buffer are successfully retrieved.
+  EFI_INVALID_PARAMETER - The source data is corrupted
+
 **/
+
 EFI_STATUS
 TianoDecompress (
   IN      VOID    *Source,
@@ -102,6 +105,27 @@ TianoDecompress (
   IN OUT  VOID    *Scratch,
   IN      UINT32  ScratchSize
   );
+/**
+
+Routine Description:
+
+  The implementation of Tiano Decompress().
+
+Arguments:
+
+  Source      - The source buffer containing the compressed data.
+  SrcSize     - The size of source buffer
+  Destination - The destination buffer to store the decompressed data
+  DstSize     - The size of destination buffer.
+  Scratch     - The buffer used internally by the decompress routine. This  buffer is needed to store intermediate data.
+  ScratchSize - The size of scratch buffer.
+
+Returns:
+
+  EFI_SUCCESS           - Decompression is successful
+  EFI_INVALID_PARAMETER - The source data is corrupted
+
+**/
 
 typedef
 EFI_STATUS

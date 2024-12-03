@@ -49,7 +49,6 @@ native:
 - fuse-devel
 - fuse3
 - fuse3-devel
-- gawk
 - gcc
 - gcc-c++
 - gdb
@@ -134,7 +133,6 @@ native:
 - libuuid-devel
 - libvirt-devel
 - libwsman-devel
-- libxdp-devel
 - libxml2
 - libxml2-devel
 - libxslt
@@ -149,7 +147,6 @@ native:
 - make
 - mesa-libgbm-devel
 - meson
-- mtools
 - nano
 - nbdkit
 - ncurses-devel
@@ -202,7 +199,6 @@ native:
 - perl-generators
 - perl-podlators
 - php-devel
-- pipewire-devel
 - pixman-devel
 - pkgconfig
 - polkit
@@ -227,13 +223,13 @@ native:
 - python3-setuptools
 - python3-sphinx
 - python3-sphinx_rtd_theme
-- python3-tomli
 - python3-wheel
 - qemu-img
 - qemu-kvm
 - rdma-core-devel
 - readline-devel
 - rpcgen
+- rpm
 - rpm-build
 - ruby-devel
 - rubygem-rake
@@ -249,7 +245,6 @@ native:
 - spice-server-devel
 - strace
 - sudo
-- swtpm
 - systemd-devel
 - systemd-rpm-macros
 - systemtap-sdt-devel
@@ -277,5 +272,3 @@ native:
 - zlib-devel
 - zlib-static
 - zstd
-pypi:
-- build

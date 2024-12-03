@@ -281,7 +281,7 @@ static void phb3_msi_instance_init(Object *obj)
                              object_property_allow_set_link,
                              OBJ_PROP_LINK_STRONG);
 
-    /* Will be overridden later */
+    /* Will be overriden later */
     ics->offset = 0;
 }
 

@@ -14,7 +14,7 @@ from lcitool import util
 from lcitool.manifest import Manifest
 
 
-def test_generate(assert_equal, targets, packages, projects, monkeypatch):
+def test_generate(targets, packages, projects, monkeypatch):
     manifest_path = Path(test_utils.test_data_indir(__file__), "manifest.yml")
 
     # Squish the header that contains argv with paths we don't
@@ -84,14 +84,16 @@ def test_generate(assert_equal, targets, packages, projects, monkeypatch):
         assert key in unlinks
         unlinks.remove(key)
 
-    def assert_write(filename, assert_func):
+    def assert_write(filename):
         actual_path = Path(filename)
         expected_path = Path(test_utils.test_data_outdir(__file__), filename)
 
-        assert_func(writes[actual_path.as_posix()], expected_path)
+        test_utils.assert_matches_file(writes[actual_path.as_posix()],
+                                       expected_path,
+                                       allow_regenerate=False)
         del writes[actual_path.as_posix()]
 
-    def assert_operations(**kwargs):
+    def assert_operations():
         # Verify which directories we expect to be created
         assert_mkdir(Path("ci", "gitlab"))
         assert_mkdir(Path("ci", "containers"))
@@ -103,31 +105,27 @@ def test_generate(assert_equal, targets, packages, projects, monkeypatch):
         assert_unlink(Path("ci", "containers", "almalinux-8.Dockerfile"))
 
         # Verify content of files we expect to be created
-        assert_writes = [
-            Path("ci", "gitlab.yml"),
-            Path("ci", "gitlab", "container-templates.yml"),
-            Path("ci", "gitlab", "containers.yml"),
-            Path("ci", "gitlab", "build-templates.yml"),
-            Path("ci", "gitlab", "builds.yml"),
-            Path("ci", "gitlab", "sanity-checks.yml"),
-            Path("ci", "cirrus", "freebsd-current.vars"),
-            Path("ci", "cirrus", "macos-12.vars"),
-            Path("ci", "cirrus", "macos-13.vars"),
-            Path("ci", "containers", "centos-stream-9.Dockerfile"),
-            Path("ci", "containers", "fedora-rawhide.Dockerfile"),
-            Path("ci", "containers", "fedora-rawhide-cross-mingw32.Dockerfile"),
-            Path("ci", "containers", "debian-12.Dockerfile"),
-            Path("ci", "containers", "debian-sid-cross-ppc64le.Dockerfile"),
-            Path("ci", "containers", "debian-sid-cross-i686.Dockerfile"),
-            Path("ci", "buildenv", "centos-stream-9.sh"),
-            Path("ci", "buildenv", "fedora-rawhide.sh"),
-            Path("ci", "buildenv", "fedora-rawhide-cross-mingw32.sh"),
-            Path("ci", "buildenv", "debian-12.sh"),
-            Path("ci", "buildenv", "debian-sid-cross-ppc64le.sh"),
-            Path("ci", "buildenv", "debian-sid-cross-i686.sh"),
-        ]
-        for path in assert_writes:
-            assert_write(path, kwargs["assert_func"])
+        assert_write(Path("ci", "gitlab.yml"))
+        assert_write(Path("ci", "gitlab", "container-templates.yml"))
+        assert_write(Path("ci", "gitlab", "containers.yml"))
+        assert_write(Path("ci", "gitlab", "build-templates.yml"))
+        assert_write(Path("ci", "gitlab", "builds.yml"))
+        assert_write(Path("ci", "gitlab", "sanity-checks.yml"))
+        assert_write(Path("ci", "cirrus", "freebsd-current.vars"))
+        assert_write(Path("ci", "cirrus", "macos-12.vars"))
+        assert_write(Path("ci", "cirrus", "macos-13.vars"))
+        assert_write(Path("ci", "containers", "centos-stream-9.Dockerfile"))
+        assert_write(Path("ci", "containers", "fedora-rawhide.Dockerfile"))
+        assert_write(Path("ci", "containers", "fedora-rawhide-cross-mingw32.Dockerfile"))
+        assert_write(Path("ci", "containers", "debian-10.Dockerfile"))
+        assert_write(Path("ci", "containers", "debian-sid-cross-ppc64le.Dockerfile"))
+        assert_write(Path("ci", "containers", "debian-sid-cross-i686.Dockerfile"))
+        assert_write(Path("ci", "buildenv", "centos-stream-9.sh"))
+        assert_write(Path("ci", "buildenv", "fedora-rawhide.sh"))
+        assert_write(Path("ci", "buildenv", "fedora-rawhide-cross-mingw32.sh"))
+        assert_write(Path("ci", "buildenv", "debian-10.sh"))
+        assert_write(Path("ci", "buildenv", "debian-sid-cross-ppc64le.sh"))
+        assert_write(Path("ci", "buildenv", "debian-sid-cross-i686.sh"))
 
         # Verify nothing else unexpected was created/deleted/written
         assert len(mkdirs) == 0
@@ -135,7 +133,7 @@ def test_generate(assert_equal, targets, packages, projects, monkeypatch):
         assert len(writes) == 0
 
     try:
-        assert_operations(assert_func=assert_equal)
+        assert_operations()
     finally:
         if pytest.custom_args["regenerate_output"]:
             with open(manifest_path, "r") as fp:

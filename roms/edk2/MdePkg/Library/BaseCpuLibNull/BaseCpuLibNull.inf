@@ -22,8 +22,5 @@
 [Sources]
   BaseCpuLibNull.c
 
-[Sources.IA32, Sources.X64]
-  X86BaseCpuLibNull.c
-
 [Packages]
   MdePkg/MdePkg.dec

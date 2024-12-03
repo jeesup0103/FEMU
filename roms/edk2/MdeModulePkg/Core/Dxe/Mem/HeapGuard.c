@@ -1037,17 +1037,12 @@ AdjustPoolHeadA (
   Get the page base address according to pool head address.
 
   @param[in]  Memory    Head address of pool to free.
-  @param[in]  NoPages   Number of pages actually allocated.
-  @param[in]  Size      Size of memory requested.
-                        (plus pool head/tail overhead)
 
   @return Address of pool head.
 **/
 VOID *
 AdjustPoolHeadF (
-  IN EFI_PHYSICAL_ADDRESS  Memory,
-  IN UINTN                 NoPages,
-  IN UINTN                 Size
+  IN EFI_PHYSICAL_ADDRESS  Memory
   )
 {
   if ((Memory == 0) || ((PcdGet8 (PcdHeapGuardPropertyMask) & BIT7) != 0)) {
@@ -1058,12 +1053,9 @@ AdjustPoolHeadF (
   }
 
   //
-  // Pool head is put near the tail Guard. We need to exactly undo the addition done in AdjustPoolHeadA
-  // because we may not have allocated the pool head on the first allocated page, since we are aligned to
-  // the tail and on some architectures, the runtime page allocation granularity is > one page. So we allocate
-  // more pages than we need and put the pool head somewhere past the first page.
+  // Pool head is put near the tail Guard
   //
-  return (VOID *)(UINTN)(Memory + Size - EFI_PAGES_TO_SIZE (NoPages));
+  return (VOID *)(UINTN)(Memory & ~EFI_PAGE_MASK);
 }
 
 /**

@@ -77,7 +77,7 @@ static const VMStateDescription vmstate_xen_pvdevice = {
     .name = "xen-pvdevice",
     .version_id = 1,
     .minimum_version_id = 1,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_PCI_DEVICE(parent_obj, XenPVDevice),
         VMSTATE_END_OF_LIST()
     }

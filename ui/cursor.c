@@ -90,12 +90,11 @@ QEMUCursor *cursor_builtin_left_ptr(void)
     return cursor_parse_xpm(cursor_left_ptr_xpm);
 }
 
-QEMUCursor *cursor_alloc(uint16_t width, uint16_t height)
+QEMUCursor *cursor_alloc(int width, int height)
 {
     QEMUCursor *c;
     size_t datasize = width * height * sizeof(uint32_t);
 
-    /* Modern physical hardware typically uses 512x512 sprites */
     if (width > 512 || height > 512) {
         return NULL;
     }

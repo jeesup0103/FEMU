@@ -106,10 +106,8 @@ const generic_fuzz_config predefined_configs[] = {
     },{
         .name = "intel-hda",
         .args = "-machine q35 -nodefaults -device intel-hda,id=hda0 "
-        "-audiodev driver=none,id=audio0",
-        "-device hda-output,bus=hda0.0,audiodev=audio0 "
-        "-device hda-micro,bus=hda0.0,audiodev=audio0 "
-        "-device hda-duplex,bus=hda0.0,audiodev=audio0",
+        "-device hda-output,bus=hda0.0 -device hda-micro,bus=hda0.0 "
+        "-device hda-duplex,bus=hda0.0",
         .objects = "intel-hda",
     },{
         .name = "ide-hd",

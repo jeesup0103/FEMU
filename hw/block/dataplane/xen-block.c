@@ -19,7 +19,6 @@
  */
 
 #include "qemu/osdep.h"
-#include "qemu/defer-call.h"
 #include "qemu/error-report.h"
 #include "qemu/main-loop.h"
 #include "qemu/memalign.h"
@@ -260,6 +259,8 @@ static void xen_block_complete_aio(void *opaque, int ret)
     XenBlockRequest *request = opaque;
     XenBlockDataPlane *dataplane = request->dataplane;
 
+    aio_context_acquire(dataplane->ctx);
+
     if (ret != 0) {
         error_report("%s I/O error",
                      request->req.operation == BLKIF_OP_READ ?
@@ -271,10 +272,10 @@ static void xen_block_complete_aio(void *opaque, int ret)
     if (request->presync) {
         request->presync = 0;
         xen_block_do_aio(request);
-        return;
+        goto done;
     }
     if (request->aio_inflight > 0) {
-        return;
+        goto done;
     }
 
     switch (request->req.operation) {
@@ -316,6 +317,9 @@ static void xen_block_complete_aio(void *opaque, int ret)
     if (dataplane->more_work) {
         qemu_bh_schedule(dataplane->bh);
     }
+
+done:
+    aio_context_release(dataplane->ctx);
 }
 
 static bool xen_block_split_discard(XenBlockRequest *request,
@@ -505,7 +509,7 @@ static int xen_block_get_request(XenBlockDataPlane *dataplane,
 
 /*
  * Threshold of in-flight requests above which we will start using
- * defer_call_begin()/defer_call_end() to batch requests.
+ * blk_io_plug()/blk_io_unplug() to batch requests.
  */
 #define IO_PLUG_THRESHOLD 1
 
@@ -533,7 +537,7 @@ static bool xen_block_handle_requests(XenBlockDataPlane *dataplane)
      * is below us.
      */
     if (inflight_atstart > IO_PLUG_THRESHOLD) {
-        defer_call_begin();
+        blk_io_plug(dataplane->blk);
     }
     while (rc != rp) {
         /* pull request from ring */
@@ -573,12 +577,12 @@ static bool xen_block_handle_requests(XenBlockDataPlane *dataplane)
 
         if (inflight_atstart > IO_PLUG_THRESHOLD &&
             batched >= inflight_atstart) {
-            defer_call_end();
+            blk_io_unplug(dataplane->blk);
         }
         xen_block_do_aio(request);
         if (inflight_atstart > IO_PLUG_THRESHOLD) {
             if (batched >= inflight_atstart) {
-                defer_call_begin();
+                blk_io_plug(dataplane->blk);
                 batched = 0;
             } else {
                 batched++;
@@ -586,7 +590,7 @@ static bool xen_block_handle_requests(XenBlockDataPlane *dataplane)
         }
     }
     if (inflight_atstart > IO_PLUG_THRESHOLD) {
-        defer_call_end();
+        blk_io_unplug(dataplane->blk);
     }
 
     return done_something;
@@ -596,7 +600,9 @@ static void xen_block_dataplane_bh(void *opaque)
 {
     XenBlockDataPlane *dataplane = opaque;
 
+    aio_context_acquire(dataplane->ctx);
     xen_block_handle_requests(dataplane);
+    aio_context_release(dataplane->ctx);
 }
 
 static bool xen_block_dataplane_event(void *opaque)
@@ -627,9 +633,8 @@ XenBlockDataPlane *xen_block_dataplane_create(XenDevice *xendev,
     } else {
         dataplane->ctx = qemu_get_aio_context();
     }
-    dataplane->bh = aio_bh_new_guarded(dataplane->ctx, xen_block_dataplane_bh,
-                                       dataplane,
-                                       &DEVICE(xendev)->mem_reentrancy_guard);
+    dataplane->bh = aio_bh_new(dataplane->ctx, xen_block_dataplane_bh,
+                               dataplane);
 
     return dataplane;
 }
@@ -658,30 +663,6 @@ void xen_block_dataplane_destroy(XenBlockDataPlane *dataplane)
     g_free(dataplane);
 }
 
-void xen_block_dataplane_detach(XenBlockDataPlane *dataplane)
-{
-    if (!dataplane || !dataplane->event_channel) {
-        return;
-    }
-
-    /* Only reason for failure is a NULL channel */
-    xen_device_set_event_channel_context(dataplane->xendev,
-                                         dataplane->event_channel,
-                                         NULL, &error_abort);
-}
-
-void xen_block_dataplane_attach(XenBlockDataPlane *dataplane)
-{
-    if (!dataplane || !dataplane->event_channel) {
-        return;
-    }
-
-    /* Only reason for failure is a NULL channel */
-    xen_device_set_event_channel_context(dataplane->xendev,
-                                         dataplane->event_channel,
-                                         dataplane->ctx, &error_abort);
-}
-
 void xen_block_dataplane_stop(XenBlockDataPlane *dataplane)
 {
     XenDevice *xendev;
@@ -692,12 +673,16 @@ void xen_block_dataplane_stop(XenBlockDataPlane *dataplane)
 
     xendev = dataplane->xendev;
 
-    if (!blk_in_drain(dataplane->blk)) {
-        xen_block_dataplane_detach(dataplane);
+    aio_context_acquire(dataplane->ctx);
+    if (dataplane->event_channel) {
+        /* Only reason for failure is a NULL channel */
+        xen_device_set_event_channel_context(xendev, dataplane->event_channel,
+                                             qemu_get_aio_context(),
+                                             &error_abort);
     }
-
     /* Xen doesn't have multiple users for nodes, so this can't fail */
     blk_set_aio_context(dataplane->blk, qemu_get_aio_context(), &error_abort);
+    aio_context_release(dataplane->ctx);
 
     /*
      * Now that the context has been moved onto the main thread, cancel
@@ -743,6 +728,7 @@ void xen_block_dataplane_start(XenBlockDataPlane *dataplane,
 {
     ERRP_GUARD();
     XenDevice *xendev = dataplane->xendev;
+    AioContext *old_context;
     unsigned int ring_size;
     unsigned int i;
 
@@ -826,12 +812,17 @@ void xen_block_dataplane_start(XenBlockDataPlane *dataplane,
         goto stop;
     }
 
+    old_context = blk_get_aio_context(dataplane->blk);
+    aio_context_acquire(old_context);
     /* If other users keep the BlockBackend in the iothread, that's ok */
     blk_set_aio_context(dataplane->blk, dataplane->ctx, NULL);
+    aio_context_release(old_context);
 
-    if (!blk_in_drain(dataplane->blk)) {
-        xen_block_dataplane_attach(dataplane);
-    }
+    /* Only reason for failure is a NULL channel */
+    aio_context_acquire(dataplane->ctx);
+    xen_device_set_event_channel_context(xendev, dataplane->event_channel,
+                                         dataplane->ctx, &error_abort);
+    aio_context_release(dataplane->ctx);
 
     return;
 

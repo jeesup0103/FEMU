@@ -232,8 +232,8 @@ ShellCommandRunTouch (
         }
 
         //
-        // make sure we completed the param parsing successfully...
-        // Also make sure that any previous action was successful
+        // make sure we completed the param parsing sucessfully...
+        // Also make sure that any previous action was sucessful
         //
         if (ShellStatus == SHELL_SUCCESS) {
           //

@@ -1,4 +1,4 @@
-system_ss.add(files('trace-hmp-cmds.c'))
+softmmu_ss.add(files('trace-hmp-cmds.c'))
 
 specific_ss.add(files('control-target.c'))
 
@@ -64,7 +64,7 @@ trace_events_all = custom_target('trace-events-all',
                                  input: trace_events_files,
                                  command: [ 'cat', '@INPUT@' ],
                                  capture: true,
-                                 install: get_option('trace_backends') != [ 'nop' ],
+                                 install: true,
                                  install_dir: qemu_datadir)
 
 if 'ust' in get_option('trace_backends')

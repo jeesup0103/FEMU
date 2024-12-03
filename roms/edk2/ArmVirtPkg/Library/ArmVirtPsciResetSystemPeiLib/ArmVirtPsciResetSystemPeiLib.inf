@@ -26,7 +26,6 @@
   EmbeddedPkg/EmbeddedPkg.dec
   MdeModulePkg/MdeModulePkg.dec
   MdePkg/MdePkg.dec
-  OvmfPkg/OvmfPkg.dec
 
 [LibraryClasses]
   ArmSmcLib
@@ -37,4 +36,4 @@
   HobLib
 
 [Pcd]
-  gUefiOvmfPkgTokenSpaceGuid.PcdDeviceTreeInitialBaseAddress
+  gArmVirtTokenSpaceGuid.PcdDeviceTreeInitialBaseAddress

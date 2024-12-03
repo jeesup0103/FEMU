@@ -40,7 +40,6 @@
   gArmTokenSpaceGuid.PcdArmArchTimerIntrNum
   gArmTokenSpaceGuid.PcdArmArchTimerVirtIntrNum
   gArmTokenSpaceGuid.PcdArmArchTimerHypIntrNum
-  gArmTokenSpaceGuid.PcdArmArchTimerHypVirtIntrNum
 
 [Depex]
   gFdtClientProtocolGuid

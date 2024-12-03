@@ -1,5 +1,3 @@
-.. _tcg_internals:
-
 ====================
 Translator Internals
 ====================

@@ -45,12 +45,24 @@
   X64/VirtualMemory.c
   X64/DxeLoadFunc.c
 
-[Sources.LOONGARCH64,Sources.RISCV64,Sources.EBC,Sources.ARM,Sources.AARCH64]
-  DxeHandoff.c
+[Sources.EBC]
+  Ebc/DxeLoadFunc.c
+
+[Sources.ARM, Sources.AARCH64]
+  Arm/DxeLoadFunc.c
+
+[Sources.RISCV64]
+  RiscV64/DxeLoadFunc.c
+
+[Sources.LOONGARCH64]
+  LoongArch64/DxeLoadFunc.c
 
 [Packages]
   MdePkg/MdePkg.dec
   MdeModulePkg/MdeModulePkg.dec
+
+[Packages.ARM, Packages.AARCH64]
+  ArmPkg/ArmPkg.dec
 
 [LibraryClasses]
   PcdLib
@@ -68,6 +80,9 @@
   PeiServicesTablePointerLib
   PerformanceLib
 
+[LibraryClasses.ARM, LibraryClasses.AARCH64]
+  ArmMmuLib
+
 [Ppis]
   gEfiDxeIplPpiGuid                      ## PRODUCES
   gEfiPeiDecompressPpiGuid               ## PRODUCES
@@ -82,7 +97,6 @@
   gEfiPeiMemoryDiscoveredPpiGuid         ## SOMETIMES_CONSUMES
   gEdkiiPeiBootInCapsuleOnDiskModePpiGuid  ## SOMETIMES_CONSUMES
   gEdkiiPeiCapsuleOnDiskPpiGuid            ## SOMETIMES_CONSUMES # Consumed on firmware update boot path
-  gEdkiiMemoryAttributePpiGuid             ## SOMETIMES_CONSUMES
 
 [Guids]
   ## SOMETIMES_CONSUMES ## Variable:L"MemoryTypeInformation"
@@ -109,11 +123,9 @@
   gEfiMdeModulePkgTokenSpaceGuid.PcdGhcbSize                            ## CONSUMES
 
 [Pcd.IA32,Pcd.X64,Pcd.ARM,Pcd.AARCH64]
+  gEfiMdeModulePkgTokenSpaceGuid.PcdSetNxForStack               ## SOMETIMES_CONSUMES
   gEfiMdeModulePkgTokenSpaceGuid.PcdDxeNxMemoryProtectionPolicy ## SOMETIMES_CONSUMES
   gEfiMdeModulePkgTokenSpaceGuid.PcdImageProtectionPolicy       ## SOMETIMES_CONSUMES
-
-[Pcd]
-  gEfiMdeModulePkgTokenSpaceGuid.PcdSetNxForStack               ## SOMETIMES_CONSUMES
 
 [Depex]
   gEfiPeiLoadFilePpiGuid AND gEfiPeiMasterBootModePpiGuid

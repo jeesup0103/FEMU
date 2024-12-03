@@ -277,18 +277,6 @@ DxeMain (
   MemoryProfileInit (HobStart);
 
   //
-  // Start the Image Services.
-  //
-  Status = CoreInitializeImageServices (HobStart);
-  ASSERT_EFI_ERROR (Status);
-
-  //
-  // Initialize the Global Coherency Domain Services
-  //
-  Status = CoreInitializeGcdServices (&HobStart, MemoryBaseAddress, MemoryLength);
-  ASSERT_EFI_ERROR (Status);
-
-  //
   // Allocate the EFI System Table and EFI Runtime Service Table from EfiRuntimeServicesData
   // Use the templates to initialize the contents of the EFI System Table and EFI Runtime Services Table
   //
@@ -301,9 +289,16 @@ DxeMain (
   gDxeCoreST->RuntimeServices = gDxeCoreRT;
 
   //
-  // Update DXE Core Loaded Image Protocol with allocated UEFI System Table
+  // Start the Image Services.
   //
-  gDxeCoreLoadedImage->SystemTable = gDxeCoreST;
+  Status = CoreInitializeImageServices (HobStart);
+  ASSERT_EFI_ERROR (Status);
+
+  //
+  // Initialize the Global Coherency Domain Services
+  //
+  Status = CoreInitializeGcdServices (&HobStart, MemoryBaseAddress, MemoryLength);
+  ASSERT_EFI_ERROR (Status);
 
   //
   // Call constructor for all libraries
@@ -320,7 +315,7 @@ DxeMain (
   DEBUG ((
     DEBUG_INFO,
     "%a: MemoryBaseAddress=0x%Lx MemoryLength=0x%Lx\n",
-    __func__,
+    __FUNCTION__,
     MemoryBaseAddress,
     MemoryLength
     ));

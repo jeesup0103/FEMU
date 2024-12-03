@@ -97,10 +97,6 @@ static int wav_init_out(HWVoiceOut *hw, struct audsettings *as,
         dolog ("WAVE files can not handle 32bit formats\n");
         return -1;
 
-    case AUDIO_FORMAT_F32:
-        dolog("WAVE files can not handle float formats\n");
-        return -1;
-
     default:
         abort();
     }
@@ -186,7 +182,7 @@ static void wav_enable_out(HWVoiceOut *hw, bool enable)
     }
 }
 
-static void *wav_audio_init(Audiodev *dev, Error **errp)
+static void *wav_audio_init(Audiodev *dev)
 {
     assert(dev->driver == AUDIODEV_DRIVER_WAV);
     return dev;
@@ -212,6 +208,7 @@ static struct audio_driver wav_audio_driver = {
     .init           = wav_audio_init,
     .fini           = wav_audio_fini,
     .pcm_ops        = &wav_pcm_ops,
+    .can_be_default = 0,
     .max_voices_out = 1,
     .max_voices_in  = 0,
     .voice_size_out = sizeof (WAVVoiceOut),

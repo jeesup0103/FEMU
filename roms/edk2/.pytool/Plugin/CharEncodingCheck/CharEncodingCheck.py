@@ -93,7 +93,9 @@ class CharEncodingCheck(ICiBuildPlugin):
             files = [Edk2pathObj.GetAbsolutePathOnThisSystemFromEdk2RelativePath(x) for x in files]
             for a in files:
                 files_tested += 1
-                if not self.TestEncodingOk(a, enc):
+                if(self.TestEncodingOk(a, enc)):
+                    logging.debug("File {0} Passed Encoding Check {1}".format(a, enc))
+                else:
                     tc.LogStdError("Encoding Failure in {0}.  Not {1}".format(a, enc))
                     overall_status += 1
 

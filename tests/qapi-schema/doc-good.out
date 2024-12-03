@@ -104,7 +104,7 @@ doc symbol=Enum
     body=
 
     arg=one
-The _one_ {and only}, description on the same line
+The _one_ {and only}
     arg=two
 
     feature=enum-feat
@@ -117,15 +117,12 @@ doc symbol=Base
     body=
 
     arg=base1
-description starts on a new line,
-minimally indented
+the first member
 doc symbol=Variant1
     body=
 A paragraph
 
-Another paragraph
-
-@var1 is undocumented
+Another paragraph (but no @var: line)
     arg=var1
 
     feature=variant1-feat
@@ -144,8 +141,7 @@ doc symbol=Alternate
     body=
 
     arg=i
-description starts on the same line
-remainder indented the same
+an integer
 @b is undocumented
     arg=b
 
@@ -158,11 +154,10 @@ doc symbol=cmd
     body=
 
     arg=arg1
-description starts on a new line,
-indented
+the first argument
     arg=arg2
-description starts on the same line
-remainder indented differently
+the second
+argument
     arg=arg3
 
     feature=cmd-feat1
@@ -173,8 +168,6 @@ another feature
 @arg3 is undocumented
     section=Returns
 @Object
-    section=Errors
-some
     section=TODO
 frobnicate
     section=Notes

@@ -2,9 +2,7 @@
 packages:
   - autoconf
   - automake
-  - awk
   - bash-completion
-  - cargo
   - ccache
   - clang
   - diffutils

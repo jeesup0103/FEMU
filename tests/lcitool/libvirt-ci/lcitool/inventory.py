@@ -6,8 +6,6 @@
 
 import logging
 
-from pathlib import Path
-
 from lcitool import util, LcitoolError
 from lcitool.packages import package_names_by_type
 
@@ -39,28 +37,23 @@ class Inventory():
     def hosts(self):
         return list(self.host_facts.keys())
 
-    def __init__(self, targets, config, inventory_path=None):
+    def __init__(self, targets, config):
         self._targets = targets
         self._config = config
         self._host_facts = None
         self._ansible_inventory = None
-        self._inventory_path = inventory_path
 
     def _get_ansible_inventory(self):
         from lcitool.ansible_wrapper import AnsibleWrapper, AnsibleWrapperError
 
         inventory_sources = []
-        if self._inventory_path is None:
-            self._inventory_path = Path(util.get_config_dir(), "inventory")
+        inventory_path = self._config.get_config_path("inventory")
+        log.debug(f"Using '{inventory_path}' for lcitool inventory")
+        if inventory_path.exists():
+            inventory_sources.append(inventory_path)
 
-            # we only call into libvirt when we need to use default inventory
-            # sources, i.e. user didn't provide one via datadir
-            log.debug("Querying libvirt for lcitool hosts")
-            inventory_sources.append(self._get_libvirt_inventory())
-
-        if self._inventory_path.exists():
-            log.debug(f"Adding '{self._inventory_path}' to Ansible inventory sources")
-            inventory_sources.append(self._inventory_path)
+        log.debug("Querying libvirt for lcitool hosts")
+        inventory_sources.append(self._get_libvirt_inventory())
 
         ansible_runner = AnsibleWrapper()
         ansible_runner.prepare_env(inventories=inventory_sources,
@@ -95,12 +88,6 @@ class Inventory():
         def _rec(inventory, group_name):
             for key, subinventory in inventory.items():
                 if key == "hosts":
-                    if (group_name != "ungrouped" and
-                        group_name not in self._targets.targets):
-                        log.info(f"Unsupported target OS group '{group_name}'"
-                                 "found in the inventory, skipping...")
-                        return
-
                     for host_name, host_facts in subinventory.items():
                         log.debug(f"Host '{host_name}' is in group '{group_name}'")
 

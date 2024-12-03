@@ -35,14 +35,26 @@ InitSmmS3Cr3 (
   VOID
   )
 {
+  EFI_PHYSICAL_ADDRESS  Pages;
+  UINT64                *PTEntry;
+
   //
-  // Generate level4 page table for the first 4GB memory space
+  // Generate PAE page table for the first 4GB memory space
+  //
+  Pages = Gen4GPageTable (FALSE);
+
+  //
+  // Fill Page-Table-Level4 (PML4) entry
+  //
+  PTEntry = (UINT64 *)AllocatePageTableMemory (1);
+  ASSERT (PTEntry != NULL);
+  *PTEntry = Pages | mAddressEncMask | PAGE_ATTRIBUTE_BITS;
+  ZeroMem (PTEntry + 1, EFI_PAGE_SIZE - sizeof (*PTEntry));
+
+  //
   // Return the address of PML4 (to set CR3)
   //
-  //
-  // The SmmS3Cr3 is only used by S3Resume PEIM to switch CPU from 32bit to 64bit
-  //
-  mSmmS3ResumeState->SmmS3Cr3 = (UINT32)GenSmmPageTable (Paging4Level, 32);
+  mSmmS3ResumeState->SmmS3Cr3 = (UINT32)(UINTN)PTEntry;
 
   return;
 }

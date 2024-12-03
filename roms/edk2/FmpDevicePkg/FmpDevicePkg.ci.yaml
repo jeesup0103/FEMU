@@ -6,9 +6,6 @@
 # SPDX-License-Identifier: BSD-2-Clause-Patent
 ##
 {
-    "PrEval": {
-        "DscPath": "FmpDevicePkg.dsc",
-    },
     "LicenseCheck": {
         "IgnoreFiles": []
     },

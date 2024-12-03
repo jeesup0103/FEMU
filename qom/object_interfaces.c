@@ -259,7 +259,7 @@ static void user_creatable_print_help_from_qdict(QDict *args)
     }
 }
 
-ObjectOptions *user_creatable_parse_str(const char *str, Error **errp)
+ObjectOptions *user_creatable_parse_str(const char *optarg, Error **errp)
 {
     ERRP_GUARD();
     QObject *obj;
@@ -267,14 +267,14 @@ ObjectOptions *user_creatable_parse_str(const char *str, Error **errp)
     Visitor *v;
     ObjectOptions *options;
 
-    if (str[0] == '{') {
-        obj = qobject_from_json(str, errp);
+    if (optarg[0] == '{') {
+        obj = qobject_from_json(optarg, errp);
         if (!obj) {
             return NULL;
         }
         v = qobject_input_visitor_new(obj);
     } else {
-        QDict *args = keyval_parse(str, "qom-type", &help, errp);
+        QDict *args = keyval_parse(optarg, "qom-type", &help, errp);
         if (*errp) {
             return NULL;
         }
@@ -295,12 +295,12 @@ ObjectOptions *user_creatable_parse_str(const char *str, Error **errp)
     return options;
 }
 
-bool user_creatable_add_from_str(const char *str, Error **errp)
+bool user_creatable_add_from_str(const char *optarg, Error **errp)
 {
     ERRP_GUARD();
     ObjectOptions *options;
 
-    options = user_creatable_parse_str(str, errp);
+    options = user_creatable_parse_str(optarg, errp);
     if (!options) {
         return false;
     }
@@ -310,9 +310,9 @@ bool user_creatable_add_from_str(const char *str, Error **errp)
     return !*errp;
 }
 
-void user_creatable_process_cmdline(const char *cmdline)
+void user_creatable_process_cmdline(const char *optarg)
 {
-    if (!user_creatable_add_from_str(cmdline, &error_fatal)) {
+    if (!user_creatable_add_from_str(optarg, &error_fatal)) {
         /* Help was printed */
         exit(EXIT_SUCCESS);
     }

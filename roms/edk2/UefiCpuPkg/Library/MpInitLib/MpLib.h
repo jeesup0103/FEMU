@@ -1,7 +1,7 @@
 /** @file
   Common header file for MP Initialize Library.
 
-  Copyright (c) 2016 - 2023, Intel Corporation. All rights reserved.<BR>
+  Copyright (c) 2016 - 2022, Intel Corporation. All rights reserved.<BR>
   Copyright (c) 2020, AMD Inc. All rights reserved.<BR>
 
   SPDX-License-Identifier: BSD-2-Clause-Patent
@@ -27,6 +27,7 @@
 #include <Library/DebugLib.h>
 #include <Library/LocalApicLib.h>
 #include <Library/CpuLib.h>
+#include <Library/UefiCpuLib.h>
 #include <Library/TimerLib.h>
 #include <Library/SynchronizationLib.h>
 #include <Library/MtrrLib.h>
@@ -39,17 +40,8 @@
 #include <Register/Amd/Ghcb.h>
 
 #include <Guid/MicrocodePatchHob.h>
-#include "MpHandOff.h"
 
 #define WAKEUP_AP_SIGNAL  SIGNATURE_32 ('S', 'T', 'A', 'P')
-//
-// To trigger the start-up signal, BSP writes the specified
-// StartupSignalValue to the StartupSignalAddress of each processor.
-// This address is monitored by the APs, and as soon as they receive
-// the value that matches the MP_HAND_OFF_SIGNAL, they will wake up
-// and switch the context from PEI to DXE phase.
-//
-#define MP_HAND_OFF_SIGNAL  SIGNATURE_32 ('M', 'P', 'H', 'O')
 
 #define CPU_INIT_MP_LIB_HOB_GUID \
   { \
@@ -185,10 +177,8 @@ typedef struct {
   UINT8    *RendezvousFunnelAddress;
   UINTN    ModeEntryOffset;
   UINTN    RendezvousFunnelSize;
-  UINT8    *RelocateApLoopFuncAddressGeneric;
-  UINTN    RelocateApLoopFuncSizeGeneric;
-  UINT8    *RelocateApLoopFuncAddressAmdSev;
-  UINTN    RelocateApLoopFuncSizeAmdSev;
+  UINT8    *RelocateApLoopFuncAddress;
+  UINTN    RelocateApLoopFuncSize;
   UINTN    ModeTransitionOffset;
   UINTN    SwitchToRealNoNxOffset;
   UINTN    SwitchToRealPM16ModeOffset;
@@ -203,8 +193,6 @@ typedef struct _CPU_MP_DATA CPU_MP_DATA;
 // MP CPU exchange information for AP reset code
 // This structure is required to be packed because fixed field offsets
 // into this structure are used in assembly code in this module
-// Assembly routines should refrain from directly interacting with
-// the internal details of CPU_MP_DATA.
 //
 typedef struct {
   UINTN              StackStart;
@@ -241,16 +229,17 @@ typedef struct {
 #pragma pack()
 
 //
-// CPU MP Data save in memory, and intended for use in C code.
-// There are some duplicated fields, such as XD status, between
-// CpuMpData and ExchangeInfo. These duplications in CpuMpData
-// are present to avoid to be direct accessed and comprehended
-// in assembly code.
+// CPU MP Data save in memory
 //
 struct _CPU_MP_DATA {
   UINT64                           CpuInfoInHob;
   UINT32                           CpuCount;
   UINT32                           BspNumber;
+  //
+  // The above fields data will be passed from PEI to DXE
+  // Please make sure the fields offset same in the different
+  // architecture.
+  //
   SPIN_LOCK                        MpLock;
   UINTN                            Buffer;
   UINTN                            CpuApStackSize;
@@ -271,7 +260,6 @@ struct _CPU_MP_DATA {
   UINT64                           TotalTime;
   EFI_EVENT                        WaitEvent;
   UINTN                            **FailedCpuList;
-  BOOLEAN                          EnableExecuteDisableForSwitchContext;
 
   AP_INIT_STATE                    InitFlag;
   BOOLEAN                          SwitchBspFlag;
@@ -323,7 +311,6 @@ typedef struct {
 
 #define AP_SAFE_STACK_SIZE   128
 #define AP_RESET_STACK_SIZE  AP_SAFE_STACK_SIZE
-STATIC_ASSERT ((AP_SAFE_STACK_SIZE & (CPU_STACK_ALIGNMENT - 1)) == 0, "AP_SAFE_STACK_SIZE is not aligned with CPU_STACK_ALIGNMENT");
 
 #pragma pack(1)
 
@@ -375,30 +362,7 @@ extern EFI_GUID  mCpuInitMpLibHobGuid;
 **/
 typedef
   VOID
-(EFIAPI *ASM_RELOCATE_AP_LOOP_GENERIC)(
-  IN BOOLEAN                 MwaitSupport,
-  IN UINTN                   ApTargetCState,
-  IN UINTN                   TopOfApStack,
-  IN UINTN                   NumberToFinish,
-  IN UINTN                   Cr3
-  );
-
-/**
-  Assembly code to place AP into safe loop mode for Amd processors
-  with Sev enabled.
-  Place AP into targeted C-State if MONITOR is supported, otherwise
-  place AP into hlt state.
-  Place AP in protected mode if the current is long mode. Due to AP maybe
-  wakeup by some hardware event. It could avoid accessing page table that
-  may not available during booting to OS.
-  @param[in] MwaitSupport    TRUE indicates MONITOR is supported.
-                             FALSE indicates MONITOR is not supported.
-  @param[in] ApTargetCState  Target C-State value.
-  @param[in] PmCodeSegment   Protected mode code segment value.
-**/
-typedef
-  VOID
-(EFIAPI *ASM_RELOCATE_AP_LOOP_AMDSEV)(
+(EFIAPI *ASM_RELOCATE_AP_LOOP)(
   IN BOOLEAN                 MwaitSupport,
   IN UINTN                   ApTargetCState,
   IN UINTN                   PmCodeSegment,
@@ -437,12 +401,6 @@ AsmExchangeRole (
   IN CPU_EXCHANGE_ROLE_INFO  *OthersInfo
   );
 
-typedef union {
-  VOID                            *Data;
-  ASM_RELOCATE_AP_LOOP_AMDSEV     AmdSevEntry;  // 64-bit AMD Sev processors
-  ASM_RELOCATE_AP_LOOP_GENERIC    GenericEntry; // Intel processors (32-bit or 64-bit), 32-bit AMD processors, or AMD non-Sev processors
-} RELOCATE_AP_LOOP_ENTRY;
-
 /**
   Get the pointer to CPU MP Data structure.
 
@@ -477,15 +435,6 @@ GetWakeupBuffer (
   );
 
 /**
-  Switch Context for each AP.
-
-**/
-VOID
-SwitchApContext (
-  IN MP_HAND_OFF  *MpHandOff
-  );
-
-/**
   Get available EfiBootServicesCode memory below 4GB by specified size.
 
   This buffer is required to safely transfer AP from real address mode to
@@ -513,18 +462,6 @@ AllocateCodeBuffer (
 UINTN
 GetSevEsAPMemory (
   VOID
-  );
-
-/**
-  Create 1:1 mapping page table in reserved memory to map the specified address range.
-  @param[in]      LinearAddress  The start of the linear address range.
-  @param[in]      Length         The length of the linear address range.
-  @return The page table to be created.
-**/
-UINTN
-CreatePageTable (
-  IN UINTN  Address,
-  IN UINTN  Length
   );
 
 /**
@@ -909,16 +846,6 @@ VOID
 SevSnpCreateAP (
   IN CPU_MP_DATA  *CpuMpData,
   IN INTN         ProcessorNumber
-  );
-
-/**
-  Get pointer to CPU MP Data structure from GUIDed HOB.
-
-  @param[in] CpuMpData  The pointer to CPU MP Data structure.
-**/
-VOID
-AmdSevUpdateCpuMpData (
-  IN CPU_MP_DATA  *CpuMpData
   );
 
 #endif

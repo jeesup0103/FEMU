@@ -3,7 +3,6 @@ packages:
   - autoconf
   - automake
   - autopoint
-  - awk
   - ccache
   - gcc
   - libcmpiutil

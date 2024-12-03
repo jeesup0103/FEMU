@@ -1,8 +1,8 @@
-if not have_tools or host_os == 'windows'
+if not have_tools or targetos == 'windows' or get_option('gprof')
   subdir_done()
 endif
 
-foreach cflag: qemu_ldflags
+foreach cflag: config_host['QEMU_CFLAGS'].split()
   if cflag.startswith('-fsanitize') and \
      not cflag.contains('safe-stack') and not cflag.contains('cfi-icall')
     message('Sanitizers are enabled ==> Disabled the qemu-iotests.')

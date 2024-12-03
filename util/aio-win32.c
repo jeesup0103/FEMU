@@ -32,6 +32,7 @@ struct AioHandler {
     GPollFD pfd;
     int deleted;
     void *opaque;
+    bool is_external;
     QLIST_ENTRY(AioHandler) node;
 };
 
@@ -63,6 +64,7 @@ static void aio_remove_fd_handler(AioContext *ctx, AioHandler *node)
 
 void aio_set_fd_handler(AioContext *ctx,
                         int fd,
+                        bool is_external,
                         IOHandler *io_read,
                         IOHandler *io_write,
                         AioPollFn *io_poll,
@@ -109,6 +111,7 @@ void aio_set_fd_handler(AioContext *ctx,
         node->opaque = opaque;
         node->io_read = io_read;
         node->io_write = io_write;
+        node->is_external = is_external;
 
         if (io_read) {
             bitmask |= FD_READ | FD_ACCEPT | FD_CLOSE;
@@ -132,6 +135,7 @@ void aio_set_fd_handler(AioContext *ctx,
 
 void aio_set_event_notifier(AioContext *ctx,
                             EventNotifier *e,
+                            bool is_external,
                             EventNotifierHandler *io_notify,
                             AioPollFn *io_poll,
                             EventNotifierHandler *io_poll_ready)
@@ -157,6 +161,7 @@ void aio_set_event_notifier(AioContext *ctx,
             node->e = e;
             node->pfd.fd = (uintptr_t)event_notifier_get_handle(e);
             node->pfd.events = G_IO_IN;
+            node->is_external = is_external;
             QLIST_INSERT_HEAD_RCU(&ctx->aio_handlers, node, node);
 
             g_source_add_poll(&ctx->source, &node->pfd);
@@ -363,7 +368,8 @@ bool aio_poll(AioContext *ctx, bool blocking)
     /* fill fd sets */
     count = 0;
     QLIST_FOREACH_RCU(node, &ctx->aio_handlers, node) {
-        if (!node->deleted && node->io_notify) {
+        if (!node->deleted && node->io_notify
+            && aio_node_check(ctx, node->is_external)) {
             assert(count < MAXIMUM_WAIT_OBJECTS);
             events[count++] = event_notifier_get_handle(node->e);
         }
@@ -438,6 +444,7 @@ void aio_context_set_poll_params(AioContext *ctx, int64_t max_ns,
     }
 }
 
-void aio_context_set_aio_params(AioContext *ctx, int64_t max_batch)
+void aio_context_set_aio_params(AioContext *ctx, int64_t max_batch,
+                                Error **errp)
 {
 }

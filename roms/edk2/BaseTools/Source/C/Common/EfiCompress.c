@@ -250,20 +250,6 @@ STATIC NODE   mPos, mMatchPos, mAvail, *mPosition, *mParent, *mPrev, *mNext = NU
 // functions
 //
 
-/**
-  The main compression routine.
-
-  @param SrcBuffer   The buffer storing the source data
-  @param SrcSize     The size of source data
-  @param DstBuffer   The buffer to store the compressed data
-  @param DstSize     On input, the size of DstBuffer; On output,
-                     the size of the actual compressed data.
-
-  @retval EFI_BUFFER_TOO_SMALL  The DstBuffer is too small. In this case,
-                               DstSize contains the size needed.
-  @retval EFI_SUCCESS           Compression is successful.
-
-**/
 EFI_STATUS
 EfiCompress (
   IN      UINT8   *SrcBuffer,
@@ -271,6 +257,27 @@ EfiCompress (
   IN      UINT8   *DstBuffer,
   IN OUT  UINT32  *DstSize
   )
+/*++
+
+Routine Description:
+
+  The main compression routine.
+
+Arguments:
+
+  SrcBuffer   - The buffer storing the source data
+  SrcSize     - The size of source data
+  DstBuffer   - The buffer to store the compressed data
+  DstSize     - On input, the size of DstBuffer; On output,
+                the size of the actual compressed data.
+
+Returns:
+
+  EFI_BUFFER_TOO_SMALL  - The DstBuffer is too small. In this case,
+                DstSize contains the size needed.
+  EFI_SUCCESS           - Compression is successful.
+
+--*/
 {
   EFI_STATUS Status = EFI_SUCCESS;
 
@@ -338,16 +345,24 @@ EfiCompress (
 
 }
 
-/**
-  Put a dword to output stream
-
-  @param Data    the dword to put
-**/
 STATIC
 VOID
 PutDword(
   IN UINT32 Data
   )
+/*++
+
+Routine Description:
+
+  Put a dword to output stream
+
+Arguments:
+
+  Data    - the dword to put
+
+Returns: (VOID)
+
+--*/
 {
   if (mDst < mDstUpperLimit) {
     *mDst++ = (UINT8)(((UINT8)(Data        )) & 0xff);
@@ -366,15 +381,23 @@ PutDword(
   }
 }
 
-/**
-  Allocate memory spaces for data structures used in compression process
-
-  @retval EFI_SUCCESS           Memory is allocated successfully
-  @retva; EFI_OUT_OF_RESOURCES  Allocation fails
-**/
 STATIC
 EFI_STATUS
 AllocateMemory ()
+/*++
+
+Routine Description:
+
+  Allocate memory spaces for data structures used in compression process
+
+Arguments: (VOID)
+
+Returns:
+
+  EFI_SUCCESS           - Memory is allocated successfully
+  EFI_OUT_OF_RESOURCES  - Allocation fails
+
+--*/
 {
   UINT32      i;
 
@@ -409,11 +432,19 @@ AllocateMemory ()
   return EFI_SUCCESS;
 }
 
-/**
-  Called when compression is completed to free memory previously allocated.
-**/
 VOID
 FreeMemory ()
+/*++
+
+Routine Description:
+
+  Called when compression is completed to free memory previously allocated.
+
+Arguments: (VOID)
+
+Returns: (VOID)
+
+--*/
 {
   if (mText) {
     free (mText);
@@ -450,12 +481,21 @@ FreeMemory ()
   return;
 }
 
-/**
-  Initialize String Info Log data structures
-**/
+
 STATIC
 VOID
 InitSlide ()
+/*++
+
+Routine Description:
+
+  Initialize String Info Log data structures
+
+Arguments: (VOID)
+
+Returns: (VOID)
+
+--*/
 {
   NODE i;
 
@@ -477,20 +517,29 @@ InitSlide ()
   }
 }
 
-/**
-  Find child node given the parent node and the edge character
 
-  @param q       the parent node
-  @param c       the edge character
-
-  @return The child node (NIL if not found)
-**/
 STATIC
 NODE
 Child (
   IN NODE q,
   IN UINT8 c
   )
+/*++
+
+Routine Description:
+
+  Find child node given the parent node and the edge character
+
+Arguments:
+
+  q       - the parent node
+  c       - the edge character
+
+Returns:
+
+  The child node (NIL if not found)
+
+--*/
 {
   NODE r;
 
@@ -503,13 +552,6 @@ Child (
   return r;
 }
 
-/**
-  Create a new child for a given parent node.
-
-  @param q       the parent node
-  @param c       the edge character
-  @param r       the child node
-**/
 STATIC
 VOID
 MakeChild (
@@ -517,6 +559,21 @@ MakeChild (
   IN UINT8 c,
   IN NODE r
   )
+/*++
+
+Routine Description:
+
+  Create a new child for a given parent node.
+
+Arguments:
+
+  q       - the parent node
+  c       - the edge character
+  r       - the child node
+
+Returns: (VOID)
+
+--*/
 {
   NODE h, t;
 
@@ -530,16 +587,24 @@ MakeChild (
   mChildCount[q]++;
 }
 
-/**
-  Split a node.
-
-  @param Old     the node to split
-**/
 STATIC
 VOID
 Split (
   NODE Old
   )
+/*++
+
+Routine Description:
+
+  Split a node.
+
+Arguments:
+
+  Old     - the node to split
+
+Returns: (VOID)
+
+--*/
 {
   NODE New, t;
 
@@ -559,12 +624,20 @@ Split (
   MakeChild(New, mText[mPos + mMatchLen], mPos);
 }
 
-/**
-  Insert string info for current position into the String Info Log
-**/
 STATIC
 VOID
 InsertNode ()
+/*++
+
+Routine Description:
+
+  Insert string info for current position into the String Info Log
+
+Arguments: (VOID)
+
+Returns: (VOID)
+
+--*/
 {
   NODE q, r, j, t;
   UINT8 c, *t1, *t2;
@@ -666,13 +739,21 @@ InsertNode ()
 
 }
 
-/**
-  Delete outdated string info. (The Usage of PERC_FLAG
-  ensures a clean deletion)
-**/
 STATIC
 VOID
 DeleteNode ()
+/*++
+
+Routine Description:
+
+  Delete outdated string info. (The Usage of PERC_FLAG
+  ensures a clean deletion)
+
+Arguments: (VOID)
+
+Returns: (VOID)
+
+--*/
 {
   NODE q, r, s, t, u;
 
@@ -732,13 +813,21 @@ DeleteNode ()
   mAvail = r;
 }
 
-/**
-  Advance the current position (read in new data if needed).
-  Delete outdated string info. Find a match string for current position.
-**/
 STATIC
 VOID
 GetNextMatch ()
+/*++
+
+Routine Description:
+
+  Advance the current position (read in new data if needed).
+  Delete outdated string info. Find a match string for current position.
+
+Arguments: (VOID)
+
+Returns: (VOID)
+
+--*/
 {
   INT32 n;
 
@@ -753,15 +842,23 @@ GetNextMatch ()
   InsertNode();
 }
 
-/**
-  The main controlling routine for compression process.
-
-  @retval EFI_SUCCESS           The compression is successful
-  @retval EFI_OUT_0F_RESOURCES  Not enough memory for compression process
-**/
 STATIC
 EFI_STATUS
 Encode ()
+/*++
+
+Routine Description:
+
+  The main controlling routine for compression process.
+
+Arguments: (VOID)
+
+Returns:
+
+  EFI_SUCCESS           - The compression is successful
+  EFI_OUT_0F_RESOURCES  - Not enough memory for compression process
+
+--*/
 {
   EFI_STATUS  Status;
   INT32       LastMatchLen;
@@ -823,12 +920,20 @@ Encode ()
   return EFI_SUCCESS;
 }
 
-/**
-  Count the frequencies for the Extra Set
-**/
 STATIC
 VOID
 CountTFreq ()
+/*++
+
+Routine Description:
+
+  Count the frequencies for the Extra Set
+
+Arguments: (VOID)
+
+Returns: (VOID)
+
+--*/
 {
   INT32 i, k, n, Count;
 
@@ -864,13 +969,6 @@ CountTFreq ()
   }
 }
 
-/**
-  Outputs the code length array for the Extra Set or the Position Set.
-
-  @param n       the number of symbols
-  @param nbit    the number of bits needed to represent 'n'
-  @param Special the special symbol that needs to be take care of
-**/
 STATIC
 VOID
 WritePTLen (
@@ -878,6 +976,21 @@ WritePTLen (
   IN INT32 nbit,
   IN INT32 Special
   )
+/*++
+
+Routine Description:
+
+  Outputs the code length array for the Extra Set or the Position Set.
+
+Arguments:
+
+  n       - the number of symbols
+  nbit    - the number of bits needed to represent 'n'
+  Special - the special symbol that needs to be take care of
+
+Returns: (VOID)
+
+--*/
 {
   INT32 i, k;
 
@@ -902,12 +1015,20 @@ WritePTLen (
   }
 }
 
-/**
-  Outputs the code length array for Char&Length Set
-**/
 STATIC
 VOID
 WriteCLen ()
+/*++
+
+Routine Description:
+
+  Outputs the code length array for Char&Length Set
+
+Arguments: (VOID)
+
+Returns: (VOID)
+
+--*/
 {
   INT32 i, k, n, Count;
 
@@ -975,12 +1096,20 @@ EncodeP (
   }
 }
 
-/**
-  Huffman code the block and output it.
-**/
 STATIC
 VOID
 SendBlock ()
+/*++
+
+Routine Description:
+
+  Huffman code the block and output it.
+
+Argument: (VOID)
+
+Returns: (VOID)
+
+--*/
 {
   UINT32 i, k, Flags, Root, Pos, Size;
   Flags = 0;
@@ -1035,18 +1164,27 @@ SendBlock ()
   }
 }
 
-/**
-  Outputs an Original Character or a Pointer
 
-  @param c     The original character or the 'String Length' element of a Pointer
-  @param p     The 'Position' field of a Pointer
-**/
 STATIC
 VOID
 Output (
   IN UINT32 c,
   IN UINT32 p
   )
+/*++
+
+Routine Description:
+
+  Outputs an Original Character or a Pointer
+
+Arguments:
+
+  c     - The original character or the 'String Length' element of a Pointer
+  p     - The 'Position' field of a Pointer
+
+Returns: (VOID)
+
+--*/
 {
   STATIC UINT32 CPos;
 
@@ -1125,18 +1263,26 @@ MakeCrcTable ()
   }
 }
 
-/**
-  Outputs rightmost n bits of x
-
-  @param n   the rightmost n bits of the data is used
-  @param x   the data
-**/
 STATIC
 VOID
 PutBits (
   IN INT32 n,
   IN UINT32 x
   )
+/*++
+
+Routine Description:
+
+  Outputs rightmost n bits of x
+
+Arguments:
+
+  n   - the rightmost n bits of the data is used
+  x   - the data
+
+Returns: (VOID)
+
+--*/
 {
   UINT8 Temp;
 
@@ -1165,20 +1311,28 @@ PutBits (
   }
 }
 
-/**
-  Read in source data
-
-  @param p   the buffer to hold the data
-  @param n   number of bytes to read
-
-  @return number of bytes actually read
-**/
 STATIC
 INT32
 FreadCrc (
   OUT UINT8 *p,
   IN  INT32 n
   )
+/*++
+
+Routine Description:
+
+  Read in source data
+
+Arguments:
+
+  p   - the buffer to hold the data
+  n   - number of bytes to read
+
+Returns:
+
+  number of bytes actually read
+
+--*/
 {
   INT32 i;
 
@@ -1204,16 +1358,24 @@ InitPutBits ()
   mSubBitBuf = 0;
 }
 
-/**
-  Count the number of each code length for a Huffman tree.
-
-  @param i   the top node
-**/
 STATIC
 VOID
 CountLen (
   IN INT32 i
   )
+/*++
+
+Routine Description:
+
+  Count the number of each code length for a Huffman tree.
+
+Arguments:
+
+  i   - the top node
+
+Returns: (VOID)
+
+--*/
 {
   STATIC INT32 Depth = 0;
 
@@ -1227,16 +1389,22 @@ CountLen (
   }
 }
 
-/**
-  Create code length array for a Huffman tree
-
-  @param Root   the root of the tree
-**/
 STATIC
 VOID
 MakeLen (
   IN INT32 Root
   )
+/*++
+
+Routine Description:
+
+  Create code length array for a Huffman tree
+
+Arguments:
+
+  Root   - the root of the tree
+
+--*/
 {
   INT32 i, k;
   UINT32 Cum;
@@ -1300,13 +1468,6 @@ DownHeap (
   mHeap[i] = (INT16)k;
 }
 
-/**
-  Assign code to each symbol based on the code length array
-
-  @param n     number of symbols
-  @param Len   the code length array
-  @param Code  stores codes for each symbol
-**/
 STATIC
 VOID
 MakeCode (
@@ -1314,6 +1475,21 @@ MakeCode (
   IN  UINT8 Len[],
   OUT UINT16 Code[]
   )
+/*++
+
+Routine Description:
+
+  Assign code to each symbol based on the code length array
+
+Arguments:
+
+  n     - number of symbols
+  Len   - the code length array
+  Code  - stores codes for each symbol
+
+Returns: (VOID)
+
+--*/
 {
   INT32    i;
   UINT16   Start[18];
@@ -1327,16 +1503,6 @@ MakeCode (
   }
 }
 
-/**
-  Generates Huffman codes given a frequency distribution of symbols
-
-  @param NParm    number of symbols
-  @param FreqParm frequency of each symbol
-  @param LenParm  code length for each symbol
-  @param CodeParm code for each symbol
-
-  @return Root of the Huffman tree.
-**/
 STATIC
 INT32
 MakeTree (
@@ -1345,6 +1511,24 @@ MakeTree (
   OUT UINT8   LenParm[],
   OUT UINT16  CodeParm[]
   )
+/*++
+
+Routine Description:
+
+  Generates Huffman codes given a frequency distribution of symbols
+
+Arguments:
+
+  NParm    - number of symbols
+  FreqParm - frequency of each symbol
+  LenParm  - code length for each symbol
+  CodeParm - code for each symbol
+
+Returns:
+
+  Root of the Huffman tree.
+
+--*/
 {
   INT32 i, j, k, Avail;
 

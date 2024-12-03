@@ -15,4 +15,3 @@ Emulated devices:
 - USB controller
 - SATA controller
 - TWI (I2C) controller
-- Watchdog timer

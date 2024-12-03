@@ -28,7 +28,8 @@
 #define MAIL_SEND_OFFSET      0
 #define ANY_SEND_OFFSET       (IOCSR_ANY_SEND - IOCSR_MAIL_SEND)
 
-#define IPI_MBX_NUM           4
+#define MAX_IPI_CORE_NUM      4
+#define MAX_IPI_MBX_NUM       4
 
 #define TYPE_LOONGARCH_IPI "loongarch_ipi"
 OBJECT_DECLARE_SIMPLE_TYPE(LoongArchIPI, LOONGARCH_IPI)
@@ -39,16 +40,14 @@ typedef struct IPICore {
     uint32_t set;
     uint32_t clear;
     /* 64bit buf divide into 2 32bit buf */
-    uint32_t buf[IPI_MBX_NUM * 2];
+    uint32_t buf[MAX_IPI_MBX_NUM * 2];
     qemu_irq irq;
 } IPICore;
 
 struct LoongArchIPI {
     SysBusDevice parent_obj;
-    MemoryRegion ipi_iocsr_mem;
-    MemoryRegion ipi64_iocsr_mem;
-    uint32_t num_cpu;
-    IPICore *cpu;
+    MemoryRegion ipi_iocsr_mem[MAX_IPI_CORE_NUM];
+    MemoryRegion ipi64_iocsr_mem[MAX_IPI_CORE_NUM];
 };
 
 #endif

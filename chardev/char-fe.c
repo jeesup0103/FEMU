@@ -199,27 +199,26 @@ bool qemu_chr_fe_init(CharBackend *b, Chardev *s, Error **errp)
             MuxChardev *d = MUX_CHARDEV(s);
 
             if (d->mux_cnt >= MAX_MUX) {
-                error_setg(errp,
-                           "too many uses of multiplexed chardev '%s'"
-                           " (maximum is " stringify(MAX_MUX) ")",
-                           s->label);
-                return false;
+                goto unavailable;
             }
 
             d->backends[d->mux_cnt] = b;
             tag = d->mux_cnt++;
         } else if (s->be) {
-            error_setg(errp, "chardev '%s' is already in use", s->label);
-            return false;
+            goto unavailable;
         } else {
             s->be = b;
         }
     }
 
-    b->fe_is_open = false;
+    b->fe_open = false;
     b->tag = tag;
     b->chr = s;
     return true;
+
+unavailable:
+    error_setg(errp, QERR_DEVICE_IN_USE, s->label);
+    return false;
 }
 
 void qemu_chr_fe_deinit(CharBackend *b, bool del)
@@ -258,7 +257,7 @@ void qemu_chr_fe_set_handlers_full(CharBackend *b,
                                    bool sync_state)
 {
     Chardev *s;
-    bool fe_open;
+    int fe_open;
 
     s = b->chr;
     if (!s) {
@@ -266,10 +265,10 @@ void qemu_chr_fe_set_handlers_full(CharBackend *b,
     }
 
     if (!opaque && !fd_can_read && !fd_read && !fd_event) {
-        fe_open = false;
+        fe_open = 0;
         remove_fd_in_watch(s);
     } else {
-        fe_open = true;
+        fe_open = 1;
     }
     b->chr_can_read = fd_can_read;
     b->chr_read = fd_read;
@@ -337,7 +336,7 @@ void qemu_chr_fe_set_echo(CharBackend *be, bool echo)
     }
 }
 
-void qemu_chr_fe_set_open(CharBackend *be, bool is_open)
+void qemu_chr_fe_set_open(CharBackend *be, int fe_open)
 {
     Chardev *chr = be->chr;
 
@@ -345,12 +344,12 @@ void qemu_chr_fe_set_open(CharBackend *be, bool is_open)
         return;
     }
 
-    if (be->fe_is_open == is_open) {
+    if (be->fe_open == fe_open) {
         return;
     }
-    be->fe_is_open = is_open;
+    be->fe_open = fe_open;
     if (CHARDEV_GET_CLASS(chr)->chr_set_fe_open) {
-        CHARDEV_GET_CLASS(chr)->chr_set_fe_open(chr, is_open);
+        CHARDEV_GET_CLASS(chr)->chr_set_fe_open(chr, fe_open);
     }
 }
 

@@ -59,6 +59,7 @@
   FspCommonLib
   FspSecPlatformLib
   CpuLib
+  UefiCpuLib
   FspMultiPhaseLib
 
 [Pcd]

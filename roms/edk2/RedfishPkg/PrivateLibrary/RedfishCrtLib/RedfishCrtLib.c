@@ -4,7 +4,6 @@
 
   Copyright (c) 2019, Intel Corporation. All rights reserved.<BR>
   (C) Copyright 2020 Hewlett Packard Enterprise Development LP<BR>
-  Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
     SPDX-License-Identifier: BSD-2-Clause-Patent
 
@@ -520,7 +519,7 @@ strtoull (
 }
 
 /**
-  edk2 Jansson port does not support doubles, simply return integer part.
+  edk2 Jansson port does not support doubles, simply return 0.
 
   These conversion functions convert the initial portion of the string
   pointed to by nptr to double, float, and long double representation,
@@ -541,7 +540,7 @@ strtoull (
   the return value), and ERANGE is stored in errno.  If the correct value
   would cause underflow, zero is returned and ERANGE is stored in errno.
 
-  @return  Integer part of decimal number.
+  @return  Return 0.
 **/
 double
 strtod (
@@ -549,30 +548,9 @@ strtod (
   char **__restrict       endptr
   )
 {
-  UINTN  Data;
-  UINTN  StrLen;
-
-  Data   = 0;
-  StrLen = 0;
-
-  if (nptr == NULL) {
-    return (double)0;
-  }
-
-  AsciiStrDecimalToUintnS (nptr, NULL, &Data);
-  DEBUG ((DEBUG_WARN, "%a: \"%a\" We don't support double type on edk2 yet. Only integer part is returned: %d\n", __func__, nptr, Data));
-
-  //
-  // Force endptr to the last position of nptr because caller may
-  // check endptr and raise assertion. We don't support floating
-  // number in edk2 so this prevents unecessary assertion from happening.
-  //
-  if (endptr != NULL) {
-    StrLen  = AsciiStrLen (nptr);
-    *endptr = (char *__restrict)nptr + StrLen;
-  }
-
-  return (double)Data;
+  DEBUG ((DEBUG_INFO, "We don't supprot double type on edk2 yet!"));
+  ASSERT (FALSE);
+  return (double)0;
 }
 
 static UINT8  BitMask[] = {

@@ -1416,7 +1416,7 @@ RedBlackTreeValidate (
   CONST RED_BLACK_TREE_NODE  *Last;
   CONST RED_BLACK_TREE_NODE  *Node;
 
-  DEBUG ((DEBUG_VERBOSE, "%a: Tree=%p\n", __func__, Tree));
+  DEBUG ((DEBUG_VERBOSE, "%a: Tree=%p\n", __FUNCTION__, Tree));
 
   //
   // property #5
@@ -1459,7 +1459,7 @@ RedBlackTreeValidate (
   DEBUG ((
     DEBUG_VERBOSE,
     "%a: Tree=%p BlackHeight=%Ld Count=%Ld\n",
-    __func__,
+    __FUNCTION__,
     Tree,
     (INT64)BlackHeight,
     (INT64)ForwardCount

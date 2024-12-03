@@ -159,9 +159,8 @@ RestoreDebugRegister (
   If InitFlag is DEBUG_AGENT_INIT_SMM, it will override IDT table entries
   and initialize debug port. It will get debug agent Mailbox from GUIDed HOB,
   it it exists, debug agent wiil copied it into the local Mailbox in SMM space.
-  it will override IDT table entries and initialize debug port. Context must
-  point to a BOOLEAN if it's not NULL, which indicates SMM Debug Agent supported
-  or not.
+  it will override IDT table entries and initialize debug port. Context will be
+  NULL.
   If InitFlag is DEBUG_AGENT_INIT_ENTER_SMI, debug agent will save Debug
   Registers and get local Mailbox in SMM space. Context will be NULL.
   If InitFlag is DEBUG_AGENT_INIT_EXIT_SMI, debug agent will restore Debug
@@ -206,10 +205,6 @@ InitializeDebugAgent (
                         );
       if (EFI_ERROR (Status)) {
         DEBUG ((DEBUG_ERROR, "DebugAgent: Cannot install configuration table for persisted vector handoff info!\n"));
-        if (Context != NULL) {
-          *(BOOLEAN *)Context = FALSE;
-        }
-
         CpuDeadLoop ();
       }
 
@@ -220,10 +215,6 @@ InitializeDebugAgent (
       if ((Status == EFI_SUCCESS) && (Mailbox != NULL)) {
         VerifyMailboxChecksum (Mailbox);
         mMailboxPointer = Mailbox;
-        if (Context != NULL) {
-          *(BOOLEAN *)Context = TRUE;
-        }
-
         break;
       }
 
@@ -233,10 +224,6 @@ InitializeDebugAgent (
       Mailbox = GetMailboxFromHob ();
       if (Mailbox != NULL) {
         mMailboxPointer = Mailbox;
-        if (Context != NULL) {
-          *(BOOLEAN *)Context = TRUE;
-        }
-
         break;
       }
 
@@ -287,10 +274,6 @@ InitializeDebugAgent (
       // Restore saved IDT entries
       //
       CopyMem ((VOID *)IdtDescriptor.Base, &IdtEntry, 33 * sizeof (IA32_IDT_GATE_DESCRIPTOR));
-
-      if (Context != NULL) {
-        *(BOOLEAN *)Context = TRUE;
-      }
 
       break;
 

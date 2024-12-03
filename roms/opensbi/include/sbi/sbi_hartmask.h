@@ -11,7 +11,6 @@
 #define __SBI_HARTMASK_H__
 
 #include <sbi/sbi_bitmap.h>
-#include <sbi/sbi_scratch.h>
 
 /**
  * Maximum number of bits in a hartmask
@@ -33,10 +32,7 @@ struct sbi_hartmask {
 
 /** Initialize hartmask to zero except a particular HART id */
 #define SBI_HARTMASK_INIT_EXCEPT(__m, __h)	\
-	do { \
-		u32 __i = sbi_hartid_to_hartindex(__h); \
-		bitmap_zero_except(((__m)->bits), __i, SBI_HARTMASK_MAX_BITS); \
-	} while(0)
+	bitmap_zero_except(((__m)->bits), (__h), SBI_HARTMASK_MAX_BITS)
 
 /**
  * Get underlying bitmap of hartmask
@@ -45,68 +41,37 @@ struct sbi_hartmask {
 #define sbi_hartmask_bits(__m)		((__m)->bits)
 
 /**
- * Set a HART index in hartmask
- * @param i HART index to set
- * @param m the hartmask pointer
- */
-static inline void sbi_hartmask_set_hartindex(u32 i, struct sbi_hartmask *m)
-{
-	if (i < SBI_HARTMASK_MAX_BITS)
-		__set_bit(i, m->bits);
-}
-
-/**
- * Set a HART id in hartmask
+ * Set a HART in hartmask
  * @param h HART id to set
  * @param m the hartmask pointer
  */
-static inline void sbi_hartmask_set_hartid(u32 h, struct sbi_hartmask *m)
+static inline void sbi_hartmask_set_hart(u32 h, struct sbi_hartmask *m)
 {
-	sbi_hartmask_set_hartindex(sbi_hartid_to_hartindex(h), m);
+	if (h < SBI_HARTMASK_MAX_BITS)
+		__set_bit(h, m->bits);
 }
 
 /**
- * Clear a HART index in hartmask
- * @param i HART index to clear
- * @param m the hartmask pointer
- */
-static inline void sbi_hartmask_clear_hartindex(u32 i, struct sbi_hartmask *m)
-{
-	if (i < SBI_HARTMASK_MAX_BITS)
-		__clear_bit(i, m->bits);
-}
-
-/**
- * Clear a HART id in hartmask
+ * Clear a HART in hartmask
  * @param h HART id to clear
  * @param m the hartmask pointer
  */
-static inline void sbi_hartmask_clear_hartid(u32 h, struct sbi_hartmask *m)
+static inline void sbi_hartmask_clear_hart(u32 h, struct sbi_hartmask *m)
 {
-	sbi_hartmask_clear_hartindex(sbi_hartid_to_hartindex(h), m);
+	if (h < SBI_HARTMASK_MAX_BITS)
+		__clear_bit(h, m->bits);
 }
 
 /**
- * Test a HART index in hartmask
- * @param i HART index to test
- * @param m the hartmask pointer
- */
-static inline int sbi_hartmask_test_hartindex(u32 i,
-					      const struct sbi_hartmask *m)
-{
-	if (i < SBI_HARTMASK_MAX_BITS)
-		return __test_bit(i, m->bits);
-	return 0;
-}
-
-/**
- * Test a HART id in hartmask
+ * Test a HART in hartmask
  * @param h HART id to test
  * @param m the hartmask pointer
  */
-static inline int sbi_hartmask_test_hartid(u32 h, const struct sbi_hartmask *m)
+static inline int sbi_hartmask_test_hart(u32 h, const struct sbi_hartmask *m)
 {
-	return sbi_hartmask_test_hartindex(sbi_hartid_to_hartindex(h), m);
+	if (h < SBI_HARTMASK_MAX_BITS)
+		return __test_bit(h, m->bits);
+	return 0;
 }
 
 /**
@@ -169,14 +134,8 @@ static inline void sbi_hartmask_xor(struct sbi_hartmask *dstp,
 		   sbi_hartmask_bits(src2p), SBI_HARTMASK_MAX_BITS);
 }
 
-/**
- * Iterate over each HART index in hartmask
- * __i hart index
- * __m hartmask
-*/
-#define sbi_hartmask_for_each_hartindex(__i, __m) \
-	for((__i) = find_first_bit((__m)->bits, SBI_HARTMASK_MAX_BITS); \
-		(__i) < SBI_HARTMASK_MAX_BITS; \
-		(__i) = find_next_bit((__m)->bits, SBI_HARTMASK_MAX_BITS, (__i) + 1))
+/** Iterate over each HART in hartmask */
+#define sbi_hartmask_for_each_hart(__h, __m)	\
+	for_each_set_bit(__h, (__m)->bits, SBI_HARTMASK_MAX_BITS)
 
 #endif

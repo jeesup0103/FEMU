@@ -35,7 +35,7 @@ Usb3IoMmuPpiNotify (
 {
   USB3_DEBUG_PORT_HANDLE  *Instance;
 
-  DEBUG ((DEBUG_INFO, "%a()\n", __func__));
+  DEBUG ((DEBUG_INFO, "%a()\n", __FUNCTION__));
 
   Instance = GetUsb3DebugPortInstance ();
   ASSERT (Instance != NULL);

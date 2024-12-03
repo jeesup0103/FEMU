@@ -58,7 +58,6 @@
 
 [Pcd]
   gEfiMdePkgTokenSpaceGuid.PcdPciExpressBaseAddress
-  gEfiMdeModulePkgTokenSpaceGuid.PcdUse1GPageTable
 
 [FixedPcd]
   gUefiOvmfPkgTokenSpaceGuid.PcdOvmfWorkAreaBase

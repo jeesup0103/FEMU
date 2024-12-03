@@ -32,7 +32,6 @@ void mmap_lock(void)
 
 void mmap_unlock(void)
 {
-    assert(mmap_lock_count > 0);
     if (--mmap_lock_count == 0) {
         pthread_mutex_unlock(&mmap_mutex);
     }
@@ -214,6 +213,8 @@ static int mmap_frag(abi_ulong real_start,
 #endif
 abi_ulong mmap_next_start = TASK_UNMAPPED_BASE;
 
+unsigned long last_brk;
+
 /*
  * Subroutine of mmap_find_vma, used when we have pre-allocated a chunk of guest
  * address space.
@@ -221,16 +222,50 @@ abi_ulong mmap_next_start = TASK_UNMAPPED_BASE;
 static abi_ulong mmap_find_vma_reserved(abi_ulong start, abi_ulong size,
                                         abi_ulong alignment)
 {
-    abi_ulong ret;
+    abi_ulong addr;
+    abi_ulong end_addr;
+    int prot;
+    int looped = 0;
 
-    ret = page_find_range_empty(start, reserved_va, size, alignment);
-    if (ret == -1 && start > TARGET_PAGE_SIZE) {
-        /* Restart at the beginning of the address space. */
-        ret = page_find_range_empty(TARGET_PAGE_SIZE, start - 1,
-                                    size, alignment);
+    if (size > reserved_va) {
+        return (abi_ulong)-1;
     }
 
-    return ret;
+    size = HOST_PAGE_ALIGN(size) + alignment;
+    end_addr = start + size;
+    if (end_addr > reserved_va) {
+        end_addr = reserved_va + 1;
+    }
+    addr = end_addr - qemu_host_page_size;
+
+    while (1) {
+        if (addr > end_addr) {
+            if (looped) {
+                return (abi_ulong)-1;
+            }
+            end_addr = reserved_va + 1;
+            addr = end_addr - qemu_host_page_size;
+            looped = 1;
+            continue;
+        }
+        prot = page_get_flags(addr);
+        if (prot) {
+            end_addr = addr;
+        }
+        if (end_addr - addr >= size) {
+            break;
+        }
+        addr -= qemu_host_page_size;
+    }
+
+    if (start == mmap_next_start) {
+        mmap_next_start = addr;
+    }
+    /* addr is sufficiently low to align it up */
+    if (alignment != 0) {
+        addr = (addr + alignment) & ~(alignment - 1);
+    }
+    return addr;
 }
 
 /*
@@ -258,8 +293,7 @@ static abi_ulong mmap_find_vma_aligned(abi_ulong start, abi_ulong size,
 
     if (reserved_va) {
         return mmap_find_vma_reserved(start, size,
-            (alignment != 0 ? 1 << alignment :
-             MAX(qemu_host_page_size, TARGET_PAGE_SIZE)));
+            (alignment != 0 ? 1 << alignment : 0));
     }
 
     addr = start;
@@ -575,7 +609,7 @@ abi_long target_mmap(abi_ulong start, abi_ulong len, int prot,
         }
 
         /* Reject the mapping if any page within the range is mapped */
-        if ((flags & MAP_EXCL) && !page_check_range_empty(start, end - 1)) {
+        if ((flags & MAP_EXCL) && page_check_range(start, len, 0) < 0) {
             errno = EINVAL;
             goto fail;
         }
@@ -636,7 +670,7 @@ fail:
     return -1;
 }
 
-void mmap_reserve(abi_ulong start, abi_ulong size)
+static void mmap_reserve(abi_ulong start, abi_ulong size)
 {
     abi_ulong real_start;
     abi_ulong real_end;

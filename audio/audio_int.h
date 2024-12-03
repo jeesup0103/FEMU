@@ -140,12 +140,13 @@ typedef struct audio_driver audio_driver;
 struct audio_driver {
     const char *name;
     const char *descr;
-    void *(*init) (Audiodev *, Error **);
+    void *(*init) (Audiodev *);
     void (*fini) (void *);
 #ifdef CONFIG_GIO
     void (*set_dbus_server) (AudioState *s, GDBusObjectManagerServer *manager, bool p2p);
 #endif
     struct audio_pcm_ops *pcm_ops;
+    int can_be_default;
     int max_voices_out;
     int max_voices_in;
     size_t voice_size_out;
@@ -242,6 +243,7 @@ extern const struct mixeng_volume nominal_volume;
 extern const char *audio_prio_list[];
 
 void audio_driver_register(audio_driver *drv);
+audio_driver *audio_driver_lookup(const char *name);
 
 void audio_pcm_init_info (struct audio_pcm_info *info, struct audsettings *as);
 void audio_pcm_info_clear_buf (struct audio_pcm_info *info, void *buf, int len);
@@ -295,6 +297,9 @@ typedef struct AudiodevListEntry {
 } AudiodevListEntry;
 
 typedef QSIMPLEQ_HEAD(, AudiodevListEntry) AudiodevListHead;
+AudiodevListHead audio_handle_legacy_opts(void);
+
+void audio_free_audiodev_list(AudiodevListHead *head);
 
 void audio_create_pdos(Audiodev *dev);
 AudiodevPerDirectionOptions *audio_get_pdo_in(Audiodev *dev);

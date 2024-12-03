@@ -43,10 +43,10 @@ EXTRA_CFLAGS="$CFLAGS -U __OPTIMIZE__"
 if ! { [ -e "./COPYING" ] &&
    [ -e "./MAINTAINERS" ] &&
    [ -e "./Makefile" ] &&
-   [ -d "./docs" ] &&
+   [ -e "./docs" ] &&
    [ -e "./VERSION" ] &&
-   [ -d "./linux-user" ] &&
-   [ -d "./system" ];} ; then
+   [ -e "./linux-user" ] &&
+   [ -e "./softmmu" ];} ; then
     fatal "Please run the script from the top of the QEMU tree"
 fi
 

@@ -17,7 +17,6 @@
 //
 // The Library classes this module consumes
 //
-#include <Library/BaseMemoryLib.h>
 #include <Library/BaseLib.h>
 #include <Library/DebugLib.h>
 #include <Library/HobLib.h>
@@ -28,7 +27,6 @@
 #include <Library/PciLib.h>
 #include <Library/PeimEntryPoint.h>
 #include <Library/PeiServicesLib.h>
-#include <Library/PlatformInitLib.h>
 #include <Library/ResourcePublicationLib.h>
 #include <Guid/MemoryTypeInformation.h>
 #include <Ppi/MasterBootMode.h>
@@ -153,8 +151,8 @@ MemMapInitialization (
   UINT64         PciIoSize;
   RETURN_STATUS  PcdStatus;
 
-  PciIoBase = 0x2000;
-  PciIoSize = 0xE000;
+  PciIoBase = 0xC000;
+  PciIoSize = 0x4000;
 
   //
   // Create Memory Type Information HOB
@@ -375,7 +373,7 @@ MiscInitialization (
       DEBUG ((
         DEBUG_ERROR,
         "%a: Unknown Host Bridge Device ID: 0x%04x\n",
-        __func__,
+        __FUNCTION__,
         mHostBridgeDevId
         ));
       ASSERT (FALSE);
@@ -493,6 +491,35 @@ DebugDumpCmos (
   }
 }
 
+VOID
+S3Verification (
+  VOID
+  )
+{
+ #if defined (MDE_CPU_X64)
+  if (FeaturePcdGet (PcdSmmSmramRequire) && mS3Supported) {
+    DEBUG ((
+      DEBUG_ERROR,
+      "%a: S3Resume2Pei doesn't support X64 PEI + SMM yet.\n",
+      __FUNCTION__
+      ));
+    DEBUG ((
+      DEBUG_ERROR,
+      "%a: Please disable S3 on the QEMU command line (see the README),\n",
+      __FUNCTION__
+      ));
+    DEBUG ((
+      DEBUG_ERROR,
+      "%a: or build OVMF with \"OvmfPkgIa32X64.dsc\".\n",
+      __FUNCTION__
+      ));
+    ASSERT (FALSE);
+    CpuDeadLoop ();
+  }
+
+ #endif
+}
+
 /**
   Fetch the number of boot CPUs from QEMU and expose it to UefiCpuPkg modules.
   Set the mMaxCpuCount variable.
@@ -531,27 +558,9 @@ MaxCpuCountInitialization (
   DEBUG ((
     DEBUG_INFO,
     "%a: QEMU reports %d processor(s)\n",
-    __func__,
+    __FUNCTION__,
     ProcessorCount
     ));
-}
-
-/**
- * @brief Builds PlatformInfo Hob
- */
-STATIC
-EFI_HOB_PLATFORM_INFO *
-BuildPlatformInfoHob (
-  VOID
-  )
-{
-  EFI_HOB_PLATFORM_INFO  PlatformInfoHob;
-  EFI_HOB_GUID_TYPE      *GuidHob;
-
-  ZeroMem (&PlatformInfoHob, sizeof PlatformInfoHob);
-  BuildGuidDataHob (&gUefiOvmfPkgPlatformInfoGuid, &PlatformInfoHob, sizeof (EFI_HOB_PLATFORM_INFO));
-  GuidHob = GetFirstGuidHob (&gUefiOvmfPkgPlatformInfoGuid);
-  return (EFI_HOB_PLATFORM_INFO *)GET_GUID_HOB_DATA (GuidHob);
 }
 
 /**
@@ -571,7 +580,6 @@ InitializePlatform (
   )
 {
   DEBUG ((DEBUG_INFO, "Platform PEIM Loaded\n"));
-  BuildPlatformInfoHob ();
 
   //
   // Initialize Local APIC Timer hardware and disable Local APIC Timer

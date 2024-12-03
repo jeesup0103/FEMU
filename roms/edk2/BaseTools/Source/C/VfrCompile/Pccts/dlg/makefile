@@ -35,7 +35,7 @@ PCCTS_H=../h
 #
 #$(LIBS: = +^
 #)
-#$(DEF_FILE) $(LDFLAGS) ;
+#$(DEF_FILE) $(LFLAGS) ;
 #<<
 #        bind $@ c:\os2\doscalls.lib
 #        copy *.exe ..\bin
@@ -59,7 +59,7 @@ PCCTS_H=../h
 #$@ /Tde /c
 #
 #$(LIBS)
-#$(DEF_FILE) $(LDFLAGS) ;
+#$(DEF_FILE) $(LFLAGS) ;
 #|
 #        copy *.exe ..\bin
 #
@@ -83,7 +83,7 @@ PCCTS_H=../h
 #
 #$(LIBS: = +^
 #)
-#$(DEF_FILE) $(LDFLAGS) ;
+#$(DEF_FILE) $(LFLAGS) ;
 #<<
 #        copy *.exe ..\bin
 #
@@ -114,24 +114,23 @@ PCCTS_H=../h
 #
 #   UNIX
 #
-CLANG:=$(shell $(CC) --version | grep clang)
-ifneq ($(CLANG),)
-CC?=$(CLANG_BIN)clang
-else ifeq ($(origin CC),default)
-CC=gcc
+ifeq ($(CXX), llvm)
+BUILD_CC?=$(CLANG_BIN)clang
+else
+BUILD_CC?=cc
 endif
 COPT=-O
 ANTLR=${BIN_DIR}/antlr
 DLG=${BIN_DIR}/dlg
-CFLAGS= $(COPT) -I. -I$(SET) -I$(PCCTS_H) -DUSER_ZZSYN -DZZLEXBUFSIZE=65536
-CPPFLAGS=
+BUILD_CFLAGS= $(COPT) -I. -I$(SET) -I$(PCCTS_H) -DUSER_ZZSYN -DZZLEXBUFSIZE=65536
+BUILD_CPPFLAGS=
 OBJ_EXT=o
 OUT_OBJ = -o
 OBJ = dlg_p.o dlg_a.o main.o err.o set.o support.o output.o \
         relabel.o automata.o
 
 $(BIN_DIR)/dlg : $(OBJ) $(SRC)
-		$(CC) $(CFLAGS) -o $(BIN_DIR)/dlg $(OBJ)
+		$(BUILD_CC) $(BUILD_CFLAGS) -o $(BIN_DIR)/dlg $(OBJ)
 
 SRC = dlg_p.c dlg_a.c main.c err.c $(SET)/set.c support.c output.c \
         relabel.c automata.c
@@ -143,19 +142,19 @@ SRC = dlg_p.c dlg_a.c main.c err.c $(SET)/set.c support.c output.c \
 #	$(DLG) -C2 parser.dlg dlg_a.c
 
 dlg_p.$(OBJ_EXT) : dlg_p.c dlg.h tokens.h mode.h
-	$(CC) $(CFLAGS) -c dlg_p.c
+	$(BUILD_CC) $(BUILD_CFLAGS) -c dlg_p.c
 
 dlg_a.$(OBJ_EXT) : dlg_a.c dlg.h tokens.h mode.h
-	$(CC) $(CFLAGS) -c dlg_a.c
+	$(BUILD_CC) $(BUILD_CFLAGS) -c dlg_a.c
 
 main.$(OBJ_EXT) : main.c dlg.h
-	$(CC) $(CFLAGS) -c main.c
+	$(BUILD_CC) $(BUILD_CFLAGS) -c main.c
 
 set.$(OBJ_EXT) : $(SET)/set.c
-	$(CC) -c $(CFLAGS) $(SET)/set.c
+	$(BUILD_CC) -c $(BUILD_CFLAGS) $(SET)/set.c
 
 %.o : %.c 
-	$(CC) -c $(CFLAGS) $(CPPFLAGS) $< -o $@
+	$(BUILD_CC) -c $(BUILD_CFLAGS) $(BUILD_CPPFLAGS) $< -o $@
 
 lint:
 	lint *.c

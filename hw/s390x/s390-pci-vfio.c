@@ -66,10 +66,6 @@ S390PCIDMACount *s390_pci_start_dma_count(S390pciState *s,
 
     assert(vpdev);
 
-    if (!vpdev->vbasedev.group) {
-        return NULL;
-    }
-
     id = vpdev->vbasedev.group->container->fd;
 
     if (!s390_pci_update_dma_avail(id, &avail)) {
@@ -136,7 +132,7 @@ static void s390_pci_read_base(S390PCIBusDevice *pbdev,
      * to the guest based upon the vfio DMA limit.
      */
     vfio_size = pbdev->iommu->max_dma_limit << TARGET_PAGE_BITS;
-    if (vfio_size > 0 && vfio_size < cap->end_dma - cap->start_dma + 1) {
+    if (vfio_size < (cap->end_dma - cap->start_dma + 1)) {
         pbdev->zpci_fn.edma = cap->start_dma + vfio_size - 1;
     }
 }
@@ -293,11 +289,38 @@ static void s390_pci_read_pfip(S390PCIBusDevice *pbdev,
     memcpy(pbdev->zpci_fn.pfip, cap->pfip, CLP_PFIP_NR_SEGMENTS);
 }
 
-static struct vfio_device_info *get_device_info(S390PCIBusDevice *pbdev)
+static struct vfio_device_info *get_device_info(S390PCIBusDevice *pbdev,
+                                                uint32_t argsz)
 {
-    VFIOPCIDevice *vfio_pci = container_of(pbdev->pdev, VFIOPCIDevice, pdev);
+    struct vfio_device_info *info = g_malloc0(argsz);
+    VFIOPCIDevice *vfio_pci;
+    int fd;
 
-    return vfio_get_device_info(vfio_pci->vbasedev.fd);
+    vfio_pci = container_of(pbdev->pdev, VFIOPCIDevice, pdev);
+    fd = vfio_pci->vbasedev.fd;
+
+    /*
+     * If the specified argsz is not large enough to contain all capabilities
+     * it will be updated upon return from the ioctl.  Retry until we have
+     * a big enough buffer to hold the entire capability chain.  On error,
+     * just exit and rely on CLP defaults.
+     */
+retry:
+    info->argsz = argsz;
+
+    if (ioctl(fd, VFIO_DEVICE_GET_INFO, info)) {
+        trace_s390_pci_clp_dev_info(vfio_pci->vbasedev.name);
+        g_free(info);
+        return NULL;
+    }
+
+    if (info->argsz > argsz) {
+        argsz = info->argsz;
+        info = g_realloc(info, argsz);
+        goto retry;
+    }
+
+    return info;
 }
 
 /*
@@ -312,7 +335,7 @@ bool s390_pci_get_host_fh(S390PCIBusDevice *pbdev, uint32_t *fh)
 
     assert(fh);
 
-    info = get_device_info(pbdev);
+    info = get_device_info(pbdev, sizeof(*info));
     if (!info) {
         return false;
     }
@@ -333,7 +356,7 @@ void s390_pci_get_clp_info(S390PCIBusDevice *pbdev)
 {
     g_autofree struct vfio_device_info *info = NULL;
 
-    info = get_device_info(pbdev);
+    info = get_device_info(pbdev, sizeof(*info));
     if (!info) {
         return;
     }

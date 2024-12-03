@@ -16,17 +16,24 @@
 extern struct fdt_timer *fdt_timer_drivers[];
 extern unsigned long fdt_timer_drivers_size;
 
-static struct fdt_timer *current_driver = NULL;
+static struct fdt_timer dummy = {
+	.match_table = NULL,
+	.cold_init = NULL,
+	.warm_init = NULL,
+	.exit = NULL,
+};
+
+static struct fdt_timer *current_driver = &dummy;
 
 void fdt_timer_exit(void)
 {
-	if (current_driver && current_driver->exit)
+	if (current_driver->exit)
 		current_driver->exit();
 }
 
 static int fdt_timer_warm_init(void)
 {
-	if (current_driver && current_driver->warm_init)
+	if (current_driver->warm_init)
 		return current_driver->warm_init();
 	return 0;
 }
@@ -44,28 +51,20 @@ static int fdt_timer_cold_init(void)
 		noff = -1;
 		while ((noff = fdt_find_match(fdt, noff,
 					drv->match_table, &match)) >= 0) {
-			/* drv->cold_init must not be NULL */
-			if (drv->cold_init == NULL)
-				return SBI_EFAIL;
-
-			rc = drv->cold_init(fdt, noff, match);
-			if (rc == SBI_ENODEV)
-				continue;
-			if (rc)
-				return rc;
+			if (drv->cold_init) {
+				rc = drv->cold_init(fdt, noff, match);
+				if (rc == SBI_ENODEV)
+					continue;
+				if (rc)
+					return rc;
+			}
 			current_driver = drv;
-
-			/*
-			 * We will have multiple timer devices on multi-die or
-			 * multi-socket systems so we cannot break here.
-			 */
 		}
+
+		if (current_driver != &dummy)
+			break;
 	}
 
-	/*
-	 * We can't fail here since systems with Sstc might not provide
-	 * mtimer/clint DT node in the device tree.
-	 */
 	return 0;
 }
 

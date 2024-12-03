@@ -9,72 +9,63 @@
 
 #include <libfdt.h>
 #include <sbi/sbi_error.h>
-#include <sbi/sbi_heap.h>
-#include <sbi/sbi_list.h>
 #include <sbi_utils/fdt/fdt_helper.h>
 #include <sbi_utils/timer/fdt_timer.h>
 #include <sbi_utils/timer/aclint_mtimer.h>
 
+#define MTIMER_MAX_NR			16
+
 struct timer_mtimer_quirks {
-	bool		is_clint;
-	unsigned int	clint_mtime_offset;
-	bool		clint_without_mtime;
+	unsigned int	mtime_offset;
 	bool		has_64bit_mmio;
+	bool		without_mtime;
 };
 
-struct timer_mtimer_node {
-	struct sbi_dlist head;
-	struct aclint_mtimer_data data;
-};
-static SBI_LIST_HEAD(mtn_list);
-
+static unsigned long mtimer_count = 0;
+static struct aclint_mtimer_data mtimer[MTIMER_MAX_NR];
 static struct aclint_mtimer_data *mt_reference = NULL;
 
 static int timer_mtimer_cold_init(void *fdt, int nodeoff,
 				  const struct fdt_match *match)
 {
-	int rc;
+	int i, rc;
 	unsigned long addr[2], size[2];
-	struct timer_mtimer_node *mtn, *n;
 	struct aclint_mtimer_data *mt;
-	const struct timer_mtimer_quirks *quirks = match->data;
-	bool is_clint = quirks && quirks->is_clint;
 
-	mtn = sbi_zalloc(sizeof(*mtn));
-	if (!mtn)
-		return SBI_ENOMEM;
-	mt = &mtn->data;
+	if (MTIMER_MAX_NR <= mtimer_count)
+		return SBI_ENOSPC;
+	mt = &mtimer[mtimer_count];
 
-	rc = fdt_parse_aclint_node(fdt, nodeoff, true, !is_clint,
+	rc = fdt_parse_aclint_node(fdt, nodeoff, true,
 				   &addr[0], &size[0], &addr[1], &size[1],
 				   &mt->first_hartid, &mt->hart_count);
-	if (rc) {
-		sbi_free(mtn);
+	if (rc)
 		return rc;
-	}
 	mt->has_64bit_mmio = true;
 	mt->has_shared_mtime = false;
 
 	rc = fdt_parse_timebase_frequency(fdt, &mt->mtime_freq);
-	if (rc) {
-		sbi_free(mtn);
+	if (rc)
 		return rc;
-	}
 
-	if (is_clint) { /* SiFive CLINT */
+	if (match->data) { /* SiFive CLINT */
+		const struct timer_mtimer_quirks *quirks = match->data;
+
 		/* Set CLINT addresses */
 		mt->mtimecmp_addr = addr[0] + ACLINT_DEFAULT_MTIMECMP_OFFSET;
 		mt->mtimecmp_size = ACLINT_DEFAULT_MTIMECMP_SIZE;
-		if (!quirks->clint_without_mtime) {
+		if (!quirks->without_mtime) {
 			mt->mtime_addr = addr[0] + ACLINT_DEFAULT_MTIME_OFFSET;
 			mt->mtime_size = size[0] - mt->mtimecmp_size;
 			/* Adjust MTIMER address and size for CLINT device */
-			mt->mtime_addr += quirks->clint_mtime_offset;
-			mt->mtime_size -= quirks->clint_mtime_offset;
+			mt->mtime_addr += quirks->mtime_offset;
+			mt->mtime_size -= quirks->mtime_offset;
 		} else {
 			mt->mtime_addr = mt->mtime_size = 0;
 		}
-		mt->mtimecmp_addr += quirks->clint_mtime_offset;
+		mt->mtimecmp_addr += quirks->mtime_offset;
+		/* Apply additional CLINT quirks */
+		mt->has_64bit_mmio = quirks->has_64bit_mmio;
 	} else { /* RISC-V ACLINT MTIMER */
 		/* Set ACLINT MTIMER addresses */
 		mt->mtime_addr = addr[0];
@@ -83,16 +74,11 @@ static int timer_mtimer_cold_init(void *fdt, int nodeoff,
 		mt->mtimecmp_size = size[1];
 	}
 
-	/* Apply additional quirks */
-	if (quirks) {
-		mt->has_64bit_mmio = quirks->has_64bit_mmio;
-	}
-
 	/* Check if MTIMER device has shared MTIME address */
 	if (mt->mtime_size) {
 		mt->has_shared_mtime = false;
-		sbi_list_for_each_entry(n, &mtn_list, head) {
-			if (n->data.mtime_addr == mt->mtime_addr) {
+		for (i = 0; i < mtimer_count; i++) {
+			if (mtimer[i].mtime_addr == mt->mtime_addr) {
 				mt->has_shared_mtime = true;
 				break;
 			}
@@ -104,10 +90,8 @@ static int timer_mtimer_cold_init(void *fdt, int nodeoff,
 
 	/* Initialize the MTIMER device */
 	rc = aclint_mtimer_cold_init(mt, mt_reference);
-	if (rc) {
-		sbi_free(mtn);
+	if (rc)
 		return rc;
-	}
 
 	/*
 	 * Select first MTIMER device with no associated HARTs as our
@@ -122,42 +106,33 @@ static int timer_mtimer_cold_init(void *fdt, int nodeoff,
 		 * Set reference for already propbed MTIMER devices
 		 * with non-shared MTIME
 		 */
-		sbi_list_for_each_entry(n, &mtn_list, head) {
-			if (!n->data.has_shared_mtime)
-				aclint_mtimer_set_reference(&n->data, mt);
-		}
+		for (i = 0; i < mtimer_count; i++)
+			if (!mtimer[i].has_shared_mtime)
+				aclint_mtimer_set_reference(&mtimer[i], mt);
 	}
 
 	/* Explicitly sync-up MTIMER devices not associated with any HARTs */
 	if (!mt->hart_count)
 		aclint_mtimer_sync(mt);
 
-	sbi_list_add_tail(&mtn->head, &mtn_list);
+	mtimer_count++;
 	return 0;
 }
 
 static const struct timer_mtimer_quirks sifive_clint_quirks = {
-	.is_clint		= true,
-	.clint_mtime_offset	= CLINT_MTIMER_OFFSET,
-	.has_64bit_mmio		= true,
+	.mtime_offset	= CLINT_MTIMER_OFFSET,
+	.has_64bit_mmio	= true,
 };
 
 static const struct timer_mtimer_quirks thead_clint_quirks = {
-	.is_clint		= true,
-	.clint_mtime_offset	= CLINT_MTIMER_OFFSET,
-	.clint_without_mtime	= true,
-};
-
-static const struct timer_mtimer_quirks thead_aclint_quirks = {
-	.has_64bit_mmio		= false,
+	.mtime_offset	= CLINT_MTIMER_OFFSET,
+	.without_mtime  = true,
 };
 
 static const struct fdt_match timer_mtimer_match[] = {
 	{ .compatible = "riscv,clint0", .data = &sifive_clint_quirks },
 	{ .compatible = "sifive,clint0", .data = &sifive_clint_quirks },
 	{ .compatible = "thead,c900-clint", .data = &thead_clint_quirks },
-	{ .compatible = "thead,c900-aclint-mtimer",
-	  .data = &thead_aclint_quirks },
 	{ .compatible = "riscv,aclint-mtimer" },
 	{ },
 };

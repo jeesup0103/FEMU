@@ -32,7 +32,6 @@
   DebugLib
   LocalApicLib
   HobLib
-  BaseMemoryLib
 
 [Ppis]
   gEfiSecPlatformInformationPpiGuid  ## SOMETIMES_CONSUMES

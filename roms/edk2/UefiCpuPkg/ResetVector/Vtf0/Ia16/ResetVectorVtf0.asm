@@ -32,13 +32,22 @@ ALIGN   16
     TIMES (0x1000 - 0x20) DB 0
 %endif
 
+applicationProcessorEntryPoint:
 ;
-; 0xffffffe0
+; Application Processors entry point
 ;
-    DD      0, 0, 0
+; GenFv generates code aligned on a 4k boundary which will jump to this
+; location.  (0xffffffe0)  This allows the Local APIC Startup IPI to be
+; used to wake up the application processors.
+;
+    jmp     EarlyApInitReal16
+
+ALIGN   8
+
+    DD      0
 
 ;
-; The VTF signature (0xffffffec)
+; The VTF signature
 ;
 ; VTF-0 means that the VTF (Volume Top File) code does not require
 ; any fixups.

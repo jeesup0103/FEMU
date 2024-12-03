@@ -3,7 +3,6 @@
 
   Copyright (c) 2015 - 2018, Intel Corporation. All rights reserved.<BR>
   (C) Copyright 2016 Hewlett Packard Enterprise Development LP<BR>
-  Copyright (c) 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
   SPDX-License-Identifier: BSD-2-Clause-Patent
 
@@ -465,16 +464,8 @@ ON_ERROR:
 
   if (HttpService != NULL) {
     HttpCleanService (HttpService, UsingIpv6);
-    Status = gBS->UninstallMultipleProtocolInterfaces (
-                    &ControllerHandle,
-                    &gEfiHttpServiceBindingProtocolGuid,
-                    &HttpService->ServiceBinding,
-                    NULL
-                    );
-    if (!EFI_ERROR (Status)) {
-      if ((HttpService->Tcp4ChildHandle == NULL) && (HttpService->Tcp6ChildHandle == NULL)) {
-        FreePool (HttpService);
-      }
+    if ((HttpService->Tcp4ChildHandle == NULL) && (HttpService->Tcp6ChildHandle == NULL)) {
+      FreePool (HttpService);
     }
   }
 

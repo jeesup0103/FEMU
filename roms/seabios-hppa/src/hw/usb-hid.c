@@ -27,7 +27,7 @@ set_protocol(struct usb_pipe *pipe, u16 val)
     struct usb_ctrlrequest req;
     req.bRequestType = USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE;
     req.bRequest = HID_REQ_SET_PROTOCOL;
-    req.wValue = cpu_to_le16(val);
+    req.wValue = val;
     req.wIndex = 0;
     req.wLength = 0;
     return usb_send_default_control(pipe, &req, NULL);
@@ -40,7 +40,7 @@ set_idle(struct usb_pipe *pipe, int ms)
     struct usb_ctrlrequest req;
     req.bRequestType = USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE;
     req.bRequest = HID_REQ_SET_IDLE;
-    req.wValue = cpu_to_le16((ms/4)<<8);
+    req.wValue = (ms/4)<<8;
     req.wIndex = 0;
     req.wLength = 0;
     return usb_send_default_control(pipe, &req, NULL);
@@ -68,10 +68,10 @@ usb_kbd_setup(struct usbdevice_s *usbdev
         // XXX - this enables the first found keyboard (could be random)
         return -1;
 
-    if (le16_to_cpu(epdesc->wMaxPacketSize) < sizeof(struct keyevent)
-        || le16_to_cpu(epdesc->wMaxPacketSize) > MAX_KBD_EVENT) {
+    if (epdesc->wMaxPacketSize < sizeof(struct keyevent)
+        || epdesc->wMaxPacketSize > MAX_KBD_EVENT) {
         dprintf(1, "USB keyboard wMaxPacketSize=%d; aborting\n"
-                , le16_to_cpu(epdesc->wMaxPacketSize));
+                , epdesc->wMaxPacketSize);
         return -1;
     }
 
@@ -110,10 +110,10 @@ usb_mouse_setup(struct usbdevice_s *usbdev
         // XXX - this enables the first found mouse (could be random)
         return -1;
 
-    if (le16_to_cpu(epdesc->wMaxPacketSize) < sizeof(struct mouseevent)
-        || le16_to_cpu(epdesc->wMaxPacketSize) > MAX_MOUSE_EVENT) {
+    if (epdesc->wMaxPacketSize < sizeof(struct mouseevent)
+        || epdesc->wMaxPacketSize > MAX_MOUSE_EVENT) {
         dprintf(1, "USB mouse wMaxPacketSize=%d; aborting\n"
-                , le16_to_cpu(epdesc->wMaxPacketSize));
+                , epdesc->wMaxPacketSize);
         return -1;
     }
 

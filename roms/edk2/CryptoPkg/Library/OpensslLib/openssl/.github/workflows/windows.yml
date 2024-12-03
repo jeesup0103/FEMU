@@ -1,11 +1,5 @@
-# Copyright 2021-2022 The OpenSSL Project Authors. All Rights Reserved.
-#
-# Licensed under the Apache License 2.0 (the "License").  You may not use
-# this file except in compliance with the License.  You can obtain a copy
-# in the file LICENSE in the source distribution or at
-# https://www.openssl.org/source/license.html
-
-name: Windows GitHub CI
+---
+name: Windows GitHub CI for 1.1.1
 
 on: [pull_request, push]
 
@@ -18,16 +12,16 @@ jobs:
     strategy:
       matrix:
         os:
-          - windows-2019
-          - windows-2022
+        - windows-2019
+        - windows-2022
         platform:
-          - arch: win64
-            config: enable-fips
-          - arch: win32
-            config: --strict-warnings no-fips
+        - arch: win64
+          config: VC-WIN64A
+        - arch: win32
+          config: VC-WIN32 --strict-warnings
     runs-on: ${{matrix.os}}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v2
     - uses: ilammy/msvc-dev-cmd@v1
       with:
         arch: ${{ matrix.platform.arch }}
@@ -40,14 +34,14 @@ jobs:
     - name: config
       working-directory: _build
       run: |
-        perl ..\Configure --banner=Configured no-makedepend ${{ matrix.platform.config }}
+        perl ..\Configure no-makedepend ${{ matrix.platform.config }}
         perl configdata.pm --dump
     - name: build
       working-directory: _build
       run: nmake /S
     - name: test
       working-directory: _build
-      run: nmake test VERBOSE_FAILURE=yes TESTS=-test_fuzz* HARNESS_JOBS=4
+      run: nmake test VERBOSE_FAILURE=yes TESTS=-test_fuzz*
     - name: install
       # Run on 64 bit only as 32 bit is slow enough already
       if: $${{ matrix.platform.arch == 'win64' }}
@@ -59,11 +53,11 @@ jobs:
     strategy:
       matrix:
         os:
-          - windows-2019
-          - windows-2022
+        - windows-2019
+        - windows-2022
     runs-on: ${{matrix.os}}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v2
     - uses: ilammy/msvc-dev-cmd@v1
     - uses: shogo82148/actions-setup-perl@v1
     - name: prepare the build directory
@@ -71,23 +65,23 @@ jobs:
     - name: config
       working-directory: _build
       run: |
-        perl ..\Configure --banner=Configured no-makedepend no-shared no-fips VC-WIN64A-masm
+        perl ..\Configure no-makedepend no-shared VC-WIN64A-masm
         perl configdata.pm --dump
     - name: build
       working-directory: _build
       run: nmake /S
     - name: test
       working-directory: _build
-      run: nmake test VERBOSE_FAILURE=yes HARNESS_JOBS=4
+      run: nmake test VERBOSE_FAILURE=yes
   minimal:
     strategy:
       matrix:
         os:
-          - windows-2019
-          - windows-2022
+        - windows-2019
+        - windows-2022
     runs-on: ${{matrix.os}}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v2
     - uses: ilammy/msvc-dev-cmd@v1
     - uses: shogo82148/actions-setup-perl@v1
     - name: prepare the build directory
@@ -95,11 +89,11 @@ jobs:
     - name: config
       working-directory: _build
       run: |
-        perl ..\Configure --banner=Configured no-makedepend no-bulk no-deprecated no-fips no-asm -DOPENSSL_SMALL_FOOTPRINT
+        perl ..\Configure no-makedepend no-deprecated no-asm -DOPENSSL_SMALL_FOOTPRINT VC-WIN64A
         perl configdata.pm --dump
     - name: build
       working-directory: _build
       run: nmake # verbose, so no /S here
     - name: test
       working-directory: _build
-      run: nmake test VERBOSE_FAILURE=yes TESTS=-test_fuzz* HARNESS_JOBS=4
+      run: nmake test VERBOSE_FAILURE=yes TESTS=-test_fuzz*

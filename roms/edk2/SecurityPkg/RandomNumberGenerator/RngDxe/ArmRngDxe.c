@@ -40,7 +40,6 @@ FreeAvailableAlgorithms (
   VOID
   )
 {
-  mAvailableAlgoArrayCount = 0;
   FreePool (mAvailableAlgoArray);
   return;
 }
@@ -77,7 +76,7 @@ RngGetRNG (
   )
 {
   EFI_STATUS  Status;
-  GUID        RngGuid;
+  UINTN       Index;
 
   if ((This == NULL) || (RNGValueLength == 0) || (RNGValue == NULL)) {
     return EFI_INVALID_PARAMETER;
@@ -87,17 +86,22 @@ RngGetRNG (
     //
     // Use the default RNG algorithm if RNGAlgorithm is NULL.
     //
-    if (mAvailableAlgoArrayCount != 0) {
-      RNGAlgorithm = &mAvailableAlgoArray[0];
-    } else {
-      return EFI_UNSUPPORTED;
+    for (Index = 0; Index < mAvailableAlgoArrayCount; Index++) {
+      if (!IsZeroGuid (&mAvailableAlgoArray[Index])) {
+        RNGAlgorithm = &mAvailableAlgoArray[Index];
+        goto FoundAlgo;
+      }
+    }
+
+    if (Index == mAvailableAlgoArrayCount) {
+      // No algorithm available.
+      ASSERT (Index != mAvailableAlgoArrayCount);
+      return EFI_DEVICE_ERROR;
     }
   }
 
-  Status = GetRngGuid (&RngGuid);
-  if (!EFI_ERROR (Status) &&
-      CompareGuid (RNGAlgorithm, &RngGuid))
-  {
+FoundAlgo:
+  if (CompareGuid (RNGAlgorithm, PcdGetPtr (PcdCpuRngSupportedAlgorithm))) {
     Status = RngGetBytes (RNGValueLength, RNGValue);
     return Status;
   }

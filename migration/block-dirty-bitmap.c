@@ -79,7 +79,6 @@
 #include "qapi/qapi-visit-migration.h"
 #include "qapi/clone-visitor.h"
 #include "trace.h"
-#include "options.h"
 
 #define CHUNK_SIZE     (1 << 10)
 
@@ -464,7 +463,7 @@ static void send_bitmap_bits(QEMUFile *f, DBMSaveState *s,
     g_free(buf);
 }
 
-/* Called with the BQL taken.  */
+/* Called with iothread lock taken.  */
 static void dirty_bitmap_do_save_cleanup(DBMSaveState *s)
 {
     SaveBitmapState *dbms;
@@ -479,7 +478,7 @@ static void dirty_bitmap_do_save_cleanup(DBMSaveState *s)
     }
 }
 
-/* Called with the BQL taken. */
+/* Called with iothread lock taken. */
 static int add_bitmaps_to_list(DBMSaveState *s, BlockDriverState *bs,
                                const char *bs_name, GHashTable *alias_map)
 {
@@ -598,21 +597,18 @@ static int add_bitmaps_to_list(DBMSaveState *s, BlockDriverState *bs,
     return 0;
 }
 
-/* Called with the BQL taken. */
+/* Called with iothread lock taken. */
 static int init_dirty_bitmap_migration(DBMSaveState *s)
 {
     BlockDriverState *bs;
     SaveBitmapState *dbms;
     GHashTable *handled_by_blk = g_hash_table_new(NULL, NULL);
     BlockBackend *blk;
+    const MigrationParameters *mig_params = &migrate_get_current()->parameters;
     GHashTable *alias_map = NULL;
 
-    /* Runs in the migration thread, but holds the BQL */
-    GLOBAL_STATE_CODE();
-    GRAPH_RDLOCK_GUARD_MAINLOOP();
-
-    if (migrate_has_block_bitmap_mapping()) {
-        alias_map = construct_alias_map(migrate_block_bitmap_mapping(), true,
+    if (mig_params->has_block_bitmap_mapping) {
+        alias_map = construct_alias_map(mig_params->block_bitmap_mapping, true,
                                         &error_abort);
     }
 
@@ -710,7 +706,7 @@ static void bulk_phase(QEMUFile *f, DBMSaveState *s, bool limit)
     QSIMPLEQ_FOREACH(dbms, &s->dbms_list, entry) {
         while (!dbms->bulk_completed) {
             bulk_phase_send_chunk(f, s, dbms);
-            if (limit && migration_rate_exceeded(f)) {
+            if (limit && qemu_file_rate_limit(f)) {
                 return;
             }
         }
@@ -742,7 +738,7 @@ static int dirty_bitmap_save_iterate(QEMUFile *f, void *opaque)
     return s->bulk_completed;
 }
 
-/* Called with the BQL taken.  */
+/* Called with iothread lock taken.  */
 
 static int dirty_bitmap_save_complete(QEMUFile *f, void *opaque)
 {
@@ -774,7 +770,7 @@ static void dirty_bitmap_state_pending(void *opaque,
     SaveBitmapState *dbms;
     uint64_t pending = 0;
 
-    bql_lock();
+    qemu_mutex_lock_iothread();
 
     QSIMPLEQ_FOREACH(dbms, &s->dbms_list, entry) {
         uint64_t gran = bdrv_dirty_bitmap_granularity(dbms->bitmap);
@@ -784,7 +780,7 @@ static void dirty_bitmap_state_pending(void *opaque,
         pending += DIV_ROUND_UP(sectors * BDRV_SECTOR_SIZE, gran);
     }
 
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
 
     trace_dirty_bitmap_state_pending(pending);
 
@@ -1161,6 +1157,7 @@ static int dirty_bitmap_load_header(QEMUFile *f, DBMLoadState *s,
 static int dirty_bitmap_load(QEMUFile *f, void *opaque, int version_id)
 {
     GHashTable *alias_map = NULL;
+    const MigrationParameters *mig_params = &migrate_get_current()->parameters;
     DBMLoadState *s = &((DBMState *)opaque)->load;
     int ret = 0;
 
@@ -1172,9 +1169,9 @@ static int dirty_bitmap_load(QEMUFile *f, void *opaque, int version_id)
         return -EINVAL;
     }
 
-    if (migrate_has_block_bitmap_mapping()) {
-        alias_map = construct_alias_map(migrate_block_bitmap_mapping(), false,
-                                        &error_abort);
+    if (mig_params->has_block_bitmap_mapping) {
+        alias_map = construct_alias_map(mig_params->block_bitmap_mapping,
+                                        false, &error_abort);
     }
 
     do {
@@ -1218,7 +1215,9 @@ static int dirty_bitmap_save_setup(QEMUFile *f, void *opaque)
     DBMSaveState *s = &((DBMState *)opaque)->save;
     SaveBitmapState *dbms = NULL;
 
+    qemu_mutex_lock_iothread();
     if (init_dirty_bitmap_migration(s) < 0) {
+        qemu_mutex_unlock_iothread();
         return -1;
     }
 
@@ -1226,6 +1225,7 @@ static int dirty_bitmap_save_setup(QEMUFile *f, void *opaque)
         send_bitmap_start(f, s, dbms);
     }
     qemu_put_bitmap_flags(f, DIRTY_BITMAP_MIG_FLAG_EOS);
+    qemu_mutex_unlock_iothread();
     return 0;
 }
 

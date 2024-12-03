@@ -1,6 +1,6 @@
 /** @file
 *
-*  Copyright (c) 2011-2023, Arm Limited. All rights reserved.
+*  Copyright (c) 2011-2014, ARM Limited. All rights reserved.
 *
 *  SPDX-License-Identifier: BSD-2-Clause-Patent
 *
@@ -101,7 +101,7 @@ PrePiMain (
   ASSERT_EFI_ERROR (Status);
 
   // Load the DXE Core and transfer control to it
-  Status = LoadDxeCoreFromFv (NULL, SIZE_128KB);
+  Status = LoadDxeCoreFromFv (NULL, 0);
   ASSERT_EFI_ERROR (Status);
 }
 

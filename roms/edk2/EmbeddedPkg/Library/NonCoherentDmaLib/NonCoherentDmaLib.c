@@ -349,7 +349,7 @@ CommonBufferError:
     "%a: Operation type 'MapOperationBusMasterCommonBuffer' is only "
     "supported\non memory regions that were allocated using "
     "DmaAllocateBuffer ()\n",
-    __func__
+    __FUNCTION__
     ));
   Status = EFI_UNSUPPORTED;
 FreeMapInfo:

@@ -150,7 +150,7 @@ ArmVirtGicArchLibConstructor (
       break;
 
     default:
-      DEBUG ((DEBUG_ERROR, "%a: No GIC revision specified!\n", __func__));
+      DEBUG ((DEBUG_ERROR, "%a: No GIC revision specified!\n", __FUNCTION__));
       return RETURN_NOT_FOUND;
   }
 

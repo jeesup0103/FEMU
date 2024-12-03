@@ -269,7 +269,7 @@ static const VMStateDescription tz_msc_vmstate = {
     .name = "tz-msc",
     .version_id = 1,
     .minimum_version_id = 1,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_BOOL(cfg_nonsec, TZMSC),
         VMSTATE_BOOL(cfg_sec_resp, TZMSC),
         VMSTATE_BOOL(irq_clear, TZMSC),

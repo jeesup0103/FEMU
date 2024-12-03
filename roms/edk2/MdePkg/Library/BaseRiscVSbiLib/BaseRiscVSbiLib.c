@@ -4,7 +4,6 @@
   It allows calling an SBI function via an ecall from S-Mode.
 
   Copyright (c) 2021-2022, Hewlett Packard Development LP. All rights reserved.<BR>
-  Copyright (c) 2023, Intel Corporation. All rights reserved.<BR>
 
   SPDX-License-Identifier: BSD-2-Clause-Patent
 
@@ -32,6 +31,7 @@
   @retval  Returns SBI_RET structure with value and error code.
 
 **/
+STATIC
 SBI_RET
 EFIAPI
 SbiCall (
@@ -88,6 +88,7 @@ SbiCall (
   @param[in] SbiError   SBI error code
   @retval EFI_STATUS
 **/
+STATIC
 EFI_STATUS
 EFIAPI
 TranslateError (

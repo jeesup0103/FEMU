@@ -45,16 +45,14 @@ struct HVFState {
 
     hvf_vcpu_caps *hvf_caps;
     uint64_t vtimer_offset;
-    QTAILQ_HEAD(, hvf_sw_breakpoint) hvf_sw_breakpoints;
 };
 extern HVFState *hvf_state;
 
-struct AccelCPUState {
+struct hvf_vcpu_state {
     uint64_t fd;
     void *exit;
     bool vtimer_masked;
     sigset_t unblock_ipi_mask;
-    bool guest_debug_enabled;
 };
 
 void assert_hvf_ok(hv_return_t ret);

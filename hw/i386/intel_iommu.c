@@ -52,7 +52,7 @@
 
 /*
  * PCI bus number (or SID) is not reliable since the device is usaully
- * initialized before guest can configure the PCI bridge
+ * initalized before guest can configure the PCI bridge
  * (SECONDARY_BUS_NUMBER).
  */
 struct vtd_as_key {
@@ -64,8 +64,8 @@ struct vtd_as_key {
 struct vtd_iotlb_key {
     uint64_t gfn;
     uint32_t pasid;
+    uint32_t level;
     uint16_t sid;
-    uint8_t level;
 };
 
 static void vtd_address_space_refresh_all(IntelIOMMUState *s);
@@ -221,11 +221,10 @@ static gboolean vtd_iotlb_equal(gconstpointer v1, gconstpointer v2)
 static guint vtd_iotlb_hash(gconstpointer v)
 {
     const struct vtd_iotlb_key *key = v;
-    uint64_t hash64 = key->gfn | ((uint64_t)(key->sid) << VTD_IOTLB_SID_SHIFT) |
-        (uint64_t)(key->level - 1) << VTD_IOTLB_LVL_SHIFT |
-        (uint64_t)(key->pasid) << VTD_IOTLB_PASID_SHIFT;
 
-    return (guint)((hash64 >> 32) ^ (hash64 & 0xffffffffU));
+    return key->gfn | ((key->sid) << VTD_IOTLB_SID_SHIFT) |
+           (key->level) << VTD_IOTLB_LVL_SHIFT |
+           (key->pasid) << VTD_IOTLB_PASID_SHIFT;
 }
 
 static gboolean vtd_as_equal(gconstpointer v1, gconstpointer v2)
@@ -469,12 +468,21 @@ static void vtd_set_frcd_and_update_ppf(IntelIOMMUState *s, uint16_t index)
 
 /* Must not update F field now, should be done later */
 static void vtd_record_frcd(IntelIOMMUState *s, uint16_t index,
-                            uint64_t hi, uint64_t lo)
+                            uint16_t source_id, hwaddr addr,
+                            VTDFaultReason fault, bool is_write,
+                            bool is_pasid, uint32_t pasid)
 {
+    uint64_t hi = 0, lo;
     hwaddr frcd_reg_addr = DMAR_FRCD_REG_OFFSET + (((uint64_t)index) << 4);
 
     assert(index < DMAR_FRCD_REG_NR);
 
+    lo = VTD_FRCD_FI(addr);
+    hi = VTD_FRCD_SID(source_id) | VTD_FRCD_FR(fault) |
+         VTD_FRCD_PV(pasid) | VTD_FRCD_PP(is_pasid);
+    if (!is_write) {
+        hi |= VTD_FRCD_T;
+    }
     vtd_set_quad_raw(s, frcd_reg_addr, lo);
     vtd_set_quad_raw(s, frcd_reg_addr + 8, hi);
 
@@ -500,10 +508,16 @@ static bool vtd_try_collapse_fault(IntelIOMMUState *s, uint16_t source_id)
 }
 
 /* Log and report an DMAR (address translation) fault to software */
-static void vtd_report_frcd_fault(IntelIOMMUState *s, uint64_t source_id,
-                                  uint64_t hi, uint64_t lo)
+static void vtd_report_dmar_fault(IntelIOMMUState *s, uint16_t source_id,
+                                  hwaddr addr, VTDFaultReason fault,
+                                  bool is_write, bool is_pasid,
+                                  uint32_t pasid)
 {
     uint32_t fsts_reg = vtd_get_long_raw(s, DMAR_FSTS_REG);
+
+    assert(fault < VTD_FR_MAX);
+
+    trace_vtd_dmar_fault(source_id, fault, addr, is_write);
 
     if (fsts_reg & VTD_FSTS_PFO) {
         error_report_once("New fault is not recorded due to "
@@ -524,7 +538,8 @@ static void vtd_report_frcd_fault(IntelIOMMUState *s, uint64_t source_id,
         return;
     }
 
-    vtd_record_frcd(s, s->next_frcd_reg, hi, lo);
+    vtd_record_frcd(s, s->next_frcd_reg, source_id, addr, fault,
+                    is_write, is_pasid, pasid);
 
     if (fsts_reg & VTD_FSTS_PPF) {
         error_report_once("There are pending faults already, "
@@ -547,40 +562,6 @@ static void vtd_report_frcd_fault(IntelIOMMUState *s, uint64_t source_id,
          */
          vtd_generate_fault_event(s, fsts_reg);
     }
-}
-
-/* Log and report an DMAR (address translation) fault to software */
-static void vtd_report_dmar_fault(IntelIOMMUState *s, uint16_t source_id,
-                                  hwaddr addr, VTDFaultReason fault,
-                                  bool is_write, bool is_pasid,
-                                  uint32_t pasid)
-{
-    uint64_t hi, lo;
-
-    assert(fault < VTD_FR_MAX);
-
-    trace_vtd_dmar_fault(source_id, fault, addr, is_write);
-
-    lo = VTD_FRCD_FI(addr);
-    hi = VTD_FRCD_SID(source_id) | VTD_FRCD_FR(fault) |
-         VTD_FRCD_PV(pasid) | VTD_FRCD_PP(is_pasid);
-    if (!is_write) {
-        hi |= VTD_FRCD_T;
-    }
-
-    vtd_report_frcd_fault(s, source_id, hi, lo);
-}
-
-
-static void vtd_report_ir_fault(IntelIOMMUState *s, uint64_t source_id,
-                                VTDFaultReason fault, uint16_t index)
-{
-    uint64_t hi, lo;
-
-    lo = VTD_FRCD_IR_IDX(index);
-    hi = VTD_FRCD_SID(source_id) | VTD_FRCD_FR(fault);
-
-    vtd_report_frcd_fault(s, source_id, hi, lo);
 }
 
 /* Handle Invalidation Queue Errors of queued invalidation interface error
@@ -774,8 +755,6 @@ static int vtd_get_pdire_from_pdir_table(dma_addr_t pasid_dir_base,
         return -VTD_FR_PASID_TABLE_INV;
     }
 
-    pdire->val = le64_to_cpu(pdire->val);
-
     return 0;
 }
 
@@ -799,9 +778,6 @@ static int vtd_get_pe_in_pasid_leaf_table(IntelIOMMUState *s,
     if (dma_memory_read(&address_space_memory, addr,
                         pe, entry_size, MEMTXATTRS_UNSPECIFIED)) {
         return -VTD_FR_PASID_TABLE_INV;
-    }
-    for (size_t i = 0; i < ARRAY_SIZE(pe->val); i++) {
-        pe->val[i] = le64_to_cpu(pe->val[i]);
     }
 
     /* Do translation type check */
@@ -1045,35 +1021,18 @@ static dma_addr_t vtd_get_iova_pgtbl_base(IntelIOMMUState *s,
  * Rsvd field masks for spte:
  *     vtd_spte_rsvd 4k pages
  *     vtd_spte_rsvd_large large pages
- *
- * We support only 3-level and 4-level page tables (see vtd_init() which
- * sets only VTD_CAP_SAGAW_39bit and maybe VTD_CAP_SAGAW_48bit bits in s->cap).
  */
-#define VTD_SPTE_RSVD_LEN 5
-static uint64_t vtd_spte_rsvd[VTD_SPTE_RSVD_LEN];
-static uint64_t vtd_spte_rsvd_large[VTD_SPTE_RSVD_LEN];
+static uint64_t vtd_spte_rsvd[5];
+static uint64_t vtd_spte_rsvd_large[5];
 
 static bool vtd_slpte_nonzero_rsvd(uint64_t slpte, uint32_t level)
 {
-    uint64_t rsvd_mask;
-
-    /*
-     * We should have caught a guest-mis-programmed level earlier,
-     * via vtd_is_level_supported.
-     */
-    assert(level < VTD_SPTE_RSVD_LEN);
-    /*
-     * Zero level doesn't exist. The smallest level is VTD_SL_PT_LEVEL=1 and
-     * checked by vtd_is_last_slpte().
-     */
-    assert(level);
+    uint64_t rsvd_mask = vtd_spte_rsvd[level];
 
     if ((level == VTD_SL_PD_LEVEL || level == VTD_SL_PDP_LEVEL) &&
         (slpte & VTD_SL_PT_PAGE_SIZE_MASK)) {
         /* large page */
         rsvd_mask = vtd_spte_rsvd_large[level];
-    } else {
-        rsvd_mask = vtd_spte_rsvd[level];
     }
 
     return slpte & rsvd_mask;
@@ -1665,7 +1624,7 @@ static bool vtd_switch_address_space(VTDAddressSpace *as)
 {
     bool use_iommu, pt;
     /* Whether we need to take the BQL on our own */
-    bool take_bql = !bql_locked();
+    bool take_bql = !qemu_mutex_iothread_locked();
 
     assert(as);
 
@@ -1683,7 +1642,7 @@ static bool vtd_switch_address_space(VTDAddressSpace *as)
      * it. We'd better make sure we have had it already, or, take it.
      */
     if (take_bql) {
-        bql_lock();
+        qemu_mutex_lock_iothread();
     }
 
     /* Turn off first then on the other */
@@ -1729,7 +1688,7 @@ static bool vtd_switch_address_space(VTDAddressSpace *as)
      * """
      *
      * We enable per as memory region (iommu_ir_fault) for catching
-     * the translation for interrupt range through PASID + PT.
+     * the tranlsation for interrupt range through PASID + PT.
      */
     if (pt && as->pasid != PCI_NO_PASID) {
         memory_region_set_enabled(&as->iommu_ir_fault, true);
@@ -1738,7 +1697,7 @@ static bool vtd_switch_address_space(VTDAddressSpace *as)
     }
 
     if (take_bql) {
-        bql_unlock();
+        qemu_mutex_unlock_iothread();
     }
 
     return use_iommu;
@@ -3289,7 +3248,7 @@ static const VMStateDescription vtd_vmstate = {
     .minimum_version_id = 1,
     .priority = MIG_PRI_IOMMU,
     .post_load = vtd_post_load,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_UINT64(root, IntelIOMMUState),
         VMSTATE_UINT64(intr_root, IntelIOMMUState),
         VMSTATE_UINT64(iq, IntelIOMMUState),
@@ -3340,9 +3299,8 @@ static Property vtd_properties[] = {
 };
 
 /* Read IRTE entry with specific index */
-static bool vtd_irte_get(IntelIOMMUState *iommu, uint16_t index,
-                         VTD_IR_TableEntry *entry, uint16_t sid,
-                         bool do_fault)
+static int vtd_irte_get(IntelIOMMUState *iommu, uint16_t index,
+                        VTD_IR_TableEntry *entry, uint16_t sid)
 {
     static const uint16_t vtd_svt_mask[VTD_SQ_MAX] = \
         {0xffff, 0xfffb, 0xfff9, 0xfff8};
@@ -3353,10 +3311,7 @@ static bool vtd_irte_get(IntelIOMMUState *iommu, uint16_t index,
     if (index >= iommu->intr_size) {
         error_report_once("%s: index too large: ind=0x%x",
                           __func__, index);
-        if (do_fault) {
-            vtd_report_ir_fault(iommu, sid, VTD_FR_IR_INDEX_OVER, index);
-        }
-        return false;
+        return -VTD_FR_IR_INDEX_OVER;
     }
 
     addr = iommu->intr_root + index * sizeof(*entry);
@@ -3364,51 +3319,32 @@ static bool vtd_irte_get(IntelIOMMUState *iommu, uint16_t index,
                         entry, sizeof(*entry), MEMTXATTRS_UNSPECIFIED)) {
         error_report_once("%s: read failed: ind=0x%x addr=0x%" PRIx64,
                           __func__, index, addr);
-        if (do_fault) {
-            vtd_report_ir_fault(iommu, sid, VTD_FR_IR_ROOT_INVAL, index);
-        }
-        return false;
+        return -VTD_FR_IR_ROOT_INVAL;
     }
 
-    entry->data[0] = le64_to_cpu(entry->data[0]);
-    entry->data[1] = le64_to_cpu(entry->data[1]);
-
-    trace_vtd_ir_irte_get(index, entry->data[1], entry->data[0]);
-
-    /*
-     * The remaining potential fault conditions are "qualified" by the
-     * Fault Processing Disable bit in the IRTE. Even "not present".
-     * So just clear the do_fault flag if PFD is set, which will
-     * prevent faults being raised.
-     */
-    if (entry->irte.fault_disable) {
-        do_fault = false;
-    }
+    trace_vtd_ir_irte_get(index, le64_to_cpu(entry->data[1]),
+                          le64_to_cpu(entry->data[0]));
 
     if (!entry->irte.present) {
         error_report_once("%s: detected non-present IRTE "
                           "(index=%u, high=0x%" PRIx64 ", low=0x%" PRIx64 ")",
-                          __func__, index, entry->data[1], entry->data[0]);
-        if (do_fault) {
-            vtd_report_ir_fault(iommu, sid, VTD_FR_IR_ENTRY_P, index);
-        }
-        return false;
+                          __func__, index, le64_to_cpu(entry->data[1]),
+                          le64_to_cpu(entry->data[0]));
+        return -VTD_FR_IR_ENTRY_P;
     }
 
     if (entry->irte.__reserved_0 || entry->irte.__reserved_1 ||
         entry->irte.__reserved_2) {
         error_report_once("%s: detected non-zero reserved IRTE "
                           "(index=%u, high=0x%" PRIx64 ", low=0x%" PRIx64 ")",
-                          __func__, index, entry->data[1], entry->data[0]);
-        if (do_fault) {
-            vtd_report_ir_fault(iommu, sid, VTD_FR_IR_IRTE_RSVD, index);
-        }
-        return false;
+                          __func__, index, le64_to_cpu(entry->data[1]),
+                          le64_to_cpu(entry->data[0]));
+        return -VTD_FR_IR_IRTE_RSVD;
     }
 
     if (sid != X86_IOMMU_SID_INVALID) {
         /* Validate IRTE SID */
-        source_id = entry->irte.source_id;
+        source_id = le32_to_cpu(entry->irte.source_id);
         switch (entry->irte.sid_vtype) {
         case VTD_SVT_NONE:
             break;
@@ -3419,10 +3355,7 @@ static bool vtd_irte_get(IntelIOMMUState *iommu, uint16_t index,
                 error_report_once("%s: invalid IRTE SID "
                                   "(index=%u, sid=%u, source_id=%u)",
                                   __func__, index, sid, source_id);
-                if (do_fault) {
-                    vtd_report_ir_fault(iommu, sid, VTD_FR_IR_SID_ERR, index);
-                }
-                return false;
+                return -VTD_FR_IR_SID_ERR;
             }
             break;
 
@@ -3434,10 +3367,7 @@ static bool vtd_irte_get(IntelIOMMUState *iommu, uint16_t index,
                 error_report_once("%s: invalid SVT_BUS "
                                   "(index=%u, bus=%u, min=%u, max=%u)",
                                   __func__, index, bus, bus_min, bus_max);
-                if (do_fault) {
-                    vtd_report_ir_fault(iommu, sid, VTD_FR_IR_SID_ERR, index);
-                }
-                return false;
+                return -VTD_FR_IR_SID_ERR;
             }
             break;
 
@@ -3446,30 +3376,29 @@ static bool vtd_irte_get(IntelIOMMUState *iommu, uint16_t index,
                               "(index=%u, type=%d)", __func__,
                               index, entry->irte.sid_vtype);
             /* Take this as verification failure. */
-            if (do_fault) {
-                vtd_report_ir_fault(iommu, sid, VTD_FR_IR_SID_ERR, index);
-            }
-            return false;
+            return -VTD_FR_IR_SID_ERR;
         }
     }
 
-    return true;
+    return 0;
 }
 
 /* Fetch IRQ information of specific IR index */
-static bool vtd_remap_irq_get(IntelIOMMUState *iommu, uint16_t index,
-                              X86IOMMUIrq *irq, uint16_t sid, bool do_fault)
+static int vtd_remap_irq_get(IntelIOMMUState *iommu, uint16_t index,
+                             X86IOMMUIrq *irq, uint16_t sid)
 {
     VTD_IR_TableEntry irte = {};
+    int ret = 0;
 
-    if (!vtd_irte_get(iommu, index, &irte, sid, do_fault)) {
-        return false;
+    ret = vtd_irte_get(iommu, index, &irte, sid);
+    if (ret) {
+        return ret;
     }
 
     irq->trigger_mode = irte.irte.trigger_mode;
     irq->vector = irte.irte.vector;
     irq->delivery_mode = irte.irte.delivery_mode;
-    irq->dest = irte.irte.dest_id;
+    irq->dest = le32_to_cpu(irte.irte.dest_id);
     if (!iommu->intr_eime) {
 #define  VTD_IR_APIC_DEST_MASK         (0xff00ULL)
 #define  VTD_IR_APIC_DEST_SHIFT        (8)
@@ -3482,15 +3411,16 @@ static bool vtd_remap_irq_get(IntelIOMMUState *iommu, uint16_t index,
     trace_vtd_ir_remap(index, irq->trigger_mode, irq->vector,
                        irq->delivery_mode, irq->dest, irq->dest_mode);
 
-    return true;
+    return 0;
 }
 
 /* Interrupt remapping for MSI/MSI-X entry */
 static int vtd_interrupt_remap_msi(IntelIOMMUState *iommu,
                                    MSIMessage *origin,
                                    MSIMessage *translated,
-                                   uint16_t sid, bool do_fault)
+                                   uint16_t sid)
 {
+    int ret = 0;
     VTD_IR_MSIAddress addr;
     uint16_t index;
     X86IOMMUIrq irq = {};
@@ -3507,20 +3437,14 @@ static int vtd_interrupt_remap_msi(IntelIOMMUState *iommu,
     if (origin->address & VTD_MSI_ADDR_HI_MASK) {
         error_report_once("%s: MSI address high 32 bits non-zero detected: "
                           "address=0x%" PRIx64, __func__, origin->address);
-        if (do_fault) {
-            vtd_report_ir_fault(iommu, sid, VTD_FR_IR_REQ_RSVD, 0);
-        }
-        return -EINVAL;
+        return -VTD_FR_IR_REQ_RSVD;
     }
 
     addr.data = origin->address & VTD_MSI_ADDR_LO_MASK;
     if (addr.addr.__head != 0xfee) {
         error_report_once("%s: MSI address low 32 bit invalid: 0x%" PRIx32,
                           __func__, addr.data);
-        if (do_fault) {
-            vtd_report_ir_fault(iommu, sid, VTD_FR_IR_REQ_RSVD, 0);
-        }
-        return -EINVAL;
+        return -VTD_FR_IR_REQ_RSVD;
     }
 
     /* This is compatible mode. */
@@ -3529,7 +3453,7 @@ static int vtd_interrupt_remap_msi(IntelIOMMUState *iommu,
         goto out;
     }
 
-    index = addr.addr.index_h << 15 | addr.addr.index_l;
+    index = addr.addr.index_h << 15 | le16_to_cpu(addr.addr.index_l);
 
 #define  VTD_IR_MSI_DATA_SUBHANDLE       (0x0000ffff)
 #define  VTD_IR_MSI_DATA_RESERVED        (0xffff0000)
@@ -3539,8 +3463,9 @@ static int vtd_interrupt_remap_msi(IntelIOMMUState *iommu,
         index += origin->data & VTD_IR_MSI_DATA_SUBHANDLE;
     }
 
-    if (!vtd_remap_irq_get(iommu, index, &irq, sid, do_fault)) {
-        return -EINVAL;
+    ret = vtd_remap_irq_get(iommu, index, &irq, sid);
+    if (ret) {
+        return ret;
     }
 
     if (addr.addr.sub_valid) {
@@ -3550,10 +3475,7 @@ static int vtd_interrupt_remap_msi(IntelIOMMUState *iommu,
                               "(sid=%u, address=0x%" PRIx64
                               ", data=0x%" PRIx32 ")",
                               __func__, sid, origin->address, origin->data);
-            if (do_fault) {
-                vtd_report_ir_fault(iommu, sid, VTD_FR_IR_REQ_RSVD, 0);
-            }
-            return -EINVAL;
+            return -VTD_FR_IR_REQ_RSVD;
         }
     } else {
         uint8_t vector = origin->data & 0xff;
@@ -3593,7 +3515,7 @@ static int vtd_int_remap(X86IOMMUState *iommu, MSIMessage *src,
                          MSIMessage *dst, uint16_t sid)
 {
     return vtd_interrupt_remap_msi(INTEL_IOMMU_DEVICE(iommu),
-                                   src, dst, sid, false);
+                                   src, dst, sid);
 }
 
 static MemTxResult vtd_mem_ir_read(void *opaque, hwaddr addr,
@@ -3619,8 +3541,9 @@ static MemTxResult vtd_mem_ir_write(void *opaque, hwaddr addr,
         sid = attrs.requester_id;
     }
 
-    ret = vtd_interrupt_remap_msi(opaque, &from, &to, sid, true);
+    ret = vtd_interrupt_remap_msi(opaque, &from, &to, sid);
     if (ret) {
+        /* TODO: report error */
         /* Drop this interrupt */
         return MEMTX_ERROR;
     }
@@ -3815,7 +3738,7 @@ VTDAddressSpace *vtd_find_add_as(IntelIOMMUState *s, PCIBus *bus,
 /* Unmap the whole range in the notifier's scope. */
 static void vtd_address_space_unmap(VTDAddressSpace *as, IOMMUNotifier *n)
 {
-    hwaddr total, remain;
+    hwaddr size, remain;
     hwaddr start = n->start;
     hwaddr end = n->end;
     IntelIOMMUState *s = as->iommu_state;
@@ -3836,7 +3759,7 @@ static void vtd_address_space_unmap(VTDAddressSpace *as, IOMMUNotifier *n)
     }
 
     assert(start <= end);
-    total = remain = end - start + 1;
+    size = remain = end - start + 1;
 
     while (remain >= VTD_PAGE_SIZE) {
         IOMMUTLBEvent event;
@@ -3864,10 +3787,10 @@ static void vtd_address_space_unmap(VTDAddressSpace *as, IOMMUNotifier *n)
     trace_vtd_as_unmap_whole(pci_bus_num(as->bus),
                              VTD_PCI_SLOT(as->devfn),
                              VTD_PCI_FUNC(as->devfn),
-                             n->start, total);
+                             n->start, size);
 
     map.iova = n->start;
-    map.size = total - 1; /* Inclusive */
+    map.size = size;
     iova_tree_remove(as->iova_tree, map);
 }
 
@@ -3901,10 +3824,13 @@ static void vtd_iommu_replay(IOMMUMemoryRegion *iommu_mr, IOMMUNotifier *n)
     IntelIOMMUState *s = vtd_as->iommu_state;
     uint8_t bus_n = pci_bus_num(vtd_as->bus);
     VTDContextEntry ce;
-    DMAMap map = { .iova = 0, .size = HWADDR_MAX };
 
-    /* replay is protected by BQL, page walk will re-setup it safely */
-    iova_tree_remove(vtd_as->iova_tree, map);
+    /*
+     * The replay can be triggered by either a invalidation or a newly
+     * created entry. No matter what, we release existing mappings
+     * (it means flushing caches for UNMAP-only registers).
+     */
+    vtd_address_space_unmap(vtd_as, n);
 
     if (vtd_dev_to_context_entry(s, bus_n, vtd_as->devfn, &ce) == 0) {
         trace_vtd_replay_ce_valid(s->root_scalable ? "scalable mode" :
@@ -3913,7 +3839,7 @@ static void vtd_iommu_replay(IOMMUMemoryRegion *iommu_mr, IOMMUNotifier *n)
                                   PCI_FUNC(vtd_as->devfn),
                                   vtd_get_domain_id(s, &ce, vtd_as->pasid),
                                   ce.hi, ce.lo);
-        if (n->notifier_flags & IOMMU_NOTIFIER_MAP) {
+        if (vtd_as_has_map_notifier(vtd_as)) {
             /* This is required only for MAP typed notifiers */
             vtd_page_walk_info info = {
                 .hook_fn = vtd_replay_hook,
@@ -4105,10 +4031,6 @@ static AddressSpace *vtd_host_dma_iommu(PCIBus *bus, void *opaque, int devfn)
     return &vtd_as->as;
 }
 
-static PCIIOMMUOps vtd_iommu_ops = {
-    .get_address_space = vtd_host_dma_iommu,
-};
-
 static bool vtd_decide_config(IntelIOMMUState *s, Error **errp)
 {
     X86IOMMUState *x86_iommu = X86_IOMMU_DEVICE(s);
@@ -4124,7 +4046,11 @@ static bool vtd_decide_config(IntelIOMMUState *s, Error **errp)
                                               ON_OFF_AUTO_ON : ON_OFF_AUTO_OFF;
     }
     if (s->intr_eim == ON_OFF_AUTO_ON && !s->buggy_eim) {
-        if (kvm_irqchip_is_split() && !kvm_enable_x2apic()) {
+        if (!kvm_irqchip_is_split()) {
+            error_setg(errp, "eim=on requires accel=kvm,kernel-irqchip=split");
+            return false;
+        }
+        if (!kvm_enable_x2apic()) {
             error_setg(errp, "eim=on requires support on the KVM side"
                              "(X2APIC_API, first shipped in v4.7)");
             return false;
@@ -4183,7 +4109,7 @@ static void vtd_realize(DeviceState *dev, Error **errp)
     MachineState *ms = MACHINE(qdev_get_machine());
     PCMachineState *pcms = PC_MACHINE(ms);
     X86MachineState *x86ms = X86_MACHINE(ms);
-    PCIBus *bus = pcms->pcibus;
+    PCIBus *bus = pcms->bus;
     IntelIOMMUState *s = INTEL_IOMMU_DEVICE(dev);
     X86IOMMUState *x86_iommu = X86_IOMMU_DEVICE(s);
 
@@ -4205,8 +4131,6 @@ static void vtd_realize(DeviceState *dev, Error **errp)
     qemu_mutex_init(&s->iommu_lock);
     memory_region_init_io(&s->csrmem, OBJECT(s), &vtd_mem_ops, s,
                           "intel_iommu", DMAR_REG_SIZE);
-    memory_region_add_subregion(get_system_memory(),
-                                Q35_HOST_BRIDGE_IOMMU_ADDR, &s->csrmem);
 
     /* Create the shared memory regions by all devices */
     memory_region_init(&s->mr_nodmar, OBJECT(s), "vtd-nodmar",
@@ -4221,13 +4145,16 @@ static void vtd_realize(DeviceState *dev, Error **errp)
     memory_region_add_subregion_overlap(&s->mr_nodmar,
                                         VTD_INTERRUPT_ADDR_FIRST,
                                         &s->mr_ir, 1);
+
+    sysbus_init_mmio(SYS_BUS_DEVICE(s), &s->csrmem);
     /* No corresponding destroy */
     s->iotlb = g_hash_table_new_full(vtd_iotlb_hash, vtd_iotlb_equal,
                                      g_free, g_free);
     s->vtd_address_spaces = g_hash_table_new_full(vtd_as_hash, vtd_as_equal,
                                       g_free, g_free);
     vtd_init(s);
-    pci_setup_iommu(bus, &vtd_iommu_ops, dev);
+    sysbus_mmio_map(SYS_BUS_DEVICE(s), 0, Q35_HOST_BRIDGE_IOMMU_ADDR);
+    pci_setup_iommu(bus, vtd_host_dma_iommu, dev);
     /* Pseudo address space under root PCI bus. */
     x86ms->ioapic_as = vtd_host_dma_iommu(bus, s, Q35_PSEUDO_DEVFN_IOAPIC);
     qemu_add_machine_init_done_notifier(&vtd_machine_done_notify);

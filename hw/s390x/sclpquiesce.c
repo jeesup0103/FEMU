@@ -72,16 +72,18 @@ static const VMStateDescription vmstate_sclpquiesce = {
     .name = TYPE_SCLP_QUIESCE,
     .version_id = 0,
     .minimum_version_id = 0,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_BOOL(event_pending, SCLPEvent),
         VMSTATE_END_OF_LIST()
      }
 };
 
-typedef struct QuiesceNotifier {
+typedef struct QuiesceNotifier QuiesceNotifier;
+
+static struct QuiesceNotifier {
     Notifier notifier;
     SCLPEvent *event;
-} QuiesceNotifier;
+} qn;
 
 static void quiesce_powerdown_req(Notifier *n, void *opaque)
 {
@@ -95,8 +97,6 @@ static void quiesce_powerdown_req(Notifier *n, void *opaque)
 
 static int quiesce_init(SCLPEvent *event)
 {
-    static QuiesceNotifier qn;
-
     qn.notifier.notify = quiesce_powerdown_req;
     qn.event = event;
 

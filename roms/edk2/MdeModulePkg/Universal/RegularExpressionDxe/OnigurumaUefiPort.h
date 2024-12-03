@@ -4,7 +4,6 @@
 
   (C) Copyright 2014-2021 Hewlett Packard Enterprise Development LP<BR>
   Copyright (c) 2020, Intel Corporation. All rights reserved.<BR>
-  Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
   SPDX-License-Identifier: BSD-2-Clause-Patent
 **/
@@ -37,9 +36,11 @@ typedef INTN    intptr_t;
 #define offsetof  OFFSET_OF
 #endif
 
-#if defined (MDE_CPU_IA32) || defined (MDE_CPU_ARM) || defined (MDE_CPU_EBC)
+#ifdef MDE_CPU_IA32
 #define SIZEOF_VOIDP  4
-#else
+#endif
+
+#ifdef MDE_CPU_X64
 #define SIZEOF_VOIDP  8
 #endif
 
@@ -107,7 +108,6 @@ realloc (
   size_t  size
   );
 
-#if !defined (MDE_CPU_ARM)
 void *
 memcpy (
   void          *dest,
@@ -115,12 +115,10 @@ memcpy (
   unsigned int  count
   );
 
-#endif
-
 void *
 memset (
   void          *dest,
-  int           ch,
+  char          ch,
   unsigned int  count
   );
 

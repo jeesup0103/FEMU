@@ -274,7 +274,7 @@ InitUnitTestFramework (
       //
       // Don't actually report it as an error, but emit a warning.
       //
-      DEBUG ((DEBUG_ERROR, "%a - Cache was detected, but failed to load.\n", __func__));
+      DEBUG ((DEBUG_ERROR, "%a - Cache was detected, but failed to load.\n", __FUNCTION__));
       Status = EFI_SUCCESS;
     }
   }
@@ -826,10 +826,6 @@ SaveFrameworkState (
 
   Header          = NULL;
   FrameworkHandle = GetActiveFrameworkHandle ();
-  if (FrameworkHandle == NULL) {
-    DEBUG ((DEBUG_ERROR, "%a - Could not save state! FrameworkHandle not initialized\n", __func__));
-    return EFI_DEVICE_ERROR;
-  }
 
   //
   // Return a unique error code if the framework is not set.
@@ -860,7 +856,7 @@ SaveFrameworkState (
   //
   Status = SaveUnitTestCache (FrameworkHandle, Header, Header->SaveStateSize);
   if (EFI_ERROR (Status)) {
-    DEBUG ((DEBUG_ERROR, "%a - Could not save state! %r\n", __func__, Status));
+    DEBUG ((DEBUG_ERROR, "%a - Could not save state! %r\n", __FUNCTION__, Status));
     Status = EFI_DEVICE_ERROR;
   }
 

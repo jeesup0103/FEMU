@@ -28,7 +28,6 @@
 #include "qemu/main-loop.h"
 #include "qemu/module.h"
 #include "qemu/host-utils.h"
-#include "qapi/error.h"
 #include "audio.h"
 #include "trace.h"
 
@@ -549,6 +548,7 @@ static int oss_init_out(HWVoiceOut *hw, struct audsettings *as,
                        hw->size_emul);
             hw->buf_emul = NULL;
         } else {
+            int err;
             int trig = 0;
             if (ioctl (fd, SNDCTL_DSP_SETTRIGGER, &trig) < 0) {
                 oss_logerr (errno, "SNDCTL_DSP_SETTRIGGER 0 failed\n");
@@ -736,7 +736,7 @@ static void oss_init_per_direction(AudiodevOssPerDirectionOptions *opdo)
     }
 }
 
-static void *oss_audio_init(Audiodev *dev, Error **errp)
+static void *oss_audio_init(Audiodev *dev)
 {
     AudiodevOssOptions *oopts;
     assert(dev->driver == AUDIODEV_DRIVER_OSS);
@@ -745,12 +745,8 @@ static void *oss_audio_init(Audiodev *dev, Error **errp)
     oss_init_per_direction(oopts->in);
     oss_init_per_direction(oopts->out);
 
-    if (access(oopts->in->dev ?: "/dev/dsp", R_OK | W_OK) < 0) {
-        error_setg_errno(errp, errno, "%s not accessible", oopts->in->dev ?: "/dev/dsp");
-        return NULL;
-    }
-    if (access(oopts->out->dev ?: "/dev/dsp", R_OK | W_OK) < 0) {
-        error_setg_errno(errp, errno, "%s not accessible", oopts->out->dev ?: "/dev/dsp");
+    if (access(oopts->in->dev ?: "/dev/dsp", R_OK | W_OK) < 0 ||
+        access(oopts->out->dev ?: "/dev/dsp", R_OK | W_OK) < 0) {
         return NULL;
     }
     return dev;
@@ -783,6 +779,7 @@ static struct audio_driver oss_audio_driver = {
     .init           = oss_audio_init,
     .fini           = oss_audio_fini,
     .pcm_ops        = &oss_pcm_ops,
+    .can_be_default = 1,
     .max_voices_out = INT_MAX,
     .max_voices_in  = INT_MAX,
     .voice_size_out = sizeof (OSSVoiceOut),

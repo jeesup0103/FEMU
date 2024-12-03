@@ -3,7 +3,6 @@
 
 Copyright (c) 2016 - 2018, Intel Corporation. All rights reserved.<BR>
 (C) Copyright 2016 Hewlett Packard Enterprise Development LP<BR>
-Copyright (C) 2024 Advanced Micro Devices, Inc. All rights reserved.<BR>
 SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
@@ -135,31 +134,27 @@ IsHttpsUrl (
 /**
   Creates a Tls child handle, open EFI_TLS_PROTOCOL and EFI_TLS_CONFIGURATION_PROTOCOL.
 
-  @param[in]  HttpInstance  Pointer to HTTP_PROTOCOL structure.
+  @param[in]  ImageHandle           The firmware allocated handle for the UEFI image.
+  @param[out] TlsSb                 Pointer to the TLS SERVICE_BINDING_PROTOCOL.
+  @param[out] TlsProto              Pointer to the EFI_TLS_PROTOCOL instance.
+  @param[out] TlsConfiguration      Pointer to the EFI_TLS_CONFIGURATION_PROTOCOL instance.
 
-  @return  EFI_SUCCESS        TLS child handle is returned in HttpInstance->TlsChildHandle
-                              with opened EFI_TLS_PROTOCOL and EFI_TLS_CONFIGURATION_PROTOCOL.
-           EFI_DEVICE_ERROR   TLS service binding protocol is not found.
-           Otherwise          Fail to create TLS chile handle.
+  @return  The child handle with opened EFI_TLS_PROTOCOL and EFI_TLS_CONFIGURATION_PROTOCOL.
 
 **/
-EFI_STATUS
+EFI_HANDLE
 EFIAPI
 TlsCreateChild (
-  IN  HTTP_PROTOCOL  *HttpInstance
+  IN  EFI_HANDLE                      ImageHandle,
+  OUT EFI_SERVICE_BINDING_PROTOCOL    **TlsSb,
+  OUT EFI_TLS_PROTOCOL                **TlsProto,
+  OUT EFI_TLS_CONFIGURATION_PROTOCOL  **TlsConfiguration
   )
 {
-  EFI_HANDLE  ImageHandle;
   EFI_STATUS  Status;
+  EFI_HANDLE  TlsChildHandle;
 
-  //
-  // Use TlsSb to create Tls child and open the TLS protocol.
-  //
-  if (HttpInstance->LocalAddressIsIPv6) {
-    ImageHandle = HttpInstance->Service->Ip6DriverBindingHandle;
-  } else {
-    ImageHandle = HttpInstance->Service->Ip4DriverBindingHandle;
-  }
+  TlsChildHandle = 0;
 
   //
   // Locate TlsServiceBinding protocol.
@@ -167,51 +162,44 @@ TlsCreateChild (
   gBS->LocateProtocol (
          &gEfiTlsServiceBindingProtocolGuid,
          NULL,
-         (VOID **)&HttpInstance->TlsSb
+         (VOID **)TlsSb
          );
-  if (HttpInstance->TlsSb == NULL) {
-    return EFI_DEVICE_ERROR;
+  if (*TlsSb == NULL) {
+    return NULL;
   }
 
-  //
-  // Create TLS protocol on HTTP handle, this creates the association between HTTP and TLS
-  // for HTTP driver external usages.
-  //
-  Status = HttpInstance->TlsSb->CreateChild (HttpInstance->TlsSb, &HttpInstance->Handle);
+  Status = (*TlsSb)->CreateChild (*TlsSb, &TlsChildHandle);
   if (EFI_ERROR (Status)) {
-    return Status;
-  }
-
-  HttpInstance->TlsAlreadyCreated = TRUE;
-  Status                          = gBS->OpenProtocol (
-                                           HttpInstance->Handle,
-                                           &gEfiTlsProtocolGuid,
-                                           (VOID **)&HttpInstance->Tls,
-                                           ImageHandle,
-                                           HttpInstance->Handle,
-                                           EFI_OPEN_PROTOCOL_GET_PROTOCOL
-                                           );
-  if (EFI_ERROR (Status)) {
-    HttpInstance->TlsSb->DestroyChild (HttpInstance->TlsSb, HttpInstance->Handle);
-    HttpInstance->TlsAlreadyCreated = FALSE;
-    return Status;
+    return NULL;
   }
 
   Status = gBS->OpenProtocol (
-                  HttpInstance->Handle,
-                  &gEfiTlsConfigurationProtocolGuid,
-                  (VOID **)&HttpInstance->TlsConfiguration,
+                  TlsChildHandle,
+                  &gEfiTlsProtocolGuid,
+                  (VOID **)TlsProto,
                   ImageHandle,
-                  HttpInstance->Handle,
+                  TlsChildHandle,
                   EFI_OPEN_PROTOCOL_GET_PROTOCOL
                   );
   if (EFI_ERROR (Status)) {
-    HttpInstance->TlsSb->DestroyChild (HttpInstance->TlsSb, HttpInstance->Handle);
-    HttpInstance->TlsAlreadyCreated = FALSE;
-    return Status;
+    (*TlsSb)->DestroyChild (*TlsSb, TlsChildHandle);
+    return NULL;
   }
 
-  return EFI_SUCCESS;
+  Status = gBS->OpenProtocol (
+                  TlsChildHandle,
+                  &gEfiTlsConfigurationProtocolGuid,
+                  (VOID **)TlsConfiguration,
+                  ImageHandle,
+                  TlsChildHandle,
+                  EFI_OPEN_PROTOCOL_GET_PROTOCOL
+                  );
+  if (EFI_ERROR (Status)) {
+    (*TlsSb)->DestroyChild (*TlsSb, TlsChildHandle);
+    return NULL;
+  }
+
+  return TlsChildHandle;
 }
 
 /**
@@ -448,7 +436,7 @@ TlsConfigCertificate (
       DEBUG ((
         DEBUG_ERROR,
         "%a: truncated EFI_SIGNATURE_LIST header\n",
-        __func__
+        __FUNCTION__
         ));
       goto FreeCACert;
     }
@@ -459,7 +447,7 @@ TlsConfigCertificate (
       DEBUG ((
         DEBUG_ERROR,
         "%a: SignatureListSize too small for EFI_SIGNATURE_LIST\n",
-        __func__
+        __FUNCTION__
         ));
       goto FreeCACert;
     }
@@ -468,7 +456,7 @@ TlsConfigCertificate (
       DEBUG ((
         DEBUG_ERROR,
         "%a: truncated EFI_SIGNATURE_LIST body\n",
-        __func__
+        __FUNCTION__
         ));
       goto FreeCACert;
     }
@@ -477,7 +465,7 @@ TlsConfigCertificate (
       DEBUG ((
         DEBUG_ERROR,
         "%a: only X509 certificates are supported\n",
-        __func__
+        __FUNCTION__
         ));
       Status = EFI_UNSUPPORTED;
       goto FreeCACert;
@@ -487,7 +475,7 @@ TlsConfigCertificate (
       DEBUG ((
         DEBUG_ERROR,
         "%a: SignatureHeaderSize must be 0 for X509\n",
-        __func__
+        __FUNCTION__
         ));
       goto FreeCACert;
     }
@@ -496,7 +484,7 @@ TlsConfigCertificate (
       DEBUG ((
         DEBUG_ERROR,
         "%a: SignatureSize too small for EFI_SIGNATURE_DATA\n",
-        __func__
+        __FUNCTION__
         ));
       goto FreeCACert;
     }
@@ -507,7 +495,7 @@ TlsConfigCertificate (
       DEBUG ((
         DEBUG_ERROR,
         "%a: EFI_SIGNATURE_DATA array not a multiple of SignatureSize\n",
-        __func__
+        __FUNCTION__
         ));
       goto FreeCACert;
     }
@@ -517,7 +505,7 @@ TlsConfigCertificate (
   }
 
   if (CertCount == 0) {
-    DEBUG ((DEBUG_ERROR, "%a: no X509 certificates provided\n", __func__));
+    DEBUG ((DEBUG_ERROR, "%a: no X509 certificates provided\n", __FUNCTION__));
     goto FreeCACert;
   }
 
@@ -722,21 +710,8 @@ TlsConfigureSession (
   //
   Status = TlsConfigCertificate (HttpInstance);
   if (EFI_ERROR (Status)) {
-    if (Status == EFI_NOT_FOUND) {
-      DEBUG ((DEBUG_WARN, "TLS Certificate is not found on the system!\n"));
-      //
-      // We still return EFI_SUCCESS to the caller when TlsConfigCertificate
-      // returns error, for the use case the platform doesn't require
-      // certificate for the specific HTTP session. This ensures
-      // HttpInitSession function still initiated and returns EFI_SUCCESS to
-      // the caller. The failure is pushed back to TLS DXE driver if the
-      // HTTP communication actually requires certificate.
-      //
-      Status = EFI_SUCCESS;
-    } else {
-      DEBUG ((DEBUG_ERROR, "TLS Certificate Config Error!\n"));
-      return Status;
-    }
+    DEBUG ((DEBUG_ERROR, "TLS Certificate Config Error!\n"));
+    return Status;
   }
 
   //

@@ -25,9 +25,15 @@
 #include "hw/audio/wm8750.h"
 #include "audio/audio.h"
 #include "exec/address-spaces.h"
+#include "cpu.h"
 #include "qom/object.h"
-#include "qapi/error.h"
-#include "trace.h"
+
+#ifdef DEBUG_Z2
+#define DPRINTF(fmt, ...) \
+        printf(fmt, ## __VA_ARGS__)
+#else
+#define DPRINTF(fmt, ...)
+#endif
 
 static const struct keymap map[0x100] = {
     [0 ... 0xff] = { -1, -1 },
@@ -113,8 +119,6 @@ static uint32_t zipit_lcd_transfer(SSIPeripheral *dev, uint32_t value)
 {
     ZipitLCD *z = ZIPIT_LCD(dev);
     uint16_t val;
-
-    trace_z2_lcd_reg_update(z->cur_reg, z->buf[0], z->buf[1], z->buf[2], value);
     if (z->selected) {
         z->buf[z->pos] = value & 0xff;
         z->pos++;
@@ -122,19 +126,22 @@ static uint32_t zipit_lcd_transfer(SSIPeripheral *dev, uint32_t value)
     if (z->pos == 3) {
         switch (z->buf[0]) {
         case 0x74:
+            DPRINTF("%s: reg: 0x%.2x\n", __func__, z->buf[2]);
             z->cur_reg = z->buf[2];
             break;
         case 0x76:
             val = z->buf[1] << 8 | z->buf[2];
+            DPRINTF("%s: value: 0x%.4x\n", __func__, val);
             if (z->cur_reg == 0x22 && val == 0x0000) {
                 z->enabled = 1;
-                trace_z2_lcd_enable_disable_result("enabled");
+                printf("%s: LCD enabled\n", __func__);
             } else if (z->cur_reg == 0x10 && val == 0x0000) {
                 z->enabled = 0;
-                trace_z2_lcd_enable_disable_result("disabled");
+                printf("%s: LCD disabled\n", __func__);
             }
             break;
         default:
+            DPRINTF("%s: unknown command!\n", __func__);
             break;
         }
         z->pos = 0;
@@ -160,7 +167,7 @@ static const VMStateDescription vmstate_zipit_lcd_state = {
     .name = "zipit-lcd",
     .version_id = 2,
     .minimum_version_id = 2,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_SSI_PERIPHERAL(ssidev, ZipitLCD),
         VMSTATE_INT32(selected, ZipitLCD),
         VMSTATE_INT32(enabled, ZipitLCD),
@@ -204,12 +211,14 @@ static int aer915_send(I2CSlave *i2c, uint8_t data)
 
     s->buf[s->len] = data;
     if (s->len++ > 2) {
-        trace_z2_aer915_send_too_long(s->len);
+        DPRINTF("%s: message too long (%i bytes)\n",
+            __func__, s->len);
         return 1;
     }
 
     if (s->len == 2) {
-        trace_z2_aer915_send(s->buf[0], s->buf[1]);
+        DPRINTF("%s: reg %d value 0x%02x\n", __func__,
+                s->buf[0], s->buf[1]);
     }
 
     return 0;
@@ -219,12 +228,14 @@ static int aer915_event(I2CSlave *i2c, enum i2c_event event)
 {
     AER915State *s = AER915(i2c);
 
-    trace_z2_aer915_event(s->len, event);
     switch (event) {
     case I2C_START_SEND:
         s->len = 0;
         break;
     case I2C_START_RECV:
+        if (s->len != 1) {
+            DPRINTF("%s: short message!?\n", __func__);
+        }
         break;
     case I2C_FINISH:
         break;
@@ -262,7 +273,7 @@ static const VMStateDescription vmstate_aer915_state = {
     .name = "aer915",
     .version_id = 1,
     .minimum_version_id = 1,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_INT32(len, AER915State),
         VMSTATE_BUFFER(buf, AER915State),
         VMSTATE_END_OF_LIST(),
@@ -296,7 +307,6 @@ static void z2_init(MachineState *machine)
     void *z2_lcd;
     I2CBus *bus;
     DeviceState *wm;
-    I2CSlave *i2c_dev;
 
     /* Setup CPU & memory */
     mpu = pxa270_init(z2_binfo.ram_size, machine->cpu_type);
@@ -318,17 +328,8 @@ static void z2_init(MachineState *machine)
     type_register_static(&aer915_info);
     z2_lcd = ssi_create_peripheral(mpu->ssp[1], TYPE_ZIPIT_LCD);
     bus = pxa2xx_i2c_bus(mpu->i2c[0]);
-
     i2c_slave_create_simple(bus, TYPE_AER915, 0x55);
-
-    i2c_dev = i2c_slave_new(TYPE_WM8750, 0x1b);
-    wm = DEVICE(i2c_dev);
-
-    if (machine->audiodev) {
-        qdev_prop_set_string(wm, "audiodev", machine->audiodev);
-    }
-    i2c_slave_realize_and_unref(i2c_dev, bus, &error_abort);
-
+    wm = DEVICE(i2c_slave_create_simple(bus, TYPE_WM8750, 0x1b));
     mpu->i2s->opaque = wm;
     mpu->i2s->codec_out = wm8750_dac_dat;
     mpu->i2s->codec_in = wm8750_adc_dat;
@@ -347,9 +348,6 @@ static void z2_machine_init(MachineClass *mc)
     mc->init = z2_init;
     mc->ignore_memory_transaction_failures = true;
     mc->default_cpu_type = ARM_CPU_TYPE_NAME("pxa270-c5");
-    mc->deprecation_reason = "machine is old and unmaintained";
-
-    machine_add_audiodev_property(mc);
 }
 
 DEFINE_MACHINE("z2", z2_machine_init)

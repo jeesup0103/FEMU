@@ -38,7 +38,6 @@
 #include "qapi/error.h"
 #include "hw/acpi/acpi_aml_interface.h"
 #include "hw/acpi/pci.h"
-#include "hw/qdev-properties.h"
 
 /* PCI bridge subsystem vendor ID helper functions */
 #define PCI_SSVID_SIZEOF        8
@@ -185,11 +184,11 @@ static void pci_bridge_init_vga_aliases(PCIBridge *br, PCIBus *parent,
     }
 }
 
-static void pci_bridge_region_init(PCIBridge *br)
+static PCIBridgeWindows *pci_bridge_region_init(PCIBridge *br)
 {
     PCIDevice *pd = PCI_DEVICE(br);
     PCIBus *parent = pci_get_bus(pd);
-    PCIBridgeWindows *w = &br->windows;
+    PCIBridgeWindows *w = g_new(PCIBridgeWindows, 1);
     uint16_t cmd = pci_get_word(pd->config + PCI_COMMAND);
 
     pci_bridge_init_alias(br, &w->alias_pref_mem,
@@ -212,6 +211,8 @@ static void pci_bridge_region_init(PCIBridge *br)
                           cmd & PCI_COMMAND_IO);
 
     pci_bridge_init_vga_aliases(br, parent, w->alias_vga);
+
+    return w;
 }
 
 static void pci_bridge_region_del(PCIBridge *br, PCIBridgeWindows *w)
@@ -233,18 +234,19 @@ static void pci_bridge_region_cleanup(PCIBridge *br, PCIBridgeWindows *w)
     object_unparent(OBJECT(&w->alias_vga[QEMU_PCI_VGA_IO_LO]));
     object_unparent(OBJECT(&w->alias_vga[QEMU_PCI_VGA_IO_HI]));
     object_unparent(OBJECT(&w->alias_vga[QEMU_PCI_VGA_MEM]));
+    g_free(w);
 }
 
 void pci_bridge_update_mappings(PCIBridge *br)
 {
-    PCIBridgeWindows *w = &br->windows;
+    PCIBridgeWindows *w = br->windows;
 
     /* Make updates atomic to: handle the case of one VCPU updating the bridge
      * while another accesses an unaffected region. */
     memory_region_transaction_begin();
-    pci_bridge_region_del(br, w);
+    pci_bridge_region_del(br, br->windows);
     pci_bridge_region_cleanup(br, w);
-    pci_bridge_region_init(br);
+    br->windows = pci_bridge_region_init(br);
     memory_region_transaction_commit();
 }
 
@@ -383,14 +385,9 @@ void pci_bridge_initfn(PCIDevice *dev, const char *typename)
     sec_bus->address_space_io = &br->address_space_io;
     memory_region_init(&br->address_space_io, OBJECT(br), "pci_bridge_io",
                        4 * GiB);
-    pci_bridge_region_init(br);
+    br->windows = pci_bridge_region_init(br);
     QLIST_INIT(&sec_bus->child);
     QLIST_INSERT_HEAD(&parent->child, sec_bus, sibling);
-
-    /* For express secondary buses, secondary latency timer is RO 0 */
-    if (pci_bus_is_express(sec_bus) && !br->pcie_writeable_slt_bug) {
-        dev->wmask[PCI_SEC_LATENCY_TIMER] = 0;
-    }
 }
 
 /* default qdev clean up function for PCI-to-PCI bridge */
@@ -399,8 +396,8 @@ void pci_bridge_exitfn(PCIDevice *pci_dev)
     PCIBridge *s = PCI_BRIDGE(pci_dev);
     assert(QLIST_EMPTY(&s->sec_bus.child));
     QLIST_REMOVE(&s->sec_bus, sibling);
-    pci_bridge_region_del(s, &s->windows);
-    pci_bridge_region_cleanup(s, &s->windows);
+    pci_bridge_region_del(s, s->windows);
+    pci_bridge_region_cleanup(s, s->windows);
     /* object_unparent() is called automatically during device deletion */
 }
 
@@ -472,18 +469,10 @@ int pci_bridge_qemu_reserve_cap_init(PCIDevice *dev, int cap_offset,
     return 0;
 }
 
-static Property pci_bridge_properties[] = {
-    DEFINE_PROP_BOOL("x-pci-express-writeable-slt-bug", PCIBridge,
-                     pcie_writeable_slt_bug, false),
-    DEFINE_PROP_END_OF_LIST(),
-};
-
 static void pci_bridge_class_init(ObjectClass *klass, void *data)
 {
     AcpiDevAmlIfClass *adevc = ACPI_DEV_AML_IF_CLASS(klass);
-    DeviceClass *k = DEVICE_CLASS(klass);
 
-    device_class_set_props(k, pci_bridge_properties);
     adevc->build_dev_aml = build_pci_bridge_aml;
 }
 

@@ -3,8 +3,7 @@
  */
 #include "qemu/osdep.h"
 #include "qapi/error.h"
-#include "hw/xen/xen_pt.h"
-#include "hw/xen/xen_igd.h"
+#include "xen_pt.h"
 #include "xen-host-pci-device.h"
 
 static unsigned long igd_guest_opregion;

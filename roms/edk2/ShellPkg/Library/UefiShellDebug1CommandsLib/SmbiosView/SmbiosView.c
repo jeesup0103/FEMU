@@ -3,7 +3,6 @@
 
   (C) Copyright 2015 Hewlett-Packard Development Company, L.P.<BR>
   Copyright (c) 2005 - 2018, Intel Corporation. All rights reserved.<BR>
-  Copyright (c) 2023 Apple Inc. All rights reserved.<BR>
   SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
@@ -264,7 +263,7 @@ SMBiosView (
     return EFI_BAD_BUFFER_SIZE;
   }
 
-  if (CompareMem (SMBiosTable->AnchorString, SMBIOS_ANCHOR_STRING, SMBIOS_ANCHOR_STRING_LENGTH) == 0) {
+  if (CompareMem (SMBiosTable->AnchorString, "_SM_", 4) == 0) {
     //
     // Have got SMBIOS table
     //
@@ -442,7 +441,7 @@ SMBios64View (
     return EFI_BAD_BUFFER_SIZE;
   }
 
-  if (CompareMem (SMBiosTable->AnchorString, SMBIOS_3_0_ANCHOR_STRING, SMBIOS_3_0_ANCHOR_STRING_LENGTH) == 0) {
+  if (CompareMem (SMBiosTable->AnchorString, "_SM3_", 5) == 0) {
     //
     // Have got SMBIOS table
     //
@@ -613,7 +612,7 @@ InitSmbiosTableStatistics (
     return EFI_NOT_FOUND;
   }
 
-  if (CompareMem (SMBiosTable->AnchorString, SMBIOS_ANCHOR_STRING, SMBIOS_ANCHOR_STRING_LENGTH) != 0) {
+  if (CompareMem (SMBiosTable->AnchorString, "_SM_", 4) != 0) {
     ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_SMBIOSVIEW_SMBIOSVIEW_SMBIOS_TABLE), gShellDebug1HiiHandle);
     return EFI_INVALID_PARAMETER;
   }
@@ -754,7 +753,7 @@ InitSmbios64BitTableStatistics (
     return EFI_NOT_FOUND;
   }
 
-  if (CompareMem (SMBiosTable->AnchorString, SMBIOS_3_0_ANCHOR_STRING, SMBIOS_3_0_ANCHOR_STRING_LENGTH) != 0) {
+  if (CompareMem (SMBiosTable->AnchorString, "_SM3_", 5) != 0) {
     ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_SMBIOSVIEW_SMBIOSVIEW_SMBIOS_TABLE), gShellDebug1HiiHandle);
     return EFI_INVALID_PARAMETER;
   }

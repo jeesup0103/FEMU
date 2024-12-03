@@ -26,6 +26,7 @@
   AcpiPlatform.h
   Bhyve.c
   EntryPoint.c
+  PciDecoding.c
 
 [Packages]
   MdePkg/MdePkg.dec
@@ -34,7 +35,6 @@
   UefiCpuPkg/UefiCpuPkg.dec
 
 [LibraryClasses]
-  AcpiPlatformLib
   BaseLib
   BaseMemoryLib
   BhyveFwCtlLib

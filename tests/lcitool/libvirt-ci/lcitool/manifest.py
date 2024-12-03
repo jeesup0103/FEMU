@@ -45,7 +45,7 @@ class Manifest:
             raise ValueError("No project list defined")
 
         projects = self.values["projects"]
-        if not isinstance(projects, list):
+        if type(projects) != list:
             raise ValueError("projects must be a list")
         if len(projects) < 1:
             raise ValueError("at least one project must be listed")
@@ -94,7 +94,7 @@ class Manifest:
         have_containers = False
         have_cirrus = False
         for target, targetinfo in targets.items():
-            if isinstance(targetinfo, str):
+            if type(targetinfo) == str:
                 targets[target] = {"jobs": [{"arch": targetinfo}]}
                 targetinfo = targets[target]
             targetinfo.setdefault("enabled", True)
@@ -209,8 +209,8 @@ class Manifest:
                 if not dryrun:
                     header = util.generate_file_header(["manifest",
                                                         self.configpath])
-                    tgt = BuildTarget(self._targets, self._packages, target, "x86_64", arch)
-                    payload = formatter.format(tgt, wantprojects)
+                    payload = formatter.format(BuildTarget(self._targets, self._packages, target, arch),
+                                               wantprojects)
                     util.atomic_write(filename, header + payload + "\n")
 
         return generated

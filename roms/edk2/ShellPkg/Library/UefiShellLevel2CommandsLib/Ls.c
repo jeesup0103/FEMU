@@ -427,7 +427,7 @@ FileTimeToLocalTime (
   @param[in] ListUnfiltered TRUE to request listing the directory contents
                             unfiltered.
 
-  @retval SHELL_SUCCESS     the printing was successful.
+  @retval SHELL_SUCCESS     the printing was sucessful.
 **/
 SHELL_STATUS
 PrintLsOutput (

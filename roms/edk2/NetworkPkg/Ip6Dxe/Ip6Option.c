@@ -17,8 +17,7 @@
   @param[in]  IpSb              The IP6 service data.
   @param[in]  Packet            The to be validated packet.
   @param[in]  Option            The first byte of the option.
-  @param[in]  OptionLen         The length of all options, expressed in byte length of octets.
-                                Maximum length is 2046 bytes or ((n + 1) * 8) - 2 where n is 255.
+  @param[in]  OptionLen         The length of the whole option.
   @param[in]  Pointer           Identifies the octet offset within
                                 the invoking packet where the error was detected.
 
@@ -32,33 +31,12 @@ Ip6IsOptionValid (
   IN IP6_SERVICE  *IpSb,
   IN NET_BUF      *Packet,
   IN UINT8        *Option,
-  IN UINT16       OptionLen,
+  IN UINT8        OptionLen,
   IN UINT32       Pointer
   )
 {
-  UINT16  Offset;
-  UINT8   OptionType;
-  UINT8   OptDataLen;
-
-  if (Option == NULL) {
-    ASSERT (Option != NULL);
-    return FALSE;
-  }
-
-  if ((OptionLen <= 0) || (OptionLen > IP6_MAX_EXT_DATA_LENGTH)) {
-    ASSERT (OptionLen > 0 && OptionLen <= IP6_MAX_EXT_DATA_LENGTH);
-    return FALSE;
-  }
-
-  if (Packet == NULL) {
-    ASSERT (Packet != NULL);
-    return FALSE;
-  }
-
-  if (IpSb == NULL) {
-    ASSERT (IpSb != NULL);
-    return FALSE;
-  }
+  UINT8  Offset;
+  UINT8  OptionType;
 
   Offset = 0;
 
@@ -76,8 +54,7 @@ Ip6IsOptionValid (
         //
         // It is a PadN option
         //
-        OptDataLen = ((IP6_OPTION_HEADER *)(Option + Offset))->Length;
-        Offset     = IP6_NEXT_OPTION_OFFSET (Offset, OptDataLen);
+        Offset = (UINT8)(Offset + *(Option + Offset + 1) + 2);
         break;
       case Ip6OptionRouterAlert:
         //
@@ -92,8 +69,7 @@ Ip6IsOptionValid (
         //
         switch (OptionType & Ip6OptionMask) {
           case Ip6OptionSkip:
-            OptDataLen = ((IP6_OPTION_HEADER *)(Option + Offset))->Length;
-            Offset     = IP6_NEXT_OPTION_OFFSET (Offset, OptDataLen);
+            Offset = (UINT8)(Offset + *(Option + Offset + 1));
             break;
           case Ip6OptionDiscard:
             return FALSE;
@@ -158,14 +134,6 @@ Ip6IsNDOptionValid (
 
   if (Option == NULL) {
     ASSERT (Option != NULL);
-    return FALSE;
-  }
-
-  //
-  // Cannot process truncated options.
-  // Cannot process options with a length of 0 as there is no Type field.
-  //
-  if (OptionLen < sizeof (IP6_OPTION_HEADER)) {
     return FALSE;
   }
 
@@ -332,7 +300,7 @@ Ip6IsExtsValid (
   UINT32               Pointer;
   UINT32               Offset;
   UINT8                *Option;
-  UINT16               OptionLen;
+  UINT8                OptionLen;
   BOOLEAN              Flag;
   UINT8                CountD;
   UINT8                CountA;
@@ -409,36 +377,6 @@ Ip6IsExtsValid (
       // Fall through
       //
       case IP6_DESTINATION:
-        //
-        // See https://www.rfc-editor.org/rfc/rfc2460#section-4.2 page 23
-        //
-        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-        // |  Next Header  |  Hdr Ext Len  |                               |
-        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+                               +
-        // |                                                               |
-        // .                                                               .
-        // .                            Options                            .
-        // .                                                               .
-        // |                                                               |
-        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-        //
-        //
-        //   Next Header    8-bit selector.  Identifies the type of header
-        //                  immediately following the Destination Options
-        //                  header.  Uses the same values as the IPv4
-        //                  Protocol field [RFC-1700 et seq.].
-        //
-        //   Hdr Ext Len    8-bit unsigned integer.  Length of the
-        //                  Destination Options header in 8-octet units, not
-        //                  including the first 8 octets.
-        //
-        //   Options        Variable-length field, of length such that the
-        //                  complete Destination Options header is an
-        //                  integer multiple of 8 octets long.  Contains one
-        //                  or  more TLV-encoded options, as described in
-        //                  section 4.2.
-        //
-
         if (*NextHeader == IP6_DESTINATION) {
           CountD++;
         }
@@ -452,7 +390,7 @@ Ip6IsExtsValid (
 
         Offset++;
         Option    = ExtHdrs + Offset;
-        OptionLen = IP6_HDR_EXT_LEN (*Option) - sizeof (IP6_EXT_HDR);
+        OptionLen = (UINT8)((*Option + 1) * 8 - 2);
         Option++;
         Offset++;
 
@@ -484,7 +422,7 @@ Ip6IsExtsValid (
           //
           // Ignore the routing header and proceed to process the next header.
           //
-          Offset = Offset + IP6_HDR_EXT_LEN (RoutingHead->HeaderLen);
+          Offset = Offset + (RoutingHead->HeaderLen + 1) * 8;
 
           if (UnFragmentLen != NULL) {
             *UnFragmentLen = Offset;
@@ -495,7 +433,7 @@ Ip6IsExtsValid (
           // to the packet's source address, pointing to the unrecognized routing
           // type.
           //
-          Pointer = Offset + sizeof (IP6_EXT_HDR) + sizeof (EFI_IP6_HEADER);
+          Pointer = Offset + 2 + sizeof (EFI_IP6_HEADER);
           if ((IpSb != NULL) && (Packet != NULL) &&
               !IP6_IS_MULTICAST (&Packet->Ip.Ip6->DestinationAddress))
           {
@@ -581,7 +519,7 @@ Ip6IsExtsValid (
         //
         // RFC2402, Payload length is specified in 32-bit words, minus "2".
         //
-        OptionLen = ((UINT16)(*Option + 2) * 4);
+        OptionLen = (UINT8)((*Option + 2) * 4);
         Offset    = Offset + OptionLen;
         break;
 

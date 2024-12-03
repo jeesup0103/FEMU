@@ -91,7 +91,7 @@ static Property xhci_sysbus_props[] = {
 static const VMStateDescription vmstate_xhci_sysbus = {
     .name = "xhci-sysbus",
     .version_id = 1,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_STRUCT(xhci, XHCISysbusState, 1, vmstate_xhci, XHCIState),
         VMSTATE_END_OF_LIST()
     }

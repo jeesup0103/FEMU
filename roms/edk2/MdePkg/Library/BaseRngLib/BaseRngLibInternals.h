@@ -9,7 +9,6 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 **/
 
 #ifndef BASE_RNGLIB_INTERNALS_H_
-#define BASE_RNGLIB_INTERNALS_H_
 
 /**
   Generates a 16-bit random number.

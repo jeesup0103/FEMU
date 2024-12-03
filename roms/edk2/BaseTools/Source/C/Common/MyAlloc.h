@@ -71,17 +71,6 @@ typedef struct MyAllocStruct {
 #define MYALLOC_HEAD_MAGIK  0xBADFACED
 #define MYALLOC_TAIL_MAGIK  0xDEADBEEF
 
-/**
-  Check for corruptions in the allocated memory chain.  If a corruption
-  is detection program operation stops w/ an exit(1) call.
-
-  @param Final When FALSE, MyCheck() returns if the allocated memory chain
-               has not been corrupted.  When TRUE, MyCheck() returns if there
-               are no un-freed allocations.  If there are un-freed allocations,
-               they are displayed and exit(1) is called.
-  @param File Set to __FILE__ by macro expansion.
-  @param Line Set to __LINE__ by macro expansion.
-**/
 VOID
 MyCheck (
   BOOLEAN      Final,
@@ -89,20 +78,31 @@ MyCheck (
   UINTN        Line
   )
 ;
-
-/**
-  Allocate a new link in the allocation chain along with enough storage
-  for the File[] string, requested Size and alignment overhead.  If
-  memory cannot be allocated or the allocation chain has been corrupted,
-  exit(1) will be called.
-
-  @param Size Number of bytes (UINT8) requested by the called.
-              Size cannot be zero.
-  @param File Set to __FILE__ by macro expansion.
-  @param Line Set to __LINE__ by macro expansion.
-
-  @return Pointer to the caller's buffer.
-**/
+//
+// *++
+// Description:
+//
+//  Check for corruptions in the allocated memory chain.  If a corruption
+//  is detection program operation stops w/ an exit(1) call.
+//
+// Parameters:
+//
+//  Final := When FALSE, MyCheck() returns if the allocated memory chain
+//           has not been corrupted.  When TRUE, MyCheck() returns if there
+//           are no un-freed allocations.  If there are un-freed allocations,
+//           they are displayed and exit(1) is called.
+//
+//
+//  File := Set to __FILE__ by macro expansion.
+//
+//  Line := Set to __LINE__ by macro expansion.
+//
+// Returns:
+//
+//  n/a
+//
+// --*/
+//
 VOID  *
 MyAlloc (
   UINTN      Size,
@@ -110,20 +110,30 @@ MyAlloc (
   UINTN      Line
   )
 ;
-
-/**
-  This does a MyAlloc(), memcpy() and MyFree().  There is no optimization
-  for shrinking or expanding buffers.  An invalid parameter will cause
-  MyRealloc() to fail with a call to exit(1).
-
-  @param Ptr Pointer to the caller's buffer to be re-allocated.
-             Ptr cannot be NULL.
-  @param Size Size of new buffer.  Size cannot be zero.
-  @param File Set to __FILE__ by macro expansion.
-  @param Line Set to __LINE__ by macro expansion.
-
-  @return Pointer to new caller's buffer.
-**/
+//
+// *++
+// Description:
+//
+//  Allocate a new link in the allocation chain along with enough storage
+//  for the File[] string, requested Size and alignment overhead.  If
+//  memory cannot be allocated or the allocation chain has been corrupted,
+//  exit(1) will be called.
+//
+// Parameters:
+//
+//  Size := Number of bytes (UINT8) requested by the called.
+//          Size cannot be zero.
+//
+//  File := Set to __FILE__ by macro expansion.
+//
+//  Line := Set to __LINE__ by macro expansion.
+//
+// Returns:
+//
+//  Pointer to the caller's buffer.
+//
+// --*/
+//
 VOID  *
 MyRealloc (
   VOID       *Ptr,
@@ -132,16 +142,31 @@ MyRealloc (
   UINTN      Line
   )
 ;
-
-/**
-  Release a previously allocated buffer.  Invalid parameters will cause
-  MyFree() to fail with an exit(1) call.
-
-  @param Ptr Pointer to the caller's buffer to be freed.
-             A NULL pointer will be ignored.
-  @param File Set to __FILE__ by macro expansion.
-  @param Line Set to __LINE__ by macro expansion.
-**/
+//
+// *++
+// Description:
+//
+//  This does a MyAlloc(), memcpy() and MyFree().  There is no optimization
+//  for shrinking or expanding buffers.  An invalid parameter will cause
+//  MyRealloc() to fail with a call to exit(1).
+//
+// Parameters:
+//
+//  Ptr := Pointer to the caller's buffer to be re-allocated.
+//         Ptr cannot be NULL.
+//
+//  Size := Size of new buffer.  Size cannot be zero.
+//
+//  File := Set to __FILE__ by macro expansion.
+//
+//  Line := Set to __LINE__ by macro expansion.
+//
+// Returns:
+//
+//  Pointer to new caller's buffer.
+//
+// --*/
+//
 VOID
 MyFree (
   VOID       *Ptr,
@@ -149,7 +174,28 @@ MyFree (
   UINTN      Line
   )
 ;
-
+//
+// *++
+// Description:
+//
+//  Release a previously allocated buffer.  Invalid parameters will cause
+//  MyFree() to fail with an exit(1) call.
+//
+// Parameters:
+//
+//  Ptr := Pointer to the caller's buffer to be freed.
+//         A NULL pointer will be ignored.
+//
+//  File := Set to __FILE__ by macro expansion.
+//
+//  Line := Set to __LINE__ by macro expansion.
+//
+// Returns:
+//
+//  n/a
+//
+// --*/
+//
 #else /* USE_MYALLOC */
 
 //

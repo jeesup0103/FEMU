@@ -11,6 +11,65 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 
 typedef struct {
   //
+  // IANA/IETF defined Cipher Suite ID
+  //
+  UINT16         IanaCipher;
+  //
+  // OpenSSL-used Cipher Suite String
+  //
+  CONST CHAR8    *OpensslCipher;
+  //
+  // Length of OpensslCipher
+  //
+  UINTN          OpensslCipherLength;
+} TLS_CIPHER_MAPPING;
+
+//
+// Create a TLS_CIPHER_MAPPING initializer from IanaCipher and OpensslCipher so
+// that OpensslCipherLength is filled in automatically. IanaCipher must be an
+// integer constant expression, and OpensslCipher must be a string literal.
+//
+#define MAP(IanaCipher, OpensslCipher) \
+  { (IanaCipher), (OpensslCipher), sizeof (OpensslCipher) - 1 }
+
+//
+// The mapping table between IANA/IETF Cipher Suite definitions and
+// OpenSSL-used Cipher Suite name.
+//
+// Keep the table uniquely sorted by the IanaCipher field, in increasing order.
+//
+STATIC CONST TLS_CIPHER_MAPPING  TlsCipherMappingTable[] = {
+  MAP (0x0001, "NULL-MD5"),                         /// TLS_RSA_WITH_NULL_MD5
+  MAP (0x0002, "NULL-SHA"),                         /// TLS_RSA_WITH_NULL_SHA
+  MAP (0x0004, "RC4-MD5"),                          /// TLS_RSA_WITH_RC4_128_MD5
+  MAP (0x0005, "RC4-SHA"),                          /// TLS_RSA_WITH_RC4_128_SHA
+  MAP (0x000A, "DES-CBC3-SHA"),                     /// TLS_RSA_WITH_3DES_EDE_CBC_SHA, mandatory TLS 1.1
+  MAP (0x0016, "DHE-RSA-DES-CBC3-SHA"),             /// TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA
+  MAP (0x002F, "AES128-SHA"),                       /// TLS_RSA_WITH_AES_128_CBC_SHA, mandatory TLS 1.2
+  MAP (0x0030, "DH-DSS-AES128-SHA"),                /// TLS_DH_DSS_WITH_AES_128_CBC_SHA
+  MAP (0x0031, "DH-RSA-AES128-SHA"),                /// TLS_DH_RSA_WITH_AES_128_CBC_SHA
+  MAP (0x0033, "DHE-RSA-AES128-SHA"),               /// TLS_DHE_RSA_WITH_AES_128_CBC_SHA
+  MAP (0x0035, "AES256-SHA"),                       /// TLS_RSA_WITH_AES_256_CBC_SHA
+  MAP (0x0036, "DH-DSS-AES256-SHA"),                /// TLS_DH_DSS_WITH_AES_256_CBC_SHA
+  MAP (0x0037, "DH-RSA-AES256-SHA"),                /// TLS_DH_RSA_WITH_AES_256_CBC_SHA
+  MAP (0x0039, "DHE-RSA-AES256-SHA"),               /// TLS_DHE_RSA_WITH_AES_256_CBC_SHA
+  MAP (0x003B, "NULL-SHA256"),                      /// TLS_RSA_WITH_NULL_SHA256
+  MAP (0x003C, "AES128-SHA256"),                    /// TLS_RSA_WITH_AES_128_CBC_SHA256
+  MAP (0x003D, "AES256-SHA256"),                    /// TLS_RSA_WITH_AES_256_CBC_SHA256
+  MAP (0x003E, "DH-DSS-AES128-SHA256"),             /// TLS_DH_DSS_WITH_AES_128_CBC_SHA256
+  MAP (0x003F, "DH-RSA-AES128-SHA256"),             /// TLS_DH_RSA_WITH_AES_128_CBC_SHA256
+  MAP (0x0067, "DHE-RSA-AES128-SHA256"),            /// TLS_DHE_RSA_WITH_AES_128_CBC_SHA256
+  MAP (0x0068, "DH-DSS-AES256-SHA256"),             /// TLS_DH_DSS_WITH_AES_256_CBC_SHA256
+  MAP (0x0069, "DH-RSA-AES256-SHA256"),             /// TLS_DH_RSA_WITH_AES_256_CBC_SHA256
+  MAP (0x006B, "DHE-RSA-AES256-SHA256"),            /// TLS_DHE_RSA_WITH_AES_256_CBC_SHA256
+  MAP (0x009F, "DHE-RSA-AES256-GCM-SHA384"),        /// TLS_DHE_RSA_WITH_AES_256_GCM_SHA384
+  MAP (0xC02B, "ECDHE-ECDSA-AES128-GCM-SHA256"),    /// TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+  MAP (0xC02C, "ECDHE-ECDSA-AES256-GCM-SHA384"),    /// TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+  MAP (0xC030, "ECDHE-RSA-AES256-GCM-SHA384"),      /// TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+};
+
+typedef struct {
+  //
   // TLS Algorithm
   //
   UINT8          Algo;
@@ -36,6 +95,54 @@ STATIC CONST TLS_ALGO_TO_NAME  TlsSignatureAlgoToName[] = {
   { TlsSignatureAlgoDsa,       "DSA"   },
   { TlsSignatureAlgoEcdsa,     "ECDSA" },
 };
+
+/**
+  Gets the OpenSSL cipher suite mapping for the supplied IANA TLS cipher suite.
+
+  @param[in]  CipherId    The supplied IANA TLS cipher suite ID.
+
+  @return  The corresponding OpenSSL cipher suite mapping if found,
+           NULL otherwise.
+
+**/
+STATIC
+CONST TLS_CIPHER_MAPPING *
+TlsGetCipherMapping (
+  IN     UINT16  CipherId
+  )
+{
+  INTN  Left;
+  INTN  Right;
+  INTN  Middle;
+
+  //
+  // Binary Search Cipher Mapping Table for IANA-OpenSSL Cipher Translation
+  //
+  Left  = 0;
+  Right = ARRAY_SIZE (TlsCipherMappingTable) - 1;
+
+  while (Right >= Left) {
+    Middle = (Left + Right) / 2;
+
+    if (CipherId == TlsCipherMappingTable[Middle].IanaCipher) {
+      //
+      // Translate IANA cipher suite ID to OpenSSL name.
+      //
+      return &TlsCipherMappingTable[Middle];
+    }
+
+    if (CipherId < TlsCipherMappingTable[Middle].IanaCipher) {
+      Right = Middle - 1;
+    } else {
+      Left = Middle + 1;
+    }
+  }
+
+  //
+  // No Cipher Mapping found, return NULL.
+  //
+  return NULL;
+}
 
 /**
   Set a new TLS/SSL method for a particular TLS object.
@@ -174,21 +281,16 @@ TlsSetCipherList (
   IN     UINTN   CipherNum
   )
 {
-  TLS_CONNECTION    *TlsConn;
-  EFI_STATUS        Status;
-  CONST SSL_CIPHER  **MappedCipher;
-  UINTN             MappedCipherBytes;
-  UINTN             MappedCipherCount;
-  UINTN             CipherStringSize;
-  UINTN             Index;
-  INT32             StackIdx;
-  CHAR8             *CipherString;
-  CHAR8             *CipherStringPosition;
-
-  STACK_OF (SSL_CIPHER)      *OpensslCipherStack;
-  CONST SSL_CIPHER  *OpensslCipher;
-  CONST CHAR8       *OpensslCipherName;
-  UINTN             OpensslCipherNameLength;
+  TLS_CONNECTION            *TlsConn;
+  EFI_STATUS                Status;
+  CONST TLS_CIPHER_MAPPING  **MappedCipher;
+  UINTN                     MappedCipherBytes;
+  UINTN                     MappedCipherCount;
+  UINTN                     CipherStringSize;
+  UINTN                     Index;
+  CONST TLS_CIPHER_MAPPING  *Mapping;
+  CHAR8                     *CipherString;
+  CHAR8                     *CipherStringPosition;
 
   TlsConn = (TLS_CONNECTION *)Tls;
   if ((TlsConn == NULL) || (TlsConn->Ssl == NULL) || (CipherId == NULL)) {
@@ -213,31 +315,23 @@ TlsSetCipherList (
     return EFI_OUT_OF_RESOURCES;
   }
 
-  OpensslCipherStack = SSL_get_ciphers (TlsConn->Ssl);
-
   //
   // Map the cipher IDs, and count the number of bytes for the full
   // CipherString.
   //
   MappedCipherCount = 0;
   CipherStringSize  = 0;
-  for (Index = 0; OpensslCipherStack != NULL && Index < CipherNum; Index++) {
+  for (Index = 0; Index < CipherNum; Index++) {
     //
     // Look up the IANA-to-OpenSSL mapping.
     //
-    for (StackIdx = 0; StackIdx < sk_SSL_CIPHER_num (OpensslCipherStack); StackIdx++) {
-      OpensslCipher = sk_SSL_CIPHER_value (OpensslCipherStack, StackIdx);
-      if (CipherId[Index] == SSL_CIPHER_get_protocol_id (OpensslCipher)) {
-        break;
-      }
-    }
-
-    if (StackIdx == sk_SSL_CIPHER_num (OpensslCipherStack)) {
+    Mapping = TlsGetCipherMapping (CipherId[Index]);
+    if (Mapping == NULL) {
       DEBUG ((
         DEBUG_VERBOSE,
         "%a:%a: skipping CipherId=0x%04x\n",
         gEfiCallerBaseName,
-        __func__,
+        __FUNCTION__,
         CipherId[Index]
         ));
       //
@@ -249,7 +343,7 @@ TlsSetCipherList (
     }
 
     //
-    // Accumulate cipher name string length into CipherStringSize. If this
+    // Accumulate Mapping->OpensslCipherLength into CipherStringSize. If this
     // is not the first successful mapping, account for a colon (":") prefix
     // too.
     //
@@ -263,7 +357,7 @@ TlsSetCipherList (
 
     Status = SafeUintnAdd (
                CipherStringSize,
-               AsciiStrLen (SSL_CIPHER_get_name (OpensslCipher)),
+               Mapping->OpensslCipherLength,
                &CipherStringSize
                );
     if (EFI_ERROR (Status)) {
@@ -274,7 +368,7 @@ TlsSetCipherList (
     //
     // Record the mapping.
     //
-    MappedCipher[MappedCipherCount++] = OpensslCipher;
+    MappedCipher[MappedCipherCount++] = Mapping;
   }
 
   //
@@ -286,7 +380,7 @@ TlsSetCipherList (
       DEBUG_ERROR,
       "%a:%a: no CipherId could be mapped\n",
       gEfiCallerBaseName,
-      __func__
+      __FUNCTION__
       ));
     Status = EFI_UNSUPPORTED;
     goto FreeMappedCipher;
@@ -309,12 +403,10 @@ TlsSetCipherList (
   //
   CipherStringPosition = CipherString;
   for (Index = 0; Index < MappedCipherCount; Index++) {
-    OpensslCipher           = MappedCipher[Index];
-    OpensslCipherName       = SSL_CIPHER_get_name (OpensslCipher);
-    OpensslCipherNameLength = AsciiStrLen (OpensslCipherName);
+    Mapping = MappedCipher[Index];
     //
     // Append the colon (":") prefix except for the first mapping, then append
-    // OpensslCipherName.
+    // Mapping->OpensslCipher.
     //
     if (Index > 0) {
       *(CipherStringPosition++) = ':';
@@ -322,10 +414,10 @@ TlsSetCipherList (
 
     CopyMem (
       CipherStringPosition,
-      OpensslCipherName,
-      OpensslCipherNameLength
+      Mapping->OpensslCipher,
+      Mapping->OpensslCipherLength
       );
-    CipherStringPosition += OpensslCipherNameLength;
+    CipherStringPosition += Mapping->OpensslCipherLength;
   }
 
   //
@@ -349,7 +441,7 @@ TlsSetCipherList (
     DEBUG_VERBOSE,
     "%a:%a: CipherString={\n",
     gEfiCallerBaseName,
-    __func__
+    __FUNCTION__
     ));
   for (CipherStringPosition = CipherString;
        CipherStringPosition < CipherString + FullLength;
@@ -518,7 +610,7 @@ TlsSetVerifyHost (
       "%a:%a: parsed \"%a\" as an IPv%c address "
       "literal\n",
       gEfiCallerBaseName,
-      __func__,
+      __FUNCTION__,
       HostName,
       (UINTN)((BinaryAddressSize == NS_IN6ADDRSZ) ? '6' : '4')
       ));
@@ -609,6 +701,7 @@ TlsSetCaCertificate (
   TLS_CONNECTION  *TlsConn;
   SSL_CTX         *SslCtx;
   INTN            Ret;
+  UINTN           ErrorCode;
 
   BioCert   = NULL;
   Cert      = NULL;
@@ -660,13 +753,11 @@ TlsSetCaCertificate (
   //
   Ret = X509_STORE_add_cert (X509Store, Cert);
   if (Ret != 1) {
-    unsigned long  ErrorCode;
-
     ErrorCode = ERR_peek_last_error ();
     //
     // Ignore "already in table" errors
     //
-    if (!((ERR_GET_LIB (ErrorCode) == ERR_LIB_X509) &&
+    if (!((ERR_GET_FUNC (ErrorCode) == X509_F_X509_STORE_ADD_CERT) &&
           (ERR_GET_REASON (ErrorCode) == X509_R_CERT_ALREADY_IN_HASH_TABLE)))
     {
       Status = EFI_ABORTED;

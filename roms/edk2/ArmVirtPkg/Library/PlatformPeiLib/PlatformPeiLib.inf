@@ -31,26 +31,24 @@
   gArmVirtTokenSpaceGuid.PcdTpm2SupportEnabled
 
 [LibraryClasses]
-  BaseMemoryLib
   DebugLib
   HobLib
   FdtLib
-  FdtSerialPortAddressLib
   PcdLib
   PeiServicesLib
 
 [FixedPcd]
   gArmTokenSpaceGuid.PcdFvSize
-  gUefiOvmfPkgTokenSpaceGuid.PcdDeviceTreeAllocationPadding
+  gArmVirtTokenSpaceGuid.PcdDeviceTreeAllocationPadding
 
 [Pcd]
   gArmTokenSpaceGuid.PcdFvBaseAddress
-  gEfiSecurityPkgTokenSpaceGuid.PcdTpmBaseAddress             ## SOMETIMES_PRODUCES
-  gUefiOvmfPkgTokenSpaceGuid.PcdDeviceTreeInitialBaseAddress
+  gArmVirtTokenSpaceGuid.PcdDeviceTreeInitialBaseAddress
+  gEfiSecurityPkgTokenSpaceGuid.PcdTpmBaseAddress         ## SOMETIMES_PRODUCES
 
 [Ppis]
-  gOvmfTpmDiscoveredPpiGuid                                   ## SOMETIMES_PRODUCES
-  gPeiTpmInitializationDonePpiGuid                            ## SOMETIMES_PRODUCES
+  gOvmfTpmDiscoveredPpiGuid                               ## SOMETIMES_PRODUCES
+  gPeiTpmInitializationDonePpiGuid                        ## SOMETIMES_PRODUCES
 
 [Guids]
   gEarlyPL011BaseAddressGuid

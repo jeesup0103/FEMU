@@ -61,7 +61,7 @@ bdrv_co_readv_vmstate(BlockDriverState *bs, QEMUIOVector *qiov, int64_t pos);
 int coroutine_fn GRAPH_RDLOCK
 bdrv_co_writev_vmstate(BlockDriverState *bs, QEMUIOVector *qiov, int64_t pos);
 
-int coroutine_fn GRAPH_RDLOCK
+int coroutine_fn
 nbd_co_do_establish_connection(BlockDriverState *bs, bool blocking,
                                Error **errp);
 
@@ -85,8 +85,7 @@ bdrv_common_block_status_above(BlockDriverState *bs,
                                int64_t *map,
                                BlockDriverState **file,
                                int *depth);
-
-int co_wrapper_mixed_bdrv_rdlock
+int co_wrapper_mixed
 nbd_do_establish_connection(BlockDriverState *bs, bool blocking, Error **errp);
 
 #endif /* BLOCK_COROUTINES_H */

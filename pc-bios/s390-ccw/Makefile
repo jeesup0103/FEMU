@@ -6,8 +6,6 @@ include config-host.mak
 CFLAGS = -O2 -g
 MAKEFLAGS += -rR
 
-GIT_SUBMODULES = roms/SLOF
-
 NULL :=
 SPACE := $(NULL) #
 TARGET_PREFIX := $(patsubst %/,%:$(SPACE),$(TARGET_DIR))
@@ -55,7 +53,7 @@ config-cc.mak: Makefile
 	    $(call cc-option,-march=z900,-march=z10)) 3> config-cc.mak
 -include config-cc.mak
 
-LDFLAGS += -Wl,-pie -nostdlib -z noexecstack
+LDFLAGS += -Wl,-pie -nostdlib
 
 build-all: s390-ccw.img s390-netboot.img
 
@@ -67,7 +65,12 @@ s390-ccw.img: s390-ccw.elf
 
 $(OBJECTS): Makefile
 
+ifneq ($(wildcard $(SRC_PATH)/../../roms/SLOF/lib/libnet),)
 include $(SRC_PATH)/netboot.mak
+else
+s390-netboot.img:
+	@echo "s390-netboot.img not built since roms/SLOF/ is not available."
+endif
 
 ALL_OBJS = $(sort $(OBJECTS) $(NETOBJS) $(LIBCOBJS) $(LIBNETOBJS))
 -include $(ALL_OBJS:%.o=%.d)
@@ -77,12 +80,3 @@ clean:
 
 distclean:
 	rm -f config-cc.mak
-
-.PHONY: git-submodule-update
-$(SRC_PATH)/../../.git-submodule-status: git-submodule-update config-host.mak
-Makefile: $(SRC_PATH)/../../.git-submodule-status
-
-git-submodule-update:
-ifneq ($(GIT_SUBMODULES_ACTION),ignore)
-	$(quiet-@)GIT=git "$(SRC_PATH)/../../scripts/git-submodule.sh" $(GIT_SUBMODULES_ACTION) $(GIT_SUBMODULES)
-endif

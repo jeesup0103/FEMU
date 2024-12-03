@@ -23,6 +23,7 @@
 #include "qemu/osdep.h"
 #include "qemu/main-loop.h"
 #include "hw/irq.h"
+#include "hw/mips/cpudevs.h"
 #include "sysemu/kvm.h"
 #include "kvm_mips.h"
 
@@ -36,7 +37,7 @@ static void cpu_mips_irq_request(void *opaque, int irq, int level)
         return;
     }
 
-    BQL_LOCK_GUARD();
+    QEMU_IOTHREAD_LOCK_GUARD();
 
     if (level) {
         env->CP0_Cause |= 1 << (irq + CP0Ca_IP);

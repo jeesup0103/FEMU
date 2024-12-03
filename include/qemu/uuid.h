@@ -78,10 +78,9 @@ typedef struct {
                  "%02hhx%02hhx-" \
                  "%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx"
 
-#define UUID_NONE "00000000-0000-0000-0000-000000000000"
-QEMU_BUILD_BUG_ON(sizeof(UUID_NONE) - 1 != 36);
+#define UUID_FMT_LEN 36
 
-#define UUID_STR_LEN sizeof(UUID_NONE)
+#define UUID_NONE "00000000-0000-0000-0000-000000000000"
 
 void qemu_uuid_generate(QemuUUID *out);
 
@@ -96,7 +95,5 @@ char *qemu_uuid_unparse_strdup(const QemuUUID *uuid);
 int qemu_uuid_parse(const char *str, QemuUUID *uuid);
 
 QemuUUID qemu_uuid_bswap(QemuUUID uuid);
-
-uint32_t qemu_uuid_hash(const void *uuid);
 
 #endif

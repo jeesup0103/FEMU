@@ -358,12 +358,10 @@ SataControllerStart (
   UINTN                             TotalCount;
   UINT64                            Supports;
   UINT8                             MaxPortNumber;
-  UINTN                             BailLogMask;
 
   DEBUG ((DEBUG_INFO, "SataControllerStart start\n"));
 
-  Private     = NULL;
-  BailLogMask = DEBUG_ERROR;
+  Private = NULL;
 
   //
   // Now test and open PCI I/O Protocol
@@ -377,16 +375,8 @@ SataControllerStart (
                   EFI_OPEN_PROTOCOL_BY_DRIVER
                   );
   if (EFI_ERROR (Status)) {
-    if (Status == EFI_ALREADY_STARTED) {
-      //
-      // This is an expected condition for OpenProtocol() / BY_DRIVER, in a
-      // DriverBindingStart() member function; degrade the log mask to
-      // DEBUG_INFO in order to reduce log pollution.
-      //
-      BailLogMask = DEBUG_INFO;
-    }
-
-    goto Bail;
+    DEBUG ((DEBUG_ERROR, "SataControllerStart error. return status = %r\n", Status));
+    return Status;
   }
 
   //
@@ -395,7 +385,7 @@ SataControllerStart (
   Private = AllocateZeroPool (sizeof (EFI_SATA_CONTROLLER_PRIVATE_DATA));
   if (Private == NULL) {
     Status = EFI_OUT_OF_RESOURCES;
-    goto ClosePciIo;
+    goto Done;
   }
 
   //
@@ -422,7 +412,7 @@ SataControllerStart (
                     &Private->OriginalPciAttributes
                     );
   if (EFI_ERROR (Status)) {
-    goto FreeSataPrivate;
+    goto Done;
   }
 
   DEBUG ((
@@ -438,7 +428,7 @@ SataControllerStart (
                     &Supports
                     );
   if (EFI_ERROR (Status)) {
-    goto FreeSataPrivate;
+    goto Done;
   }
 
   DEBUG ((DEBUG_INFO, "Supported PCI Attributes = 0x%llx\n", Supports));
@@ -451,7 +441,7 @@ SataControllerStart (
                        NULL
                        );
   if (EFI_ERROR (Status)) {
-    goto FreeSataPrivate;
+    goto Done;
   }
 
   DEBUG ((DEBUG_INFO, "Enabled PCI Attributes = 0x%llx\n", Supports));
@@ -466,7 +456,7 @@ SataControllerStart (
                         );
   if (EFI_ERROR (Status)) {
     ASSERT (FALSE);
-    goto RestorePciAttributes;
+    goto Done;
   }
 
   if (IS_PCI_IDE (&PciData)) {
@@ -480,7 +470,7 @@ SataControllerStart (
     DEBUG ((DEBUG_INFO, "Ports Implemented(PI) = 0x%x\n", Data32));
     if (Data32 == 0) {
       Status = EFI_UNSUPPORTED;
-      goto RestorePciAttributes;
+      goto Done;
     }
 
     MaxPortNumber = 31;
@@ -512,19 +502,19 @@ SataControllerStart (
   Private->DisqualifiedModes = AllocateZeroPool ((sizeof (EFI_ATA_COLLECTIVE_MODE)) * TotalCount);
   if (Private->DisqualifiedModes == NULL) {
     Status = EFI_OUT_OF_RESOURCES;
-    goto RestorePciAttributes;
+    goto Done;
   }
 
   Private->IdentifyData = AllocateZeroPool ((sizeof (EFI_IDENTIFY_DATA)) * TotalCount);
   if (Private->IdentifyData == NULL) {
     Status = EFI_OUT_OF_RESOURCES;
-    goto FreeDisqualifiedModes;
+    goto Done;
   }
 
   Private->IdentifyValid = AllocateZeroPool ((sizeof (BOOLEAN)) * TotalCount);
   if (Private->IdentifyValid == NULL) {
     Status = EFI_OUT_OF_RESOURCES;
-    goto FreeIdentifyData;
+    goto Done;
   }
 
   //
@@ -537,36 +527,45 @@ SataControllerStart (
                   NULL
                   );
 
+Done:
   if (EFI_ERROR (Status)) {
-    goto FreeIdentifyValid;
+    gBS->CloseProtocol (
+           Controller,
+           &gEfiPciIoProtocolGuid,
+           This->DriverBindingHandle,
+           Controller
+           );
+    if (Private != NULL) {
+      if (Private->DisqualifiedModes != NULL) {
+        FreePool (Private->DisqualifiedModes);
+      }
+
+      if (Private->IdentifyData != NULL) {
+        FreePool (Private->IdentifyData);
+      }
+
+      if (Private->IdentifyValid != NULL) {
+        FreePool (Private->IdentifyValid);
+      }
+
+      if (Private->PciAttributesChanged) {
+        //
+        // Restore original PCI attributes
+        //
+        PciIo->Attributes (
+                 PciIo,
+                 EfiPciIoAttributeOperationSet,
+                 Private->OriginalPciAttributes,
+                 NULL
+                 );
+      }
+
+      FreePool (Private);
+    }
   }
 
   DEBUG ((DEBUG_INFO, "SataControllerStart end with %r\n", Status));
 
-  return Status;
-
-FreeIdentifyValid:
-  FreePool (Private->IdentifyValid);
-FreeIdentifyData:
-  FreePool (Private->IdentifyData);
-FreeDisqualifiedModes:
-  FreePool (Private->DisqualifiedModes);
-RestorePciAttributes:
-  //
-  // Restore original PCI attributes
-  //
-  Private->PciIo->Attributes (
-                    Private->PciIo,
-                    EfiPciIoAttributeOperationSet,
-                    Private->OriginalPciAttributes,
-                    NULL
-                    );
-FreeSataPrivate:
-  FreePool (Private);
-ClosePciIo:
-  gBS->CloseProtocol (Controller, &gEfiPciIoProtocolGuid, This->DriverBindingHandle, Controller);
-Bail:
-  DEBUG ((BailLogMask, "SataControllerStart error return status = %r\n", Status));
   return Status;
 }
 
@@ -611,6 +610,7 @@ SataControllerStop (
   }
 
   Private = SATA_CONTROLLER_PRIVATE_DATA_FROM_THIS (IdeInit);
+  ASSERT (Private != NULL);
 
   //
   // Uninstall the IDE Controller Init Protocol from this instance
@@ -625,31 +625,33 @@ SataControllerStop (
     return Status;
   }
 
-  if (Private->DisqualifiedModes != NULL) {
-    FreePool (Private->DisqualifiedModes);
-  }
+  if (Private != NULL) {
+    if (Private->DisqualifiedModes != NULL) {
+      FreePool (Private->DisqualifiedModes);
+    }
 
-  if (Private->IdentifyData != NULL) {
-    FreePool (Private->IdentifyData);
-  }
+    if (Private->IdentifyData != NULL) {
+      FreePool (Private->IdentifyData);
+    }
 
-  if (Private->IdentifyValid != NULL) {
-    FreePool (Private->IdentifyValid);
-  }
+    if (Private->IdentifyValid != NULL) {
+      FreePool (Private->IdentifyValid);
+    }
 
-  if (Private->PciAttributesChanged) {
-    //
-    // Restore original PCI attributes
-    //
-    Private->PciIo->Attributes (
-                      Private->PciIo,
-                      EfiPciIoAttributeOperationSet,
-                      Private->OriginalPciAttributes,
-                      NULL
-                      );
-  }
+    if (Private->PciAttributesChanged) {
+      //
+      // Restore original PCI attributes
+      //
+      Private->PciIo->Attributes (
+                        Private->PciIo,
+                        EfiPciIoAttributeOperationSet,
+                        Private->OriginalPciAttributes,
+                        NULL
+                        );
+    }
 
-  FreePool (Private);
+    FreePool (Private);
+  }
 
   //
   // Close protocols opened by Sata Controller driver
@@ -744,8 +746,8 @@ IdeInitGetChannelInfo (
 {
   EFI_SATA_CONTROLLER_PRIVATE_DATA  *Private;
 
-  ASSERT (This != NULL);
   Private = SATA_CONTROLLER_PRIVATE_DATA_FROM_THIS (This);
+  ASSERT (Private != NULL);
 
   if (Channel < This->ChannelCount) {
     *Enabled    = TRUE;
@@ -844,8 +846,8 @@ IdeInitSubmitData (
   EFI_SATA_CONTROLLER_PRIVATE_DATA  *Private;
   UINTN                             DeviceIndex;
 
-  ASSERT (This != NULL);
   Private = SATA_CONTROLLER_PRIVATE_DATA_FROM_THIS (This);
+  ASSERT (Private != NULL);
 
   if ((Channel >= This->ChannelCount) || (Device >= Private->DeviceCount)) {
     return EFI_INVALID_PARAMETER;
@@ -923,8 +925,8 @@ IdeInitDisqualifyMode (
   EFI_SATA_CONTROLLER_PRIVATE_DATA  *Private;
   UINTN                             DeviceIndex;
 
-  ASSERT (This != NULL);
   Private = SATA_CONTROLLER_PRIVATE_DATA_FROM_THIS (This);
+  ASSERT (Private != NULL);
 
   if ((Channel >= This->ChannelCount) || (BadModes == NULL) || (Device >= Private->DeviceCount)) {
     return EFI_INVALID_PARAMETER;
@@ -1016,8 +1018,8 @@ IdeInitCalculateMode (
   EFI_STATUS                        Status;
   UINTN                             DeviceIndex;
 
-  ASSERT (This != NULL);
   Private = SATA_CONTROLLER_PRIVATE_DATA_FROM_THIS (This);
+  ASSERT (Private != NULL);
 
   if ((Channel >= This->ChannelCount) || (SupportedModes == NULL) || (Device >= Private->DeviceCount)) {
     return EFI_INVALID_PARAMETER;

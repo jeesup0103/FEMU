@@ -1320,7 +1320,7 @@ InitFtwProtocol (
       DEBUG ((
         DEBUG_INFO,
         "Ftw: Restart working block update in %a() - %r\n",
-        __func__,
+        __FUNCTION__,
         Status
         ));
       FtwAbort (&FtwDevice->FtwInstance);

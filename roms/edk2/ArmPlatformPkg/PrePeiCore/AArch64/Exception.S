@@ -112,5 +112,3 @@ _DefaultSError_LowerA32:
   TO_HANDLER
 
 VECTOR_END(PeiVectorTable)
-
-AARCH64_BTI_NOTE()

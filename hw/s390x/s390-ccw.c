@@ -76,9 +76,7 @@ static void s390_ccw_get_dev_info(S390CCWDevice *cdev,
                                   Error **errp)
 {
     unsigned int cssid, ssid, devid;
-    char dev_path[PATH_MAX] = {0};
-    g_autofree char *tmp_dir = NULL;
-    g_autofree char *tmp = NULL;
+    char dev_path[PATH_MAX] = {0}, *tmp;
 
     if (!sysfsdev) {
         error_setg(errp, "No host device provided");
@@ -94,8 +92,7 @@ static void s390_ccw_get_dev_info(S390CCWDevice *cdev,
 
     cdev->mdevid = g_path_get_basename(dev_path);
 
-    tmp_dir = g_path_get_dirname(dev_path);
-    tmp = g_path_get_basename(tmp_dir);
+    tmp = basename(dirname(dev_path));
     if (sscanf(tmp, "%2x.%1x.%4x", &cssid, &ssid, &devid) != 3) {
         error_setg_errno(errp, errno, "Failed to read %s", tmp);
         return;

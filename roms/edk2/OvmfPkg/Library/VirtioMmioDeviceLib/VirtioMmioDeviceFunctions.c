@@ -144,9 +144,7 @@ VirtioMmioSetQueueAlignment (
 
   Device = VIRTIO_MMIO_DEVICE_FROM_VIRTIO_DEVICE (This);
 
-  if (Device->Version == VIRTIO_MMIO_DEVICE_VERSION_0_95) {
-    VIRTIO_CFG_WRITE (Device, VIRTIO_MMIO_OFFSET_QUEUE_ALIGN, Alignment);
-  }
+  VIRTIO_CFG_WRITE (Device, VIRTIO_MMIO_OFFSET_QUEUE_ALIGN, Alignment);
 
   return EFI_SUCCESS;
 }

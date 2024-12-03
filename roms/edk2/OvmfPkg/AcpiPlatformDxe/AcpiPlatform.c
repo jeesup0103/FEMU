@@ -9,9 +9,6 @@
 
 #include <OvmfPlatforms.h> // CLOUDHV_DEVICE_ID
 #include <ConfidentialComputingGuestAttr.h>
-
-#include <Library/AcpiPlatformLib.h>
-
 #include "AcpiPlatform.h"
 
 /**

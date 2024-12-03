@@ -1863,7 +1863,7 @@ EhcDriverBindingStart (
       DEBUG ((
         DEBUG_WARN,
         "%a: failed to enable 64-bit DMA on 64-bit capable controller @ %p (%r)\n",
-        __func__,
+        __FUNCTION__,
         Controller,
         Status
         ));

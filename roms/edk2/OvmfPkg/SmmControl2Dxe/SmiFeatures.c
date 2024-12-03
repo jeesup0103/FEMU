@@ -113,7 +113,7 @@ NegotiateSmiFeatures (
     DEBUG ((
       DEBUG_INFO,
       "%a: SMI feature negotiation unavailable\n",
-      __func__
+      __FUNCTION__
       ));
     return FALSE;
   }
@@ -129,7 +129,7 @@ NegotiateSmiFeatures (
     DEBUG ((
       DEBUG_ERROR,
       "%a: size mismatch in feature negotiation\n",
-      __func__
+      __FUNCTION__
       ));
     goto FatalError;
   }
@@ -168,7 +168,7 @@ NegotiateSmiFeatures (
     DEBUG ((
       DEBUG_ERROR,
       "%a: negotiation failed for feature bitmap 0x%Lx\n",
-      __func__,
+      __FUNCTION__,
       mSmiFeatures
       ));
     goto FatalError;
@@ -179,7 +179,7 @@ NegotiateSmiFeatures (
     // If we can't get broadcast SMIs from QEMU, that's acceptable too,
     // although not optimal.
     //
-    DEBUG ((DEBUG_INFO, "%a: SMI broadcast unavailable\n", __func__));
+    DEBUG ((DEBUG_INFO, "%a: SMI broadcast unavailable\n", __FUNCTION__));
   } else {
     //
     // Configure the traditional AP sync / SMI delivery mode for
@@ -192,31 +192,31 @@ NegotiateSmiFeatures (
       DEBUG ((
         DEBUG_ERROR,
         "%a: PiSmmCpuDxeSmm PCD configuration failed\n",
-        __func__
+        __FUNCTION__
         ));
       goto FatalError;
     }
 
-    DEBUG ((DEBUG_INFO, "%a: using SMI broadcast\n", __func__));
+    DEBUG ((DEBUG_INFO, "%a: using SMI broadcast\n", __FUNCTION__));
   }
 
   if ((mSmiFeatures & ICH9_LPC_SMI_F_CPU_HOTPLUG) == 0) {
-    DEBUG ((DEBUG_INFO, "%a: CPU hotplug not negotiated\n", __func__));
+    DEBUG ((DEBUG_INFO, "%a: CPU hotplug not negotiated\n", __FUNCTION__));
   } else {
     DEBUG ((
       DEBUG_INFO,
       "%a: CPU hotplug with SMI negotiated\n",
-      __func__
+      __FUNCTION__
       ));
   }
 
   if ((mSmiFeatures & ICH9_LPC_SMI_F_CPU_HOT_UNPLUG) == 0) {
-    DEBUG ((DEBUG_INFO, "%a: CPU hot-unplug not negotiated\n", __func__));
+    DEBUG ((DEBUG_INFO, "%a: CPU hot-unplug not negotiated\n", __FUNCTION__));
   } else {
     DEBUG ((
       DEBUG_INFO,
       "%a: CPU hot-unplug with SMI negotiated\n",
-      __func__
+      __FUNCTION__
       ));
   }
 
@@ -292,7 +292,7 @@ AppendFwCfgBootScript (
   DEBUG ((
     DEBUG_VERBOSE,
     "%a: SMI feature negotiation boot script saved\n",
-    __func__
+    __FUNCTION__
     ));
   return;
 

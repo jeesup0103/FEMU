@@ -735,51 +735,49 @@ EfiShellGetDeviceName (
     //
     // Now check the parent controller using this as the child.
     //
-    Status = PARSE_HANDLE_DATABASE_PARENTS (DeviceHandle, &ParentControllerCount, &ParentControllerBuffer);
-    if ((DeviceNameToReturn == NULL) && !EFI_ERROR (Status)) {
+    if (DeviceNameToReturn == NULL) {
+      PARSE_HANDLE_DATABASE_PARENTS (DeviceHandle, &ParentControllerCount, &ParentControllerBuffer);
       for (LoopVar = 0; LoopVar < ParentControllerCount; LoopVar++) {
-        Status = PARSE_HANDLE_DATABASE_UEFI_DRIVERS (ParentControllerBuffer[LoopVar], &ParentDriverCount, &ParentDriverBuffer);
-        if (!EFI_ERROR (Status)) {
-          for (HandleCount = 0; HandleCount < ParentDriverCount; HandleCount++) {
-            //
-            // try using that driver's component name with controller and our driver as the child.
-            //
+        PARSE_HANDLE_DATABASE_UEFI_DRIVERS (ParentControllerBuffer[LoopVar], &ParentDriverCount, &ParentDriverBuffer);
+        for (HandleCount = 0; HandleCount < ParentDriverCount; HandleCount++) {
+          //
+          // try using that driver's component name with controller and our driver as the child.
+          //
+          Status = gBS->OpenProtocol (
+                          ParentDriverBuffer[HandleCount],
+                          &gEfiComponentName2ProtocolGuid,
+                          (VOID **)&CompName2,
+                          gImageHandle,
+                          NULL,
+                          EFI_OPEN_PROTOCOL_GET_PROTOCOL
+                          );
+          if (EFI_ERROR (Status)) {
             Status = gBS->OpenProtocol (
                             ParentDriverBuffer[HandleCount],
-                            &gEfiComponentName2ProtocolGuid,
+                            &gEfiComponentNameProtocolGuid,
                             (VOID **)&CompName2,
                             gImageHandle,
                             NULL,
                             EFI_OPEN_PROTOCOL_GET_PROTOCOL
                             );
-            if (EFI_ERROR (Status)) {
-              Status = gBS->OpenProtocol (
-                              ParentDriverBuffer[HandleCount],
-                              &gEfiComponentNameProtocolGuid,
-                              (VOID **)&CompName2,
-                              gImageHandle,
-                              NULL,
-                              EFI_OPEN_PROTOCOL_GET_PROTOCOL
-                              );
-            }
-
-            if (EFI_ERROR (Status)) {
-              continue;
-            }
-
-            Lang   = GetBestLanguageForDriver (CompName2->SupportedLanguages, Language, FALSE);
-            Status = CompName2->GetControllerName (CompName2, ParentControllerBuffer[LoopVar], DeviceHandle, Lang, &DeviceNameToReturn);
-            FreePool (Lang);
-            Lang = NULL;
-            if (!EFI_ERROR (Status) && (DeviceNameToReturn != NULL)) {
-              break;
-            }
           }
 
-          SHELL_FREE_NON_NULL (ParentDriverBuffer);
+          if (EFI_ERROR (Status)) {
+            continue;
+          }
+
+          Lang   = GetBestLanguageForDriver (CompName2->SupportedLanguages, Language, FALSE);
+          Status = CompName2->GetControllerName (CompName2, ParentControllerBuffer[LoopVar], DeviceHandle, Lang, &DeviceNameToReturn);
+          FreePool (Lang);
+          Lang = NULL;
           if (!EFI_ERROR (Status) && (DeviceNameToReturn != NULL)) {
             break;
           }
+        }
+
+        SHELL_FREE_NON_NULL (ParentDriverBuffer);
+        if (!EFI_ERROR (Status) && (DeviceNameToReturn != NULL)) {
+          break;
         }
       }
 

@@ -20,5 +20,6 @@
   Name:
 
 #define ASM_FUNC(Name)  _ASM_FUNC(ASM_PFX(Name), .text. ## Name)
+#define RISCV_TIMER_COMPARE_BITS  32
 
 #endif

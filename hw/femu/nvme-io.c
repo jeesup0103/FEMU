@@ -132,7 +132,7 @@ static void nvme_process_cq_cpl(void *arg, int index_poller)
     int rc;
     int i;
 
-    if (BBSSD(n) || ZNSSD(n)) {
+    if (BBSSD(n)) {
         rp = n->to_poller[index_poller];
     }
 
@@ -234,6 +234,30 @@ void *nvme_poller(void *arg)
     return NULL;
 }
 
+NvmeFdpEvent *nvme_fdp_alloc_event(FemuCtrl *n, NvmeFdpEventBuffer *ebuf)
+{
+	NvmeFdpEvent *ret = NULL;
+	bool is_full = ebuf->next == ebuf->start && ebuf->nelems;
+
+	ret = &ebuf->events[ebuf->next++]; 
+	if (ebuf->next == NVME_FDP_MAX_EVENTS)
+		ebuf->next = 0;
+	if (is_full)
+		ebuf->start = ebuf->next;
+	else
+		ebuf->nelems++;
+
+	memset(ret, 0, sizeof(NvmeFdpEvent)); 
+	ret->timestamp = (uint64_t)time(NULL);
+
+	return ret;
+}																		
+
+int log_event(NvmeRuHandle *ruh, uint8_t event_type)
+{
+	return (ruh->event_filter >> nvme_fdp_evf_shifts[event_type]) & 0x1;
+}
+
 uint16_t nvme_rw(FemuCtrl *n, NvmeNamespace *ns, NvmeCmd *cmd, NvmeRequest *req)
 {
     NvmeRwCmd *rw = (NvmeRwCmd *)cmd;
@@ -256,8 +280,9 @@ uint16_t nvme_rw(FemuCtrl *n, NvmeNamespace *ns, NvmeCmd *cmd, NvmeRequest *req)
 
     err = femu_nvme_rw_check_req(n, ns, cmd, req, slba, elba, nlb, ctrl,
                                  data_size, meta_size);
-    if (err)
+    if (err) {
         return err;
+	}
 
     if (nvme_map_prp(&req->qsg, &req->iov, prp1, prp2, data_size, n)) {
         nvme_set_error_page(n, req->sq->sqid, cmd->cid, NVME_INVALID_FIELD,
@@ -293,12 +318,11 @@ static uint16_t nvme_dsm(FemuCtrl *n, NvmeNamespace *ns, NvmeCmd *cmd,
 
         uint64_t slba;
         uint32_t nlb;
-        NvmeDsmRange *range = g_malloc0(sizeof(NvmeDsmRange) * nr);
+        NvmeDsmRange range[nr];
 
         if (dma_write_prp(n, (uint8_t *)range, sizeof(range), prp1, prp2)) {
             nvme_set_error_page(n, req->sq->sqid, cmd->cid, NVME_INVALID_FIELD,
                                 offsetof(NvmeCmd, dptr.prp1), 0, ns->id);
-            g_free(range);
             return NVME_INVALID_FIELD | NVME_DNR;
         }
 
@@ -309,14 +333,13 @@ static uint16_t nvme_dsm(FemuCtrl *n, NvmeNamespace *ns, NvmeCmd *cmd,
             if (slba + nlb > le64_to_cpu(ns->id_ns.nsze)) {
                 nvme_set_error_page(n, req->sq->sqid, cmd->cid, NVME_LBA_RANGE,
                                     offsetof(NvmeCmd, cdw10), slba + nlb, ns->id);
-                g_free(range);
                 return NVME_LBA_RANGE | NVME_DNR;
             }
 
             bitmap_clear(ns->util, slba, nlb);
         }
-        g_free(range);
     }
+
     return NVME_SUCCESS;
 }
 
@@ -357,10 +380,7 @@ static uint16_t nvme_compare(FemuCtrl *n, NvmeNamespace *ns, NvmeCmd *cmd,
 
     for (i = 0; i < req->qsg.nsg; i++) {
         uint32_t len = req->qsg.sg[i].len;
-        uint8_t *tmp[2];
-
-        tmp[0] = g_malloc0(len);
-        tmp[1] = g_malloc0(len);
+        uint8_t tmp[2][len];
 
         nvme_addr_read(n, req->qsg.sg[i].base, tmp[1], len);
         if (memcmp(tmp[0], tmp[1], len)) {
@@ -368,8 +388,6 @@ static uint16_t nvme_compare(FemuCtrl *n, NvmeNamespace *ns, NvmeCmd *cmd,
             return NVME_CMP_FAILURE;
         }
         offset += len;
-        free(tmp[0]);
-        free(tmp[1]);
     }
 
     qemu_sglist_destroy(&req->qsg);
@@ -417,6 +435,85 @@ static uint16_t nvme_write_uncor(FemuCtrl *n, NvmeNamespace *ns, NvmeCmd *cmd,
     return NVME_SUCCESS;
 }
 
+static inline uint16_t nvme_make_pid(NvmeEnduranceGroup *endgrp, uint16_t rg, uint16_t ph)
+{
+	uint16_t rgif = endgrp->fdp.rgif; 
+
+	if (rgif == 0)
+		return ph;
+
+	return (rg << (16 - rgif) | ph);												
+}	
+
+static uint16_t nvme_io_mgmt_recv_ruhs(FemuCtrl *n, NvmeNamespace* ns, NvmeCmd *cmd, 
+											NvmeRequest *req, size_t len) 
+{ 
+    NvmeEnduranceGroup *endgrp;
+    NvmeRuhStatus *hdr;
+    NvmeRuhStatusDescr *ruhsd;
+    unsigned int nruhsd;
+    uint16_t rg, ph, *ruhid;
+    size_t trans_len;
+    uint8_t *buf = NULL;  
+	uint64_t prp1 = le64_to_cpu(cmd->dptr.prp1); 
+	uint64_t prp2 = le64_to_cpu(cmd->dptr.prp2);
+
+	if (ns->id == 0 || ns->id == 0xffffffff) {
+		return NVME_INVALID_NSID | NVME_DNR;
+    }
+
+    if (!ns->endgrp->fdp.enabled) {
+        return NVME_FDP_DISABLED | NVME_DNR;
+    }
+
+    endgrp = ns->endgrp;
+
+    nruhsd = ns->fdp.nphs * endgrp->fdp.nrg;
+    trans_len = sizeof(NvmeRuhStatus) + nruhsd * sizeof(NvmeRuhStatusDescr);
+    buf = g_malloc(trans_len);
+
+    trans_len = MIN(trans_len, len);
+
+    hdr = (NvmeRuhStatus *)buf; 
+    ruhsd = (NvmeRuhStatusDescr *)(buf + sizeof(NvmeRuhStatus)); 
+
+    hdr->nruhsd = cpu_to_le16(nruhsd); 
+
+    ruhid = ns->fdp.phs;
+
+    for (ph = 0; ph < ns->fdp.nphs; ph++, ruhid++) {
+        NvmeRuHandle *ruh = &endgrp->fdp.ruhs[*ruhid];
+
+        for (rg = 0; rg < endgrp->fdp.nrg; rg++, ruhsd++) {
+            uint16_t pid = nvme_make_pid(endgrp, rg, ph);
+
+            ruhsd->pid = cpu_to_le16(pid); 
+            ruhsd->ruhid = *ruhid;
+            ruhsd->earutr = 0;
+            ruhsd->ruamw = cpu_to_le64(ruh->rus[rg].ruamw);
+        }
+    }
+
+    return dma_read_prp(n, buf, trans_len, prp1, prp2);
+}		
+
+static uint16_t nvme_io_mgmt_recv(FemuCtrl *n, NvmeNamespace *ns, NvmeCmd *cmd,	NvmeRequest *req)
+{
+    uint32_t cdw10 = le32_to_cpu(cmd->cdw10);
+    uint32_t numd = le32_to_cpu(cmd->cdw11);
+    uint8_t mo = (cdw10 & 0xff); 
+    size_t len = (numd + 1) << 2; 
+
+    switch (mo) {
+    case NVME_IOMR_MO_NOP:
+        return 0;
+    case NVME_IOMR_MO_RUH_STATUS:
+        return nvme_io_mgmt_recv_ruhs(n, ns, cmd, req, len);
+    default:
+        return NVME_INVALID_FIELD | NVME_DNR;
+    };
+}	
+
 static uint16_t nvme_io_cmd(FemuCtrl *n, NvmeCmd *cmd, NvmeRequest *req)
 {
     NvmeNamespace *ns;
@@ -455,6 +552,10 @@ static uint16_t nvme_io_cmd(FemuCtrl *n, NvmeCmd *cmd, NvmeRequest *req)
             return nvme_write_uncor(n, ns, cmd, req);
         }
         return NVME_INVALID_OPCODE | NVME_DNR;
+	case NVME_CMD_IO_MGMT_RECV: 
+		return nvme_io_mgmt_recv(n, ns, cmd, req); // FIXME: No enable condition
+	case NVME_CMD_IO_MGMT_SEND:					
+		/* return nvme_io_mgmt_send(n, ns, cmd, req); // FIXME: No enable condition */
     default:
         if (n->ext_ops.io_cmd) {
             return n->ext_ops.io_cmd(n, ns, cmd, req);

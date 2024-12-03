@@ -216,7 +216,7 @@ NvmeRead (
     DEBUG_BLKIO,
     "%a: Lba = 0x%08Lx, Original = 0x%08Lx, "
     "Remaining = 0x%08Lx, BlockSize = 0x%x, Status = %r\n",
-    __func__,
+    __FUNCTION__,
     Lba,
     (UINT64)OrginalBlocks,
     (UINT64)Blocks,
@@ -302,7 +302,7 @@ NvmeWrite (
     DEBUG_BLKIO,
     "%a: Lba = 0x%08Lx, Original = 0x%08Lx, "
     "Remaining = 0x%08Lx, BlockSize = 0x%x, Status = %r\n",
-    __func__,
+    __FUNCTION__,
     Lba,
     (UINT64)OrginalBlocks,
     (UINT64)Blocks,
@@ -817,7 +817,7 @@ NvmeAsyncRead (
     DEBUG_BLKIO,
     "%a: Lba = 0x%08Lx, Original = 0x%08Lx, "
     "Remaining = 0x%08Lx, BlockSize = 0x%x, Status = %r\n",
-    __func__,
+    __FUNCTION__,
     Lba,
     (UINT64)OrginalBlocks,
     (UINT64)Blocks,
@@ -945,7 +945,7 @@ NvmeAsyncWrite (
     DEBUG_BLKIO,
     "%a: Lba = 0x%08Lx, Original = 0x%08Lx, "
     "Remaining = 0x%08Lx, BlockSize = 0x%x, Status = %r\n",
-    __func__,
+    __FUNCTION__,
     Lba,
     (UINT64)OrginalBlocks,
     (UINT64)Blocks,

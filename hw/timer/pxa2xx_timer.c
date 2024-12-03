@@ -18,7 +18,6 @@
 #include "qemu/log.h"
 #include "qemu/module.h"
 #include "qom/object.h"
-#include "sysemu/watchdog.h"
 
 #define OSMR0	0x00
 #define OSMR1	0x04
@@ -418,7 +417,7 @@ static void pxa2xx_timer_tick(void *opaque)
     if (t->num == 3)
         if (i->reset3 & 1) {
             i->reset3 = 0;
-            watchdog_perform_action();
+            qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
         }
 }
 
@@ -502,7 +501,7 @@ static const VMStateDescription vmstate_pxa2xx_timer0_regs = {
     .name = "pxa2xx_timer0",
     .version_id = 2,
     .minimum_version_id = 2,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_UINT32(value, PXA2xxTimer0),
         VMSTATE_END_OF_LIST(),
     },
@@ -512,7 +511,7 @@ static const VMStateDescription vmstate_pxa2xx_timer4_regs = {
     .name = "pxa2xx_timer4",
     .version_id = 1,
     .minimum_version_id = 1,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_STRUCT(tm, PXA2xxTimer4, 1,
                         vmstate_pxa2xx_timer0_regs, PXA2xxTimer0),
         VMSTATE_INT32(oldclock, PXA2xxTimer4),
@@ -534,7 +533,7 @@ static const VMStateDescription vmstate_pxa2xx_timer_regs = {
     .version_id = 1,
     .minimum_version_id = 1,
     .post_load = pxa25x_timer_post_load,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_INT32(clock, PXA2xxTimerInfo),
         VMSTATE_INT32(oldclock, PXA2xxTimerInfo),
         VMSTATE_UINT64(lastload, PXA2xxTimerInfo),

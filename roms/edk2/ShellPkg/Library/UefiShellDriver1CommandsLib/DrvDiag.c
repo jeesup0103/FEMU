@@ -438,22 +438,25 @@ ShellCommandRunDrvDiag (
     ControllerHandleStr = ShellCommandLineGetRawValue (Package, 2);
     ChildHandleStr      = ShellCommandLineGetRawValue (Package, 3);
 
-    if ((DriverHandleStr != NULL) && !EFI_ERROR (ShellConvertStringToUint64 (DriverHandleStr, &Intermediate, TRUE, FALSE))) {
-      Handle1 = ConvertHandleIndexToHandle ((UINTN)Intermediate);
-    } else {
+    if (DriverHandleStr == NULL) {
       Handle1 = NULL;
+    } else {
+      ShellConvertStringToUint64 (DriverHandleStr, &Intermediate, TRUE, FALSE);
+      Handle1 = ConvertHandleIndexToHandle ((UINTN)Intermediate);
     }
 
-    if ((ControllerHandleStr != NULL) && !EFI_ERROR (ShellConvertStringToUint64 (ControllerHandleStr, &Intermediate, TRUE, FALSE))) {
-      Handle2 = ConvertHandleIndexToHandle ((UINTN)Intermediate);
-    } else {
+    if (ControllerHandleStr == NULL) {
       Handle2 = NULL;
+    } else {
+      ShellConvertStringToUint64 (ControllerHandleStr, &Intermediate, TRUE, FALSE);
+      Handle2 = ConvertHandleIndexToHandle ((UINTN)Intermediate);
     }
 
-    if ((ChildHandleStr != NULL) && !EFI_ERROR (ShellConvertStringToUint64 (ChildHandleStr, &Intermediate, TRUE, FALSE))) {
-      Handle3 = ConvertHandleIndexToHandle ((UINTN)Intermediate);
-    } else {
+    if (ChildHandleStr == NULL) {
       Handle3 = NULL;
+    } else {
+      ShellConvertStringToUint64 (ChildHandleStr, &Intermediate, TRUE, FALSE);
+      Handle3 = ConvertHandleIndexToHandle ((UINTN)Intermediate);
     }
 
     Status = DoDiagnostics (

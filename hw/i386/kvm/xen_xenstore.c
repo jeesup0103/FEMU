@@ -25,7 +25,6 @@
 #include "hw/xen/xen_backend_ops.h"
 #include "xen_overlay.h"
 #include "xen_evtchn.h"
-#include "xen_primary_console.h"
 #include "xen_xenstore.h"
 
 #include "sysemu/kvm.h"
@@ -134,7 +133,7 @@ static void xen_xenstore_realize(DeviceState *dev, Error **errp)
         error_setg(errp, "Xenstore evtchn port init failed");
         return;
     }
-    aio_set_fd_handler(qemu_get_aio_context(), xen_be_evtchn_fd(s->eh),
+    aio_set_fd_handler(qemu_get_aio_context(), xen_be_evtchn_fd(s->eh), true,
                        xen_xenstore_event, NULL, NULL, NULL, s);
 
     s->impl = xs_impl_create(xen_domid);
@@ -243,7 +242,7 @@ static const VMStateDescription xen_xenstore_vmstate = {
     .needed = xen_xenstore_is_needed,
     .pre_save = xen_xenstore_pre_save,
     .post_load = xen_xenstore_post_load,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_UINT8_ARRAY(req_data, XenXenstoreState,
                             sizeof_field(XenXenstoreState, req_data)),
         VMSTATE_UINT8_ARRAY(rsp_data, XenXenstoreState,
@@ -332,7 +331,7 @@ static void xs_error(XenXenstoreState *s, unsigned int id,
     const char *errstr = NULL;
 
     for (unsigned int i = 0; i < ARRAY_SIZE(xsd_errors); i++) {
-        const struct xsd_errors *xsd_error = &xsd_errors[i];
+        struct xsd_errors *xsd_error = &xsd_errors[i];
 
         if (xsd_error->errnum == errnum) {
             errstr = xsd_error->errstring;
@@ -1157,7 +1156,7 @@ static unsigned int copy_to_ring(XenXenstoreState *s, uint8_t *ptr,
 
     /*
      * This matches the barrier in copy_to_ring() (or the guest's
-     * equivalent) between writing the data to the ring and updating
+     * equivalent) betweem writing the data to the ring and updating
      * rsp_prod. It protects against the pathological case (which
      * again I think never happened except on Alpha) where our
      * subsequent writes to the ring could *cross* the read of
@@ -1341,7 +1340,7 @@ static void fire_watch_cb(void *opaque, const char *path, const char *token)
 {
     XenXenstoreState *s = opaque;
 
-    assert(bql_locked());
+    assert(qemu_mutex_iothread_locked());
 
     /*
      * If there's a response pending, we obviously can't scribble over
@@ -1358,12 +1357,10 @@ static void fire_watch_cb(void *opaque, const char *path, const char *token)
     } else {
         deliver_watch(s, path, token);
         /*
-         * Attempt to queue the message into the actual ring, and send
-         * the event channel notification if any bytes are copied.
+         * If the message was queued because there was already ring activity,
+         * no need to wake the guest. But if not, we need to send the evtchn.
          */
-        if (s->rsp_pending && put_rsp(s) > 0) {
-            xen_be_evtchn_notify(s->eh, s->be_port);
-        }
+        xen_be_evtchn_notify(s->eh, s->be_port);
     }
 }
 
@@ -1435,8 +1432,6 @@ static void alloc_guest_port(XenXenstoreState *s)
 int xen_xenstore_reset(void)
 {
     XenXenstoreState *s = xen_xenstore_singleton;
-    int console_port;
-    GList *perms;
     int err;
 
     if (!s) {
@@ -1463,24 +1458,6 @@ int xen_xenstore_reset(void)
         return err;
     }
     s->be_port = err;
-
-    /* Create frontend store nodes */
-    perms = g_list_append(NULL, xs_perm_as_string(XS_PERM_NONE, DOMID_QEMU));
-    perms = g_list_append(perms, xs_perm_as_string(XS_PERM_READ, xen_domid));
-
-    relpath_printf(s, perms, "store/port", "%u", s->guest_port);
-    relpath_printf(s, perms, "store/ring-ref", "%lu",
-                   XEN_SPECIAL_PFN(XENSTORE));
-
-    console_port = xen_primary_console_get_port();
-    if (console_port) {
-        relpath_printf(s, perms, "console/ring-ref", "%lu",
-                       XEN_SPECIAL_PFN(CONSOLE));
-        relpath_printf(s, perms, "console/port", "%u", console_port);
-        relpath_printf(s, perms, "console/state", "%u", XenbusStateInitialised);
-    }
-
-    g_list_free_full(perms, g_free);
 
     /*
      * We don't actually access the guest's page through the grant, because
@@ -1711,7 +1688,7 @@ static struct qemu_xs_handle *xs_be_open(void)
     XenXenstoreState *s = xen_xenstore_singleton;
     struct qemu_xs_handle *h;
 
-    if (!s || !s->impl) {
+    if (!s && !s->impl) {
         errno = -ENOSYS;
         return NULL;
     }

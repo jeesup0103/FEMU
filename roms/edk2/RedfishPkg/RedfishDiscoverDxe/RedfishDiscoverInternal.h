@@ -3,7 +3,6 @@
 
   (C) Copyright 2021 Hewlett Packard Enterprise Development LP<BR>
   Copyright (c) 2022, AMD Incorporated. All rights reserved.
-  Copyright (c) 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
   SPDX-License-Identifier: BSD-2-Clause-Patent
 
@@ -28,7 +27,6 @@
 #include <Library/MemoryAllocationLib.h>
 #include <Library/NetLib.h>
 #include <Library/PrintLib.h>
-#include <Library/RedfishDebugLib.h>
 #include <Library/RestExLib.h>
 #include <Library/UefiLib.h>
 #include <Library/UefiBootServicesTableLib.h>
@@ -38,12 +36,6 @@
 
 #define REDFISH_DISCOVER_VERSION                    0x00010000
 #define EFI_REDFISH_DISCOVER_NETWORK_INTERFACE_TPL  TPL_NOTIFY
-
-#define MAC_COMPARE(This, Target)  (CompareMem ((VOID *)&(This)->MacAddress, &(Target)->MacAddress, (This)->HwAddressSize) == 0)
-#define VALID_TCP6(Target, This)   ((Target)->IsIpv6 && ((This)->NetworkProtocolType == ProtocolTypeTcp6))
-#define VALID_TCP4(Target, This)   (!(Target)->IsIpv6 && ((This)->NetworkProtocolType == ProtocolTypeTcp4))
-#define REDFISH_HI_ITERFACE_SPECIFIC_DATA_LENGTH_OFFSET  ((UINT16)(UINTN)(&((SMBIOS_TABLE_TYPE42 *)0)->InterfaceTypeSpecificDataLength))
-#define REDFISH_HI_PROTOCOL_HOSTNAME_LENGTH_OFFSET       ((UINT16)(UINTN)(&((REDFISH_OVER_IP_PROTOCOL_DATA *)0)->RedfishServiceHostnameLength))
 
 //
 // GUID definitions
@@ -110,7 +102,7 @@ typedef struct {
   UINT32                                         SubnetAddrInfoIPv6Number;   ///< IPv6 address info number.
   EFI_IP6_ADDRESS_INFO                           *SubnetAddrInfoIPv6;        ///< IPv6 address info.
   //
-  // Network interface protocol and REST EX info.
+  // Network interface protocol and REST EX infor.
   //
   UINT32                                         NetworkProtocolType;          ///< Network protocol type. Refer to
                                                                                ///< NETWORK_INTERFACE_PROTOCOL_TYPE.
@@ -120,35 +112,21 @@ typedef struct {
   // EFI_REDFISH_DISCOVER_PROTOCOL instance installed
   // on this network interface.
   //
-  EFI_HANDLE                                     EfiRedfishDiscoverProtocolHandle; ///< EFI_REDFISH_DISCOVER_PROTOCOL instance installed
+  EFI_HANDLE                                     EfiRedfishDiscoverProtocolHandle; ///< EFI_REDFISH_DISCOVER_PROTOTOCOL instance installed
                                                                                    ///< on this network interface.
 } EFI_REDFISH_DISCOVER_NETWORK_INTERFACE_INTERNAL;
-
-//
-// Redfish Discover Instance signature
-//
-
-#define EFI_REDFISH_DISCOVER_DATA_SIGNATURE  SIGNATURE_32 ('E', 'R', 'D', 'D')
-
-#define EFI_REDFISH_DISOVER_DATA_FROM_DISCOVER_PROTOCOL(a) \
-  CR (a, EFI_REDFISH_DISCOVER_REST_EX_INSTANCE_INTERNAL, RedfishDiscoverProtocol, EFI_REDFISH_DISCOVER_DATA_SIGNATURE)
 
 //
 // Internal structure used to maintain REST EX properties.
 //
 typedef struct {
-  LIST_ENTRY                                Entry;                      ///< Link list entry.
-  UINT32                                    Signature;                  ///< Instance signature.
-  EFI_HANDLE                                OpenDriverAgentHandle;      ///< The agent to open network protocol.
-  EFI_HANDLE                                OpenDriverControllerHandle; ///< The controller handle to open network protocol.
-  EFI_HANDLE                                RestExChildHandle;          ///< The child handle created through REST EX Service Protocol.
-  EFI_HANDLE                                RestExControllerHandle;     ///< The controller handle which provide REST EX protocol.
-  EFI_REST_EX_PROTOCOL                      *RestExProtocolInterface;   ///< Pointer to EFI_REST_EX_PROTOCOL.
-  UINT32                                    RestExId;                   ///< The identifier installed on REST EX controller handle.
-  UINTN                                     NumberOfNetworkInterfaces;  ///< Number of network interfaces can do Redfish service discovery.
-  EFI_REDFISH_DISCOVER_NETWORK_INTERFACE    *NetworkInterfaceInstances; ///< Network interface instances. It's an array of instances. The number of entries
-                                                                        ///< in array is indicated by NumberOfNetworkInterfaces.
-  EFI_REDFISH_DISCOVER_PROTOCOL             RedfishDiscoverProtocol;    ///< EFI_REDFISH_DISCOVER_PROTOCOL protocol.
+  LIST_ENTRY              Entry;                      ///< Link list entry.
+  EFI_HANDLE              OpenDriverAgentHandle;      ///< The agent to open network protocol.
+  EFI_HANDLE              OpenDriverControllerHandle; ///< The controller handle to open network protocol.
+  EFI_HANDLE              RestExChildHandle;          ///< The child handle created throught REST EX Service Protocol.
+  EFI_HANDLE              RestExControllerHandle;     ///< The controller handle which provide REST EX protocol.
+  EFI_REST_EX_PROTOCOL    *RestExProtocolInterface;   ///< Pointer to EFI_REST_EX_PROTOCOL.
+  UINT32                  RestExId;                   ///< The identifier installed on REST EX controller handle.
 } EFI_REDFISH_DISCOVER_REST_EX_INSTANCE_INTERNAL;
 
 /**
@@ -200,18 +178,15 @@ typedef struct {
   EFI_REDFISH_DISCOVER_NETWORK_INTERFACE_INTERNAL    *NetworkInterface; ///< EFI_REDFISH_DISCOVER_NETWORK_INTERFACE_INTERNAL
                                                                         ///< instance used to discover Redfish service.
   //
-  // Below for Host interface discovery.
+  // Below for Host insterface discovery.
   //
   BOOLEAN                                            HostIntfValidation; ///< Indicates whether to validate Redfish Host interface.
   EFI_IP_ADDRESS                                     TargetIpAddress;    ///< Target IP address reported in Redfish Host interface.
-  UINT8                                              HostAddrFormat;     ///< Unknown=00h, Ipv4=01h, Ipv6=02h.
-  EFI_IP_ADDRESS                                     HostIpAddress;      ///< Host IP address reported in Redfish Host interface.
-  EFI_IP_ADDRESS                                     HostSubnetMask;     ///< Host subnet mask address reported in Redfish Host interface.
 } EFI_REDFISH_DISCOVERED_INTERNAL_INSTANCE;
 
 /**
-  The function adds a new found Redfish service to internal list and
-  notify client.
+  The function adds a new foudn Redfish service to internal list and
+  notify clinet.
 
   It simply frees the packet.
 
@@ -222,7 +197,7 @@ typedef struct {
   @param[in]  Os                    OS string.
   @param[in]  OsVer                 OS version string.
   @param[in]  Product               Product string.
-  @param[in]  ProductVer            Product version string.
+  @param[in]  ProductVer            Product verison string.
   @param[in]  UseHttps              Redfish service requires secured connection.
   @retval EFI_SUCCESS               Redfish service is added to list successfully.
 
@@ -249,7 +224,7 @@ AddAndSignalNewRedfishService (
   @param[out] DeviceDescriptor Pointer to REDFISH_INTERFACE_DATA.
   @param[out] ProtocolData     Pointer to REDFISH_OVER_IP_PROTOCOL_DATA.
 
-  @retval EFI_SUCCESS    Get host interface successfully.
+  @retval EFI_SUCCESS    Get host interface succesfully.
   @retval Otherwise      Fail to tet host interface.
 
 **/

@@ -1,7 +1,7 @@
 /** @file
   Unit tests of the MtrrLib instance of the MtrrLib class
 
-  Copyright (c) 2020 - 2023, Intel Corporation. All rights reserved.<BR>
+  Copyright (c) 2020, Intel Corporation. All rights reserved.<BR>
   SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
@@ -13,30 +13,23 @@ STATIC CONST MTRR_LIB_SYSTEM_PARAMETER  mDefaultSystemParameter = {
 };
 
 STATIC MTRR_LIB_SYSTEM_PARAMETER  mSystemParameters[] = {
-  { 38, TRUE, TRUE,  CacheUncacheable,    12 },
-  { 38, TRUE, TRUE,  CacheWriteBack,      12 },
-  { 38, TRUE, TRUE,  CacheWriteThrough,   12 },
-  { 38, TRUE, TRUE,  CacheWriteProtected, 12 },
-  { 38, TRUE, TRUE,  CacheWriteCombining, 12 },
+  { 38, TRUE, TRUE, CacheUncacheable,    12 },
+  { 38, TRUE, TRUE, CacheWriteBack,      12 },
+  { 38, TRUE, TRUE, CacheWriteThrough,   12 },
+  { 38, TRUE, TRUE, CacheWriteProtected, 12 },
+  { 38, TRUE, TRUE, CacheWriteCombining, 12 },
 
-  { 42, TRUE, TRUE,  CacheUncacheable,    12 },
-  { 42, TRUE, TRUE,  CacheWriteBack,      12 },
-  { 42, TRUE, TRUE,  CacheWriteThrough,   12 },
-  { 42, TRUE, TRUE,  CacheWriteProtected, 12 },
-  { 42, TRUE, TRUE,  CacheWriteCombining, 12 },
+  { 42, TRUE, TRUE, CacheUncacheable,    12 },
+  { 42, TRUE, TRUE, CacheWriteBack,      12 },
+  { 42, TRUE, TRUE, CacheWriteThrough,   12 },
+  { 42, TRUE, TRUE, CacheWriteProtected, 12 },
+  { 42, TRUE, TRUE, CacheWriteCombining, 12 },
 
-  { 48, TRUE, TRUE,  CacheUncacheable,    12 },
-  { 48, TRUE, TRUE,  CacheWriteBack,      12 },
-  { 48, TRUE, TRUE,  CacheWriteThrough,   12 },
-  { 48, TRUE, TRUE,  CacheWriteProtected, 12 },
-  { 48, TRUE, TRUE,  CacheWriteCombining, 12 },
-
-  { 48, TRUE, FALSE, CacheUncacheable,    12 },
-  { 48, TRUE, FALSE, CacheWriteBack,      12 },
-  { 48, TRUE, FALSE, CacheWriteThrough,   12 },
-  { 48, TRUE, FALSE, CacheWriteProtected, 12 },
-  { 48, TRUE, FALSE, CacheWriteCombining, 12 },
-  { 48, TRUE, TRUE,  CacheWriteBack,      12, 7},  // 7 bits for MKTME
+  { 48, TRUE, TRUE, CacheUncacheable,    12 },
+  { 48, TRUE, TRUE, CacheWriteBack,      12 },
+  { 48, TRUE, TRUE, CacheWriteThrough,   12 },
+  { 48, TRUE, TRUE, CacheWriteProtected, 12 },
+  { 48, TRUE, TRUE, CacheWriteCombining, 12 },
 };
 
 UINT32  mFixedMtrrsIndex[] = {
@@ -177,8 +170,7 @@ GenerateRandomMemoryTypeCombination (
 }
 
 /**
-  Unit test of MtrrLib service MtrrGetMemoryAttributesInMtrrSettings() and
-  MtrrSetMemoryAttributesInMtrrSettings()
+  Unit test of MtrrLib service MtrrSetMemoryAttribute()
 
   @param[in]  Context    Ignored
 
@@ -189,7 +181,7 @@ GenerateRandomMemoryTypeCombination (
 **/
 UNIT_TEST_STATUS
 EFIAPI
-UnitTestMtrrSetAndGetMemoryAttributesInMtrrSettings (
+UnitTestMtrrSetMemoryAttributesInMtrrSettings (
   IN UNIT_TEST_CONTEXT  Context
   )
 {
@@ -215,9 +207,6 @@ UnitTestMtrrSetAndGetMemoryAttributesInMtrrSettings (
   UINT32             ActualVariableMtrrUsage;
   UINTN              ActualMemoryRangesCount;
 
-  MTRR_MEMORY_RANGE  ReturnedMemoryRanges[MTRR_NUMBER_OF_FIXED_MTRR   * sizeof (UINT64) + 2 * MTRR_NUMBER_OF_VARIABLE_MTRR + 1];
-  UINTN              ReturnedMemoryRangesCount;
-
   MTRR_SETTINGS  *Mtrrs[2];
 
   SystemParameter = (MTRR_LIB_SYSTEM_PARAMETER *)Context;
@@ -230,7 +219,7 @@ UnitTestMtrrSetAndGetMemoryAttributesInMtrrSettings (
     &WcCount
     );
   GenerateValidAndConfigurableMtrrPairs (
-    SystemParameter->PhysicalAddressBits - SystemParameter->MkTmeKeyidBits,
+    SystemParameter->PhysicalAddressBits,
     RawMtrrRange,
     UcCount,
     WtCount,
@@ -243,7 +232,7 @@ UnitTestMtrrSetAndGetMemoryAttributesInMtrrSettings (
   ExpectedMemoryRangesCount = ARRAY_SIZE (ExpectedMemoryRanges);
   GetEffectiveMemoryRanges (
     SystemParameter->DefaultCacheType,
-    SystemParameter->PhysicalAddressBits - SystemParameter->MkTmeKeyidBits,
+    SystemParameter->PhysicalAddressBits,
     RawMtrrRange,
     ExpectedVariableMtrrUsage,
     ExpectedMemoryRanges,
@@ -289,7 +278,7 @@ UnitTestMtrrSetAndGetMemoryAttributesInMtrrSettings (
     ActualMemoryRangesCount = ARRAY_SIZE (ActualMemoryRanges);
     CollectTestResult (
       SystemParameter->DefaultCacheType,
-      SystemParameter->PhysicalAddressBits - SystemParameter->MkTmeKeyidBits,
+      SystemParameter->PhysicalAddressBits,
       SystemParameter->VariableMtrrCount,
       &LocalMtrrs,
       ActualMemoryRanges,
@@ -301,17 +290,6 @@ UnitTestMtrrSetAndGetMemoryAttributesInMtrrSettings (
     DumpMemoryRanges (ActualMemoryRanges, ActualMemoryRangesCount);
     VerifyMemoryRanges (ExpectedMemoryRanges, ExpectedMemoryRangesCount, ActualMemoryRanges, ActualMemoryRangesCount);
     UT_ASSERT_TRUE (ExpectedVariableMtrrUsage >= ActualVariableMtrrUsage);
-
-    ReturnedMemoryRangesCount = ARRAY_SIZE (ReturnedMemoryRanges);
-    Status                    = MtrrGetMemoryAttributesInMtrrSettings (
-                                  Mtrrs[MtrrIndex],
-                                  ReturnedMemoryRanges,
-                                  &ReturnedMemoryRangesCount
-                                  );
-    UT_ASSERT_STATUS_EQUAL (Status, RETURN_SUCCESS);
-    UT_LOG_INFO ("--- Returned Memory Ranges [%d] ---\n", ReturnedMemoryRangesCount);
-    DumpMemoryRanges (ReturnedMemoryRanges, ReturnedMemoryRangesCount);
-    VerifyMemoryRanges (ExpectedMemoryRanges, ExpectedMemoryRangesCount, ReturnedMemoryRanges, ReturnedMemoryRangesCount);
 
     ZeroMem (&LocalMtrrs, sizeof (LocalMtrrs));
   }
@@ -347,7 +325,7 @@ UnitTestInvalidMemoryLayouts (
   SystemParameter = (MTRR_LIB_SYSTEM_PARAMETER *)Context;
 
   RangeCount = Random32 (1, ARRAY_SIZE (Ranges));
-  MaxAddress = 1ull << (SystemParameter->PhysicalAddressBits - SystemParameter->MkTmeKeyidBits);
+  MaxAddress = 1ull << SystemParameter->PhysicalAddressBits;
 
   for (Index = 0; Index < RangeCount; Index++) {
     do {
@@ -419,7 +397,7 @@ UnitTestIsMtrrSupported (
   SystemParameter.VariableMtrrCount  = 0;
   SystemParameter.FixedMtrrSupported = TRUE;
   InitializeMtrrRegs (&SystemParameter);
-  UT_ASSERT_TRUE (IsMtrrSupported ());
+  UT_ASSERT_FALSE (IsMtrrSupported ());
 
   //
   // MTRR capability on in CPUID leaf, but no fixed MTRRs.
@@ -428,7 +406,7 @@ UnitTestIsMtrrSupported (
   SystemParameter.VariableMtrrCount  = 7;
   SystemParameter.FixedMtrrSupported = FALSE;
   InitializeMtrrRegs (&SystemParameter);
-  UT_ASSERT_TRUE (IsMtrrSupported ());
+  UT_ASSERT_FALSE (IsMtrrSupported ());
 
   //
   // MTRR capability on in CPUID leaf with both variable and fixed MTRRs.
@@ -570,7 +548,7 @@ UnitTestGetFirmwareVariableMtrrCount (
   InitializeMtrrRegs (&SystemParameter);
   PatchPcdSet32 (PcdCpuNumberOfReservedVariableMtrrs, 2);
   Result = GetFirmwareVariableMtrrCount ();
-  UT_ASSERT_EQUAL (Result, SystemParameter.VariableMtrrCount - 2);
+  UT_ASSERT_EQUAL (Result, 0);
 
   //
   // Expect ASSERT() if variable MTRR count is > MTRR_NUMBER_OF_VARIABLE_MTRR
@@ -665,66 +643,7 @@ UnitTestMtrrGetFixedMtrr (
   UT_ASSERT_EQUAL ((UINTN)Result, (UINTN)&FixedSettings);
   UT_ASSERT_MEM_EQUAL (&ExpectedFixedSettings, &FixedSettings, sizeof (ExpectedFixedSettings));
 
-  //
-  // Negative test case when Fixed MTRRs are not supported
-  //
-  SystemParameter.MtrrSupported      = TRUE;
-  SystemParameter.FixedMtrrSupported = FALSE;
-  InitializeMtrrRegs (&SystemParameter);
-
-  ZeroMem (&FixedSettings, sizeof (FixedSettings));
-  ZeroMem (&ExpectedFixedSettings, sizeof (ExpectedFixedSettings));
-  Result = MtrrGetFixedMtrr (&FixedSettings);
-  UT_ASSERT_EQUAL ((UINTN)Result, (UINTN)&FixedSettings);
-  UT_ASSERT_MEM_EQUAL (&ExpectedFixedSettings, &FixedSettings, sizeof (ExpectedFixedSettings));
-
   return UNIT_TEST_PASSED;
-}
-
-/**
-  Set Random Variable and Fixed MTRRs Settings for
-  unit test of UnitTestMtrrGetAllMtrrs.
-
-  @param SystemParameter      System parameter that controls the MTRR registers initialization.
-  @param ExpectedMtrrs        Expected Fixed and Variable MTRRs.
-**/
-VOID
-SetRandomlyGeneratedMtrrSettings (
-  IN MTRR_LIB_SYSTEM_PARAMETER  *SystemParameter,
-  IN MTRR_SETTINGS              *ExpectedMtrrs
-  )
-{
-  UINT32                           Index;
-  UINTN                            MsrIndex;
-  UINTN                            ByteIndex;
-  UINT64                           MsrValue;
-  MSR_IA32_MTRR_DEF_TYPE_REGISTER  Default;
-
-  AsmWriteMsr64 (MSR_IA32_MTRR_DEF_TYPE, ExpectedMtrrs->MtrrDefType);
-  //
-  // Randomly generate Variable MTRR BASE/MASK for a specified type and write to MSR.
-  //
-  for (Index = 0; Index < SystemParameter->VariableMtrrCount; Index++) {
-    GenerateRandomMtrrPair (SystemParameter->PhysicalAddressBits, GenerateRandomCacheType (), &ExpectedMtrrs->Variables.Mtrr[Index], NULL);
-    AsmWriteMsr64 (MSR_IA32_MTRR_PHYSBASE0 + (Index << 1), ExpectedMtrrs->Variables.Mtrr[Index].Base);
-    AsmWriteMsr64 (MSR_IA32_MTRR_PHYSMASK0 + (Index << 1), ExpectedMtrrs->Variables.Mtrr[Index].Mask);
-  }
-
-  //
-  // Set Fixed MTRRs when the Fixed MTRRs is enabled and the MTRRs is supported.
-  //
-  Default.Uint64 = AsmReadMsr64 (MSR_IA32_MTRR_DEF_TYPE);
-  if ((Default.Bits.FE == 1) && (SystemParameter->MtrrSupported == TRUE)) {
-    for (MsrIndex = 0; MsrIndex < ARRAY_SIZE (mFixedMtrrsIndex); MsrIndex++) {
-      MsrValue = 0;
-      for (ByteIndex = 0; ByteIndex < sizeof (UINT64); ByteIndex++) {
-        MsrValue = MsrValue | LShiftU64 (GenerateRandomCacheType (), ByteIndex * 8);
-      }
-
-      ExpectedMtrrs->Fixed.Mtrr[MsrIndex] = MsrValue;
-      AsmWriteMsr64 (mFixedMtrrsIndex[MsrIndex], MsrValue);
-    }
-  }
 }
 
 /**
@@ -743,51 +662,28 @@ UnitTestMtrrGetAllMtrrs (
   IN UNIT_TEST_CONTEXT  Context
   )
 {
-  MTRR_SETTINGS                    *Result;
-  MTRR_SETTINGS                    Mtrrs;
-  MTRR_SETTINGS                    ExpectedMtrrs;
-  MTRR_LIB_SYSTEM_PARAMETER        SystemParameter;
-  MTRR_LIB_TEST_CONTEXT            *LocalContext;
-  MSR_IA32_MTRR_DEF_TYPE_REGISTER  Default;
+  MTRR_SETTINGS              *Result;
+  MTRR_SETTINGS              Mtrrs;
+  MTRR_SETTINGS              ExpectedMtrrs;
+  MTRR_VARIABLE_SETTING      VariableMtrr[MTRR_NUMBER_OF_VARIABLE_MTRR];
+  UINT32                     Index;
+  MTRR_LIB_SYSTEM_PARAMETER  SystemParameter;
+  MTRR_LIB_TEST_CONTEXT      *LocalContext;
 
   LocalContext = (MTRR_LIB_TEST_CONTEXT *)Context;
 
   CopyMem (&SystemParameter, LocalContext->SystemParameter, sizeof (SystemParameter));
-
-  //
-  // For the case that Fixed MTRRs is NOT enabled
-  //
-  SystemParameter.MtrrSupported      = TRUE;
-  SystemParameter.FixedMtrrSupported = FALSE;
   InitializeMtrrRegs (&SystemParameter);
-  Default.Uint64  = 0;
-  Default.Bits.E  = 1;
-  Default.Bits.FE = 0;
-  ZeroMem (&ExpectedMtrrs, sizeof (ExpectedMtrrs));
-  ExpectedMtrrs.MtrrDefType = Default.Uint64;
-  //
-  // Randomly generate expected MtrrSettings and set to MSR.
-  //
-  SetRandomlyGeneratedMtrrSettings (&SystemParameter, &ExpectedMtrrs);
-  Result = MtrrGetAllMtrrs (&Mtrrs);
-  UT_ASSERT_MEM_EQUAL (&ExpectedMtrrs.Fixed, &Mtrrs.Fixed, sizeof (MTRR_FIXED_SETTINGS));
-  UT_ASSERT_MEM_EQUAL (Mtrrs.Variables.Mtrr, ExpectedMtrrs.Variables.Mtrr, sizeof (MTRR_VARIABLE_SETTING) * (SystemParameter.VariableMtrrCount));
 
-  //
-  // For the case that Fixed MTRRs is enabled
-  //
-  SystemParameter.MtrrSupported      = TRUE;
-  SystemParameter.FixedMtrrSupported = TRUE;
-  InitializeMtrrRegs (&SystemParameter);
-  Default.Uint64  = 0;
-  Default.Bits.E  = 1;
-  Default.Bits.FE = 1;
-  ZeroMem (&ExpectedMtrrs, sizeof (ExpectedMtrrs));
-  ExpectedMtrrs.MtrrDefType = Default.Uint64;
-  SetRandomlyGeneratedMtrrSettings (&SystemParameter, &ExpectedMtrrs);
+  for (Index = 0; Index < SystemParameter.VariableMtrrCount; Index++) {
+    GenerateRandomMtrrPair (SystemParameter.PhysicalAddressBits, GenerateRandomCacheType (), &VariableMtrr[Index], NULL);
+    AsmWriteMsr64 (MSR_IA32_MTRR_PHYSBASE0 + (Index << 1), VariableMtrr[Index].Base);
+    AsmWriteMsr64 (MSR_IA32_MTRR_PHYSMASK0 + (Index << 1), VariableMtrr[Index].Mask);
+  }
+
   Result = MtrrGetAllMtrrs (&Mtrrs);
-  UT_ASSERT_MEM_EQUAL (&ExpectedMtrrs.Fixed, &Mtrrs.Fixed, sizeof (MTRR_FIXED_SETTINGS));
-  UT_ASSERT_MEM_EQUAL (Mtrrs.Variables.Mtrr, ExpectedMtrrs.Variables.Mtrr, sizeof (MTRR_VARIABLE_SETTING) * (SystemParameter.VariableMtrrCount));
+  UT_ASSERT_EQUAL ((UINTN)Result, (UINTN)&Mtrrs);
+  UT_ASSERT_MEM_EQUAL (Mtrrs.Variables.Mtrr, VariableMtrr, sizeof (MTRR_VARIABLE_SETTING) * SystemParameter.VariableMtrrCount);
 
   //
   // Negative test case when MTRRs are not supported
@@ -814,10 +710,13 @@ UnitTestMtrrGetAllMtrrs (
 
 /**
   Unit test of MtrrLib service MtrrSetAllMtrrs()
+
   @param[in]  Context    Ignored
+
   @retval  UNIT_TEST_PASSED             The Unit test has completed and the test
                                         case was successful.
   @retval  UNIT_TEST_ERROR_TEST_FAILED  A test case assertion has failed.
+
 **/
 UNIT_TEST_STATUS
 EFIAPI
@@ -826,43 +725,35 @@ UnitTestMtrrSetAllMtrrs (
   )
 {
   MTRR_SETTINGS                    *Result;
-  MTRR_SETTINGS                    ExpectedMtrrs;
+  MTRR_SETTINGS                    Mtrrs;
   UINT32                           Index;
   MSR_IA32_MTRR_DEF_TYPE_REGISTER  Default;
   MTRR_LIB_SYSTEM_PARAMETER        SystemParameter;
   MTRR_LIB_TEST_CONTEXT            *LocalContext;
-  UINTN                            MsrIndex;
-  UINTN                            ByteIndex;
-  UINT64                           MsrValue;
 
   LocalContext = (MTRR_LIB_TEST_CONTEXT *)Context;
+
   CopyMem (&SystemParameter, LocalContext->SystemParameter, sizeof (SystemParameter));
   InitializeMtrrRegs (&SystemParameter);
+
   Default.Uint64    = 0;
   Default.Bits.E    = 1;
   Default.Bits.FE   = 1;
   Default.Bits.Type = GenerateRandomCacheType ();
-  ZeroMem (&ExpectedMtrrs, sizeof (ExpectedMtrrs));
-  ExpectedMtrrs.MtrrDefType = Default.Uint64;
+
+  ZeroMem (&Mtrrs, sizeof (Mtrrs));
+  Mtrrs.MtrrDefType = Default.Uint64;
   for (Index = 0; Index < SystemParameter.VariableMtrrCount; Index++) {
-    GenerateRandomMtrrPair (SystemParameter.PhysicalAddressBits, GenerateRandomCacheType (), &ExpectedMtrrs.Variables.Mtrr[Index], NULL);
+    GenerateRandomMtrrPair (SystemParameter.PhysicalAddressBits, GenerateRandomCacheType (), &Mtrrs.Variables.Mtrr[Index], NULL);
   }
 
-  for (MsrIndex = 0; MsrIndex < ARRAY_SIZE (mFixedMtrrsIndex); MsrIndex++) {
-    MsrValue = 0;
-    for (ByteIndex = 0; ByteIndex < sizeof (UINT64); ByteIndex++) {
-      MsrValue = MsrValue | LShiftU64 (GenerateRandomCacheType (), ByteIndex * 8);
-    }
+  Result = MtrrSetAllMtrrs (&Mtrrs);
+  UT_ASSERT_EQUAL ((UINTN)Result, (UINTN)&Mtrrs);
 
-    ExpectedMtrrs.Fixed.Mtrr[MsrIndex] = MsrValue;
-  }
-
-  Result = MtrrSetAllMtrrs (&ExpectedMtrrs);
-  UT_ASSERT_EQUAL ((UINTN)Result, (UINTN)&ExpectedMtrrs);
-  UT_ASSERT_EQUAL (AsmReadMsr64 (MSR_IA32_MTRR_DEF_TYPE), ExpectedMtrrs.MtrrDefType);
+  UT_ASSERT_EQUAL (AsmReadMsr64 (MSR_IA32_MTRR_DEF_TYPE), Mtrrs.MtrrDefType);
   for (Index = 0; Index < SystemParameter.VariableMtrrCount; Index++) {
-    UT_ASSERT_EQUAL (AsmReadMsr64 (MSR_IA32_MTRR_PHYSBASE0 + (Index << 1)), ExpectedMtrrs.Variables.Mtrr[Index].Base);
-    UT_ASSERT_EQUAL (AsmReadMsr64 (MSR_IA32_MTRR_PHYSMASK0 + (Index << 1)), ExpectedMtrrs.Variables.Mtrr[Index].Mask);
+    UT_ASSERT_EQUAL (AsmReadMsr64 (MSR_IA32_MTRR_PHYSBASE0 + (Index << 1)), Mtrrs.Variables.Mtrr[Index].Base);
+    UT_ASSERT_EQUAL (AsmReadMsr64 (MSR_IA32_MTRR_PHYSMASK0 + (Index << 1)), Mtrrs.Variables.Mtrr[Index].Mask);
   }
 
   return UNIT_TEST_PASSED;
@@ -1011,31 +902,24 @@ UnitTestMtrrGetDefaultMemoryType (
   Result = MtrrGetDefaultMemoryType ();
   UT_ASSERT_EQUAL (Result, CacheUncacheable);
 
-  //
-  // If MTRRs are supported, but Fixed MTRRs are not supported.
-  //
   SystemParameter.MtrrSupported      = TRUE;
   SystemParameter.FixedMtrrSupported = FALSE;
   InitializeMtrrRegs (&SystemParameter);
   Result = MtrrGetDefaultMemoryType ();
-  UT_ASSERT_EQUAL (Result, SystemParameter.DefaultCacheType);
+  UT_ASSERT_EQUAL (Result, CacheUncacheable);
 
-  //
-  // If MTRRs are supported, but Variable MTRRs are not supported.
-  //
   SystemParameter.MtrrSupported      = TRUE;
   SystemParameter.FixedMtrrSupported = TRUE;
   SystemParameter.VariableMtrrCount  = 0;
   InitializeMtrrRegs (&SystemParameter);
   Result = MtrrGetDefaultMemoryType ();
-  UT_ASSERT_EQUAL (Result, SystemParameter.DefaultCacheType);
+  UT_ASSERT_EQUAL (Result, CacheUncacheable);
 
   return UNIT_TEST_PASSED;
 }
 
 /**
-  Unit test of MtrrLib service MtrrSetMemoryAttributeInMtrrSettings() and
-  MtrrGetMemoryAttributesInMtrrSettings().
+  Unit test of MtrrLib service MtrrSetMemoryAttributeInMtrrSettings().
 
   @param[in]  Context    Ignored
 
@@ -1046,7 +930,7 @@ UnitTestMtrrGetDefaultMemoryType (
 **/
 UNIT_TEST_STATUS
 EFIAPI
-UnitTestMtrrSetMemoryAttributeAndGetMemoryAttributesInMtrrSettings (
+UnitTestMtrrSetMemoryAttributeInMtrrSettings (
   IN UNIT_TEST_CONTEXT  Context
   )
 {
@@ -1071,9 +955,6 @@ UnitTestMtrrSetMemoryAttributeAndGetMemoryAttributesInMtrrSettings (
   UINT32             ActualVariableMtrrUsage;
   UINTN              ActualMemoryRangesCount;
 
-  MTRR_MEMORY_RANGE  ReturnedMemoryRanges[MTRR_NUMBER_OF_FIXED_MTRR * sizeof (UINT64) + 2 * MTRR_NUMBER_OF_VARIABLE_MTRR + 1];
-  UINTN              ReturnedMemoryRangesCount;
-
   MTRR_SETTINGS  *Mtrrs[2];
 
   SystemParameter = (MTRR_LIB_SYSTEM_PARAMETER *)Context;
@@ -1086,7 +967,7 @@ UnitTestMtrrSetMemoryAttributeAndGetMemoryAttributesInMtrrSettings (
     &WcCount
     );
   GenerateValidAndConfigurableMtrrPairs (
-    SystemParameter->PhysicalAddressBits - SystemParameter->MkTmeKeyidBits,
+    SystemParameter->PhysicalAddressBits,
     RawMtrrRange,
     UcCount,
     WtCount,
@@ -1099,7 +980,7 @@ UnitTestMtrrSetMemoryAttributeAndGetMemoryAttributesInMtrrSettings (
   ExpectedMemoryRangesCount = ARRAY_SIZE (ExpectedMemoryRanges);
   GetEffectiveMemoryRanges (
     SystemParameter->DefaultCacheType,
-    SystemParameter->PhysicalAddressBits - SystemParameter->MkTmeKeyidBits,
+    SystemParameter->PhysicalAddressBits,
     RawMtrrRange,
     ExpectedVariableMtrrUsage,
     ExpectedMemoryRanges,
@@ -1138,7 +1019,7 @@ UnitTestMtrrSetMemoryAttributeAndGetMemoryAttributesInMtrrSettings (
     ActualMemoryRangesCount = ARRAY_SIZE (ActualMemoryRanges);
     CollectTestResult (
       SystemParameter->DefaultCacheType,
-      SystemParameter->PhysicalAddressBits - SystemParameter->MkTmeKeyidBits,
+      SystemParameter->PhysicalAddressBits,
       SystemParameter->VariableMtrrCount,
       &LocalMtrrs,
       ActualMemoryRanges,
@@ -1149,17 +1030,6 @@ UnitTestMtrrSetMemoryAttributeAndGetMemoryAttributesInMtrrSettings (
     DumpMemoryRanges (ActualMemoryRanges, ActualMemoryRangesCount);
     VerifyMemoryRanges (ExpectedMemoryRanges, ExpectedMemoryRangesCount, ActualMemoryRanges, ActualMemoryRangesCount);
     UT_ASSERT_TRUE (ExpectedVariableMtrrUsage >= ActualVariableMtrrUsage);
-
-    ReturnedMemoryRangesCount = ARRAY_SIZE (ReturnedMemoryRanges);
-    Status                    = MtrrGetMemoryAttributesInMtrrSettings (
-                                  &LocalMtrrs,
-                                  ReturnedMemoryRanges,
-                                  &ReturnedMemoryRangesCount
-                                  );
-    UT_ASSERT_STATUS_EQUAL (Status, RETURN_SUCCESS);
-    UT_LOG_INFO ("--- Returned Memory Ranges [%d] ---\n", ReturnedMemoryRangesCount);
-    DumpMemoryRanges (ReturnedMemoryRanges, ReturnedMemoryRangesCount);
-    VerifyMemoryRanges (ExpectedMemoryRanges, ExpectedMemoryRangesCount, ReturnedMemoryRanges, ReturnedMemoryRangesCount);
 
     ZeroMem (&LocalMtrrs, sizeof (LocalMtrrs));
   }
@@ -1269,8 +1139,8 @@ UnitTestingEntry (
   for (SystemIndex = 0; SystemIndex < ARRAY_SIZE (mSystemParameters); SystemIndex++) {
     for (Index = 0; Index < Iteration; Index++) {
       AddTestCase (MtrrApiTests, "Test InvalidMemoryLayouts", "InvalidMemoryLayouts", UnitTestInvalidMemoryLayouts, InitializeSystem, NULL, &mSystemParameters[SystemIndex]);
-      AddTestCase (MtrrApiTests, "Test MtrrSetMemoryAttributeInMtrrSettings and MtrrGetMemoryAttributesInMtrrSettings", "MtrrSetMemoryAttributeInMtrrSettings and MtrrGetMemoryAttributesInMtrrSettings", UnitTestMtrrSetMemoryAttributeAndGetMemoryAttributesInMtrrSettings, InitializeSystem, NULL, &mSystemParameters[SystemIndex]);
-      AddTestCase (MtrrApiTests, "Test MtrrSetMemoryAttributesInMtrrSettings and MtrrGetMemoryAttributesInMtrrSettings", "MtrrSetMemoryAttributesInMtrrSettings and MtrrGetMemoryAttributesInMtrrSetting", UnitTestMtrrSetAndGetMemoryAttributesInMtrrSettings, InitializeSystem, NULL, &mSystemParameters[SystemIndex]);
+      AddTestCase (MtrrApiTests, "Test MtrrSetMemoryAttributeInMtrrSettings", "MtrrSetMemoryAttributeInMtrrSettings", UnitTestMtrrSetMemoryAttributeInMtrrSettings, InitializeSystem, NULL, &mSystemParameters[SystemIndex]);
+      AddTestCase (MtrrApiTests, "Test MtrrSetMemoryAttributesInMtrrSettings", "MtrrSetMemoryAttributesInMtrrSettings", UnitTestMtrrSetMemoryAttributesInMtrrSettings, InitializeSystem, NULL, &mSystemParameters[SystemIndex]);
     }
   }
 

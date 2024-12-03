@@ -2,7 +2,7 @@
  * BTI vs PACIASP
  */
 
-#include "bti-crt.c.inc"
+#include "bti-crt.inc.c"
 
 static void skip2_sigill(int sig, siginfo_t *info, ucontext_t *uc)
 {

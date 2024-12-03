@@ -1,3 +1,2 @@
 config NIOS2
     bool
-    select SEMIHOSTING

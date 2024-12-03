@@ -24,7 +24,6 @@
 #include "sysemu/runstate.h"
 #include "internals.h"
 #include "arm-powerctl.h"
-#include "target/arm/multiprocessing.h"
 
 bool arm_is_psci_call(ARMCPU *cpu, int excp_type)
 {
@@ -108,7 +107,7 @@ void arm_handle_psci_call(ARMCPU *cpu)
             }
             target_cpu = ARM_CPU(target_cpu_state);
 
-            g_assert(bql_locked());
+            g_assert(qemu_mutex_iothread_locked());
             ret = target_cpu->power_state;
             break;
         default:
@@ -216,7 +215,7 @@ err:
     return;
 
 cpu_off:
-    ret = arm_set_cpu_off(arm_cpu_mp_affinity(cpu));
+    ret = arm_set_cpu_off(cpu->mp_affinity);
     /* notreached */
     /* sanity check in case something failed */
     assert(ret == QEMU_ARM_POWERCTL_RET_SUCCESS);

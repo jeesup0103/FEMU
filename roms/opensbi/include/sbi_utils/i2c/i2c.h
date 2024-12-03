@@ -15,6 +15,9 @@
 
 /** Representation of a I2C adapter */
 struct i2c_adapter {
+	/** Pointer to I2C driver owning this I2C adapter */
+	void *driver;
+
 	/** Unique ID of the I2C adapter assigned by the driver */
 	int id;
 

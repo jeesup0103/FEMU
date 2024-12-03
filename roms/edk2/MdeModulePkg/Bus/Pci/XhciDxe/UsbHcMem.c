@@ -226,7 +226,6 @@ UsbHcAllocMemFromBlock (
   @param  Pool           The memory pool of the host controller.
   @param  Mem            The pointer to host memory.
   @param  Size           The size of the memory region.
-  @param  Alignment      Alignment the size to USBHC_MEM_UNIT bytes.
 
   @return                The pci memory address
 
@@ -235,8 +234,7 @@ EFI_PHYSICAL_ADDRESS
 UsbHcGetPciAddrForHostAddr (
   IN USBHC_MEM_POOL  *Pool,
   IN VOID            *Mem,
-  IN UINTN           Size,
-  IN BOOLEAN         Alignment
+  IN UINTN           Size
   )
 {
   USBHC_MEM_BLOCK       *Head;
@@ -245,12 +243,8 @@ UsbHcGetPciAddrForHostAddr (
   EFI_PHYSICAL_ADDRESS  PhyAddr;
   UINTN                 Offset;
 
-  Head = Pool->Head;
-  if (Alignment) {
-    AllocSize = USBHC_MEM_ROUND (Size);
-  } else {
-    AllocSize = Size;
-  }
+  Head      = Pool->Head;
+  AllocSize = USBHC_MEM_ROUND (Size);
 
   if (Mem == NULL) {
     return 0;
@@ -281,7 +275,6 @@ UsbHcGetPciAddrForHostAddr (
   @param  Pool           The memory pool of the host controller.
   @param  Mem            The pointer to pci memory.
   @param  Size           The size of the memory region.
-  @param  Alignment      Alignment the size to USBHC_MEM_UNIT bytes.
 
   @return                The host memory address
 
@@ -290,8 +283,7 @@ EFI_PHYSICAL_ADDRESS
 UsbHcGetHostAddrForPciAddr (
   IN USBHC_MEM_POOL  *Pool,
   IN VOID            *Mem,
-  IN UINTN           Size,
-  IN BOOLEAN         Alignment
+  IN UINTN           Size
   )
 {
   USBHC_MEM_BLOCK       *Head;
@@ -300,12 +292,8 @@ UsbHcGetHostAddrForPciAddr (
   EFI_PHYSICAL_ADDRESS  HostAddr;
   UINTN                 Offset;
 
-  Head = Pool->Head;
-  if (Alignment) {
-    AllocSize = USBHC_MEM_ROUND (Size);
-  } else {
-    AllocSize = Size;
-  }
+  Head      = Pool->Head;
+  AllocSize = USBHC_MEM_ROUND (Size);
 
   if (Mem == NULL) {
     return 0;

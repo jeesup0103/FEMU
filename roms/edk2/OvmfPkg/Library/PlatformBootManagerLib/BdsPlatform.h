@@ -126,7 +126,7 @@ extern VENDOR_DEVICE_PATH        gTerminalTypeDeviceNode;
     1 \
   }
 
-#define gVtUtf8Terminal \
+#define gPcAnsiTerminal \
   { \
     { \
       MESSAGING_DEVICE_PATH, \
@@ -136,7 +136,7 @@ extern VENDOR_DEVICE_PATH        gTerminalTypeDeviceNode;
         (UINT8) ((sizeof (VENDOR_DEVICE_PATH)) >> 8) \
       } \
     }, \
-    DEVICE_PATH_MESSAGING_VT_UTF8 \
+    DEVICE_PATH_MESSAGING_PC_ANSI \
   }
 
 #define gEndEntire \

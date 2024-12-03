@@ -1,11 +1,10 @@
 ;------------------------------------------------------------------------------ ;
-; Copyright (c) 2019 - 2023, Intel Corporation. All rights reserved.<BR>
+; Copyright (c) 2019 - 2022, Intel Corporation. All rights reserved.<BR>
 ; SPDX-License-Identifier: BSD-2-Clause-Patent
 ;
 ;-------------------------------------------------------------------------------
 
 %include "Nasm.inc"
-%include "Cet.inc"
 
 SECTION .text
 
@@ -17,7 +16,7 @@ ASM_PFX(DisableCet):
     incsspd eax
 
     mov     eax, cr4
-    btr     eax, CR4_CET_BIT             ; clear CET
+    btr     eax, 23                      ; clear CET
     mov     cr4, eax
     ret
 
@@ -25,7 +24,7 @@ global ASM_PFX(EnableCet)
 ASM_PFX(EnableCet):
 
     mov     eax, cr4
-    bts     eax, CR4_CET_BIT             ; set CET
+    bts     eax, 23                      ; set CET
     mov     cr4, eax
 
     ; use jmp to skip the check for ret

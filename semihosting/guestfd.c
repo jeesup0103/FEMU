@@ -15,7 +15,7 @@
 #ifdef CONFIG_USER_ONLY
 #include "qemu.h"
 #else
-#include "semihosting/uaccess.h"
+#include "semihosting/softmmu-uaccess.h"
 #include CONFIG_DEVICES
 #endif
 

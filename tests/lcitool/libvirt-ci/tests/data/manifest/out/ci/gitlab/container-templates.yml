@@ -7,7 +7,7 @@
 # Note: never publish from merge requests since they have non-committed code
 #
 .container_job:
-  image: docker:latest
+  image: docker:stable
   stage: containers
   interruptible: false
   needs: []

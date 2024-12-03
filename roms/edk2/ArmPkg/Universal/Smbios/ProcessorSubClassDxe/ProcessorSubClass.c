@@ -741,7 +741,7 @@ AddSmbiosProcessorTypeTable (
     DEBUG ((
       DEBUG_ERROR,
       "[%a]:[%dL] Smbios Type04 Table Log Failed! %r \n",
-      __func__,
+      __FUNCTION__,
       DEBUG_LINE_NUMBER,
       Status
       ));

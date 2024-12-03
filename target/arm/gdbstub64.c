@@ -72,11 +72,8 @@ int aarch64_cpu_gdb_write_register(CPUState *cs, uint8_t *mem_buf, int n)
     return 0;
 }
 
-int aarch64_gdb_get_fpu_reg(CPUState *cs, GByteArray *buf, int reg)
+int aarch64_gdb_get_fpu_reg(CPUARMState *env, GByteArray *buf, int reg)
 {
-    ARMCPU *cpu = ARM_CPU(cs);
-    CPUARMState *env = &cpu->env;
-
     switch (reg) {
     case 0 ... 31:
     {
@@ -95,11 +92,8 @@ int aarch64_gdb_get_fpu_reg(CPUState *cs, GByteArray *buf, int reg)
     }
 }
 
-int aarch64_gdb_set_fpu_reg(CPUState *cs, uint8_t *buf, int reg)
+int aarch64_gdb_set_fpu_reg(CPUARMState *env, uint8_t *buf, int reg)
 {
-    ARMCPU *cpu = ARM_CPU(cs);
-    CPUARMState *env = &cpu->env;
-
     switch (reg) {
     case 0 ... 31:
         /* 128 bit FP register */
@@ -122,10 +116,9 @@ int aarch64_gdb_set_fpu_reg(CPUState *cs, uint8_t *buf, int reg)
     }
 }
 
-int aarch64_gdb_get_sve_reg(CPUState *cs, GByteArray *buf, int reg)
+int aarch64_gdb_get_sve_reg(CPUARMState *env, GByteArray *buf, int reg)
 {
-    ARMCPU *cpu = ARM_CPU(cs);
-    CPUARMState *env = &cpu->env;
+    ARMCPU *cpu = env_archcpu(env);
 
     switch (reg) {
     /* The first 32 registers are the zregs */
@@ -171,10 +164,9 @@ int aarch64_gdb_get_sve_reg(CPUState *cs, GByteArray *buf, int reg)
     return 0;
 }
 
-int aarch64_gdb_set_sve_reg(CPUState *cs, uint8_t *buf, int reg)
+int aarch64_gdb_set_sve_reg(CPUARMState *env, uint8_t *buf, int reg)
 {
-    ARMCPU *cpu = ARM_CPU(cs);
-    CPUARMState *env = &cpu->env;
+    ARMCPU *cpu = env_archcpu(env);
 
     /* The first 32 registers are the zregs */
     switch (reg) {
@@ -218,11 +210,8 @@ int aarch64_gdb_set_sve_reg(CPUState *cs, uint8_t *buf, int reg)
     return 0;
 }
 
-int aarch64_gdb_get_pauth_reg(CPUState *cs, GByteArray *buf, int reg)
+int aarch64_gdb_get_pauth_reg(CPUARMState *env, GByteArray *buf, int reg)
 {
-    ARMCPU *cpu = ARM_CPU(cs);
-    CPUARMState *env = &cpu->env;
-
     switch (reg) {
     case 0: /* pauth_dmask */
     case 1: /* pauth_cmask */
@@ -244,7 +233,7 @@ int aarch64_gdb_get_pauth_reg(CPUState *cs, GByteArray *buf, int reg)
             ARMMMUIdx mmu_idx = arm_stage1_mmu_idx(env);
             ARMVAParameters param;
 
-            param = aa64_va_parameters(env, -is_high, mmu_idx, is_data, false);
+            param = aa64_va_parameters(env, -is_high, mmu_idx, is_data);
             return gdb_get_reg64(buf, pauth_ptr_mask(param));
         }
     default:
@@ -252,13 +241,13 @@ int aarch64_gdb_get_pauth_reg(CPUState *cs, GByteArray *buf, int reg)
     }
 }
 
-int aarch64_gdb_set_pauth_reg(CPUState *cs, uint8_t *buf, int reg)
+int aarch64_gdb_set_pauth_reg(CPUARMState *env, uint8_t *buf, int reg)
 {
     /* All pseudo registers are read-only. */
     return 0;
 }
 
-static void output_vector_union_type(GDBFeatureBuilder *builder, int reg_width,
+static void output_vector_union_type(GString *s, int reg_width,
                                      const char *name)
 {
     struct TypeSize {
@@ -293,10 +282,10 @@ static void output_vector_union_type(GDBFeatureBuilder *builder, int reg_width,
 
     /* First define types and totals in a whole VL */
     for (i = 0; i < ARRAY_SIZE(vec_lanes); i++) {
-        gdb_feature_builder_append_tag(
-            builder, "<vector id=\"%s%c%c\" type=\"%s\" count=\"%d\"/>",
-            name, vec_lanes[i].sz, vec_lanes[i].suffix,
-            vec_lanes[i].gdb_type, reg_width / vec_lanes[i].size);
+        g_string_append_printf(s,
+                               "<vector id=\"%s%c%c\" type=\"%s\" count=\"%d\"/>",
+                               name, vec_lanes[i].sz, vec_lanes[i].suffix,
+                               vec_lanes[i].gdb_type, reg_width / vec_lanes[i].size);
     }
 
     /*
@@ -307,77 +296,86 @@ static void output_vector_union_type(GDBFeatureBuilder *builder, int reg_width,
     for (i = 0; i < ARRAY_SIZE(suf); i++) {
         int bits = 8 << i;
 
-        gdb_feature_builder_append_tag(builder, "<union id=\"%sn%c\">",
-                                       name, suf[i]);
+        g_string_append_printf(s, "<union id=\"%sn%c\">", name, suf[i]);
         for (j = 0; j < ARRAY_SIZE(vec_lanes); j++) {
             if (vec_lanes[j].size == bits) {
-                gdb_feature_builder_append_tag(
-                    builder, "<field name=\"%c\" type=\"%s%c%c\"/>",
-                    vec_lanes[j].suffix, name,
-                    vec_lanes[j].sz, vec_lanes[j].suffix);
+                g_string_append_printf(s, "<field name=\"%c\" type=\"%s%c%c\"/>",
+                                       vec_lanes[j].suffix, name,
+                                       vec_lanes[j].sz, vec_lanes[j].suffix);
             }
         }
-        gdb_feature_builder_append_tag(builder, "</union>");
+        g_string_append(s, "</union>");
     }
 
     /* And now the final union of unions */
-    gdb_feature_builder_append_tag(builder, "<union id=\"%s\">", name);
+    g_string_append_printf(s, "<union id=\"%s\">", name);
     for (i = ARRAY_SIZE(suf) - 1; i >= 0; i--) {
-        gdb_feature_builder_append_tag(builder,
-                                       "<field name=\"%c\" type=\"%sn%c\"/>",
-                                       suf[i], name, suf[i]);
+        g_string_append_printf(s, "<field name=\"%c\" type=\"%sn%c\"/>",
+                               suf[i], name, suf[i]);
     }
-    gdb_feature_builder_append_tag(builder, "</union>");
+    g_string_append(s, "</union>");
 }
 
-GDBFeature *arm_gen_dynamic_svereg_feature(CPUState *cs, int base_reg)
+int arm_gen_dynamic_svereg_xml(CPUState *cs, int orig_base_reg)
 {
     ARMCPU *cpu = ARM_CPU(cs);
+    GString *s = g_string_new(NULL);
+    DynamicGDBXMLInfo *info = &cpu->dyn_svereg_xml;
     int reg_width = cpu->sve_max_vq * 128;
     int pred_width = cpu->sve_max_vq * 16;
-    GDBFeatureBuilder builder;
-    char *name;
-    int reg = 0;
+    int base_reg = orig_base_reg;
     int i;
 
-    gdb_feature_builder_init(&builder, &cpu->dyn_svereg_feature.desc,
-                             "org.gnu.gdb.aarch64.sve", "sve-registers.xml",
-                             base_reg);
+    g_string_printf(s, "<?xml version=\"1.0\"?>");
+    g_string_append_printf(s, "<!DOCTYPE target SYSTEM \"gdb-target.dtd\">");
+    g_string_append_printf(s, "<feature name=\"org.gnu.gdb.aarch64.sve\">");
 
     /* Create the vector union type. */
-    output_vector_union_type(&builder, reg_width, "svev");
+    output_vector_union_type(s, reg_width, "svev");
 
     /* Create the predicate vector type. */
-    gdb_feature_builder_append_tag(
-        &builder, "<vector id=\"svep\" type=\"uint8\" count=\"%d\"/>",
-        pred_width / 8);
+    g_string_append_printf(s,
+                           "<vector id=\"svep\" type=\"uint8\" count=\"%d\"/>",
+                           pred_width / 8);
 
     /* Define the vector registers. */
     for (i = 0; i < 32; i++) {
-        name = g_strdup_printf("z%d", i);
-        gdb_feature_builder_append_reg(&builder, name, reg_width, reg++,
-                                       "svev", NULL);
+        g_string_append_printf(s,
+                               "<reg name=\"z%d\" bitsize=\"%d\""
+                               " regnum=\"%d\" type=\"svev\"/>",
+                               i, reg_width, base_reg++);
     }
 
     /* fpscr & status registers */
-    gdb_feature_builder_append_reg(&builder, "fpsr", 32, reg++,
-                                   "int", "float");
-    gdb_feature_builder_append_reg(&builder, "fpcr", 32, reg++,
-                                   "int", "float");
+    g_string_append_printf(s, "<reg name=\"fpsr\" bitsize=\"32\""
+                           " regnum=\"%d\" group=\"float\""
+                           " type=\"int\"/>", base_reg++);
+    g_string_append_printf(s, "<reg name=\"fpcr\" bitsize=\"32\""
+                           " regnum=\"%d\" group=\"float\""
+                           " type=\"int\"/>", base_reg++);
 
     /* Define the predicate registers. */
     for (i = 0; i < 16; i++) {
-        name = g_strdup_printf("p%d", i);
-        gdb_feature_builder_append_reg(&builder, name, pred_width, reg++,
-                                       "svep", NULL);
+        g_string_append_printf(s,
+                               "<reg name=\"p%d\" bitsize=\"%d\""
+                               " regnum=\"%d\" type=\"svep\"/>",
+                               i, pred_width, base_reg++);
     }
-    gdb_feature_builder_append_reg(&builder, "ffr", pred_width, reg++,
-                                   "svep", "vector");
+    g_string_append_printf(s,
+                           "<reg name=\"ffr\" bitsize=\"%d\""
+                           " regnum=\"%d\" group=\"vector\""
+                           " type=\"svep\"/>",
+                           pred_width, base_reg++);
 
     /* Define the vector length pseudo-register. */
-    gdb_feature_builder_append_reg(&builder, "vg", 64, reg++, "int", NULL);
+    g_string_append_printf(s,
+                           "<reg name=\"vg\" bitsize=\"64\""
+                           " regnum=\"%d\" type=\"int\"/>",
+                           base_reg++);
 
-    gdb_feature_builder_end(&builder);
+    g_string_append_printf(s, "</feature>");
 
-    return &cpu->dyn_svereg_feature.desc;
+    info->desc = g_string_free(s, false);
+    info->num = base_reg - orig_base_reg;
+    return info->num;
 }

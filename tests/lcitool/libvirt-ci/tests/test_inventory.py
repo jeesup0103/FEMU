@@ -5,30 +5,17 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 import pytest
-import test_utils.utils as test_utils
 
-from pathlib import Path
-
-from lcitool.config import Config
-from lcitool.inventory import Inventory, InventoryError
+from lcitool.inventory import InventoryError
 from lcitool.targets import BuildTarget
 
 
 pytestmark = pytest.mark.filterwarnings("ignore:'pipes' is deprecated:DeprecationWarning")
 
 
-@pytest.fixture(scope="module")
-def inventory(targets):
-    config_path = Path(test_utils.test_data_indir(__file__), "config.yml")
-    inventory_path = Path(test_utils.test_data_indir(__file__), "inventory")
-    return Inventory(targets,
-                     Config(path=config_path),
-                     inventory_path=inventory_path)
-
-
 @pytest.mark.parametrize("host,target,fully_managed", [
     pytest.param("centos-stream-8-1", "centos-stream-8", False, id="centos-stream-8-1"),
-    pytest.param("192.168.1.30", "debian-12", False, id="debian-12"),
+    pytest.param("192.168.1.30", "debian-10", False, id="debian-10"),
     pytest.param("fedora-test-2", "fedora-37", True, id="fedora-test-2"),
 ])
 def test_host_facts(inventory, targets, host, target, fully_managed):
@@ -46,7 +33,7 @@ def test_expand_hosts(inventory):
         "some-other-centos-stream-8"
     ]
     with pytest.raises(InventoryError):
-        inventory.expand_hosts("debian-12")
+        inventory.expand_hosts("debian-10")
 
 
 def test_host_target_name(inventory):

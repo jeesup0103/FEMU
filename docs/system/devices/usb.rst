@@ -1,3 +1,5 @@
+.. _pcsys_005fusb:
+
 USB emulation
 -------------
 
@@ -207,7 +209,7 @@ option or the ``device_add`` monitor command. Available devices are:
    USB audio device
 
 ``u2f-{emulated,passthru}``
-   :doc:`usb-u2f`
+   Universal Second Factor device
 
 ``canokey``
    An Open-source Secure Key implementing FIDO2, OpenPGP, PIV and more.

@@ -1992,10 +1992,6 @@ SetDriveParameters (
              NULL
              );
 
-  if (EFI_ERROR (Status)) {
-    DEBUG ((DEBUG_WARN, "Init Drive Parameters Fail, Status = %r\n", Status));
-  }
-
   //
   // Send Set Multiple parameters
   //
@@ -2011,10 +2007,6 @@ SetDriveParameters (
              ATA_ATAPI_TIMEOUT,
              NULL
              );
-
-  if (EFI_ERROR (Status)) {
-    DEBUG ((DEBUG_WARN, "Set Multiple Mode Parameters Fail, Status = %r\n", Status));
-  }
 
   return Status;
 }
@@ -2557,13 +2549,13 @@ DetectAndConfigIdeDevice (
     //
     if (DeviceType == EfiIdeHarddisk) {
       //
-      // Init drive parameters
+      // Init driver parameters
       //
       DriveParameters.Sector         = (UINT8)((ATA5_IDENTIFY_DATA *)(&Buffer.AtaData))->sectors_per_track;
       DriveParameters.Heads          = (UINT8)(((ATA5_IDENTIFY_DATA *)(&Buffer.AtaData))->heads - 1);
       DriveParameters.MultipleSector = (UINT8)((ATA5_IDENTIFY_DATA *)(&Buffer.AtaData))->multi_sector_cmd_max_sct_cnt;
 
-      SetDriveParameters (Instance, IdeChannel, IdeDevice, &DriveParameters, NULL);
+      Status = SetDriveParameters (Instance, IdeChannel, IdeDevice, &DriveParameters, NULL);
     }
 
     //

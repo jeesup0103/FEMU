@@ -14,7 +14,6 @@
 
 struct plic_data {
 	unsigned long addr;
-	unsigned long size;
 	unsigned long num_src;
 };
 

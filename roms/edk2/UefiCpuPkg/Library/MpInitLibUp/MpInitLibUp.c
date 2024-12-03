@@ -12,7 +12,6 @@
 #include <Library/DebugLib.h>
 #include <Library/LocalApicLib.h>
 #include <Library/HobLib.h>
-#include <Library/BaseMemoryLib.h>
 
 /**
   MP Initialize Library initialization.
@@ -78,8 +77,6 @@ MpInitLibGetNumberOfProcessors (
   instant this call is made. This service may only be called from the BSP.
 
   @param[in]  ProcessorNumber       The handle number of processor.
-                                    Lower 24 bits contains the actual processor number.
-                                    BIT24 indicates if the EXTENDED_PROCESSOR_INFORMATION will be retrived.
   @param[out] ProcessorInfoBuffer   A pointer to the buffer where information for
                                     the requested processor is deposited.
   @param[out] HealthData            Return processor health data.
@@ -107,18 +104,17 @@ MpInitLibGetProcessorInfo (
     return EFI_INVALID_PARAMETER;
   }
 
-  //
-  // Lower 24 bits contains the actual processor number.
-  //
-  if ((ProcessorNumber & (BIT24 - 1)) != 0) {
+  if (ProcessorNumber != 0) {
     return EFI_NOT_FOUND;
   }
 
-  ZeroMem (ProcessorInfoBuffer, sizeof (*ProcessorInfoBuffer));
-  ProcessorInfoBuffer->StatusFlag = PROCESSOR_AS_BSP_BIT  |
-                                    PROCESSOR_ENABLED_BIT |
-                                    PROCESSOR_HEALTH_STATUS_BIT;
-
+  ProcessorInfoBuffer->ProcessorId = 0;
+  ProcessorInfoBuffer->StatusFlag  = PROCESSOR_AS_BSP_BIT  |
+                                     PROCESSOR_ENABLED_BIT |
+                                     PROCESSOR_HEALTH_STATUS_BIT;
+  ProcessorInfoBuffer->Location.Package = 0;
+  ProcessorInfoBuffer->Location.Core    = 0;
+  ProcessorInfoBuffer->Location.Thread  = 0;
   if (HealthData != NULL) {
     GuidHob = GetFirstGuidHob (&gEfiSecPlatformInformationPpiGuid);
     if (GuidHob != NULL) {

@@ -43,8 +43,7 @@
   UefiLib
 
 [Protocols]
-  gEfiSmbiosProtocolGuid                       ## TO_START
-  gEdkIIRedfishHostInterfaceReadyProtocolGuid  ## PRODUCED
+  gEfiSmbiosProtocolGuid                ## TO_START
 
 [Depex]
   gEfiSmbiosProtocolGuid

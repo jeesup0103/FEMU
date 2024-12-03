@@ -15,8 +15,7 @@
 #include "qemu/osdep.h"
 #include "qapi/error.h"
 #include "qemu/timer.h"
-#include "hw/xen/xen_pt.h"
-#include "hw/xen/xen_igd.h"
+#include "xen_pt.h"
 #include "hw/xen/xen-legacy-backend.h"
 
 #define XEN_PT_MERGE_VALUE(value, data, val_mask) \
@@ -292,10 +291,7 @@ static int xen_pt_header_type_reg_init(XenPCIPassthroughState *s,
                                        uint32_t *data)
 {
     /* read PCI_HEADER_TYPE */
-    *data = reg->init_val;
-    if ((PCI_DEVICE(s)->cap_present & QEMU_PCI_CAP_MULTIFUNCTION)) {
-        *data |= PCI_HEADER_TYPE_MULTI_FUNCTION;
-    }
+    *data = reg->init_val | 0x80;
     return 0;
 }
 
@@ -680,7 +676,7 @@ static XenPTRegInfo xen_pt_emu_reg_header0[] = {
         .size       = 1,
         .init_val   = 0x00,
         .ro_mask    = 0xFF,
-        .emu_mask   = PCI_HEADER_TYPE_MULTI_FUNCTION,
+        .emu_mask   = 0x00,
         .init       = xen_pt_header_type_reg_init,
         .u.b.read   = xen_pt_byte_reg_read,
         .u.b.write  = xen_pt_byte_reg_write,

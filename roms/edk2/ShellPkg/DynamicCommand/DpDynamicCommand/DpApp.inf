@@ -54,7 +54,6 @@
 
 [Guids]
   gPerformanceProtocolGuid                                ## CONSUMES ## SystemTable
-  gEdkiiFpdtExtendedFirmwarePerformanceGuid               ## CONSUMES ## SystemTable
 
 [Protocols]
   gEfiLoadedImageProtocolGuid                             ## CONSUMES

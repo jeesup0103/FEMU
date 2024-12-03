@@ -6,7 +6,6 @@
 # to be built in the firmware volume.
 #
 # (C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP<BR>
-# Copyright (c) 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 #    SPDX-License-Identifier: BSD-2-Clause-Patent
 #
@@ -18,6 +17,4 @@
   INF RedfishPkg/RedfishCredentialDxe/RedfishCredentialDxe.inf
   INF RedfishPkg/RedfishDiscoverDxe/RedfishDiscoverDxe.inf
   INF RedfishPkg/RedfishConfigHandler/RedfishConfigHandlerDriver.inf
-  INF RedfishPkg/RedfishPlatformConfigDxe/RedfishPlatformConfigDxe.inf
-  INF MdeModulePkg/Universal/RegularExpressionDxe/RegularExpressionDxe.inf
 !endif

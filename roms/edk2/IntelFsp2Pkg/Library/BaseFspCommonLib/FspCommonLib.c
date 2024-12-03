@@ -373,53 +373,11 @@ GetFspSiliconInitUpdDataPointer (
 }
 
 /**
-  This function sets the FspSmmInit UPD data pointer.
-
-  @param[in] SmmInitUpdPtr   FspSmmInit UPD data pointer.
-**/
-VOID
-EFIAPI
-SetFspSmmInitUpdDataPointer (
-  IN VOID  *SmmInitUpdPtr
-  )
-{
-  FSP_GLOBAL_DATA  *FspData;
-
-  //
-  // Get the FSP Global Data Pointer
-  //
-  FspData = GetFspGlobalDataPointer ();
-
-  //
-  // Set the FspSmmInit UPD data pointer.
-  //
-  FspData->SmmInitUpdPtr = SmmInitUpdPtr;
-}
-
-/**
-  This function gets the FspSmmInit UPD data pointer.
-
-  @return FspSmmInit UPD data pointer.
-**/
-VOID *
-EFIAPI
-GetFspSmmInitUpdDataPointer (
-  VOID
-  )
-{
-  FSP_GLOBAL_DATA  *FspData;
-
-  FspData = GetFspGlobalDataPointer ();
-  return FspData->SmmInitUpdPtr;
-}
-
-/**
   Set FSP measurement point timestamp.
 
   @param[in] Id       Measurement point ID.
 
-  @return performance timestamp if current PerfIdx is valid,
-          else return 0 as invalid performance timestamp
+  @return performance timestamp.
 **/
 UINT64
 EFIAPI
@@ -437,10 +395,9 @@ SetFspMeasurePoint (
   if (FspData->PerfIdx < sizeof (FspData->PerfData) / sizeof (FspData->PerfData[0])) {
     FspData->PerfData[FspData->PerfIdx]                  = AsmReadTsc ();
     ((UINT8 *)(&FspData->PerfData[FspData->PerfIdx]))[7] = Id;
-    return FspData->PerfData[(FspData->PerfIdx)++];
   }
 
-  return 0;
+  return FspData->PerfData[(FspData->PerfIdx)++];
 }
 
 /**

@@ -7,6 +7,9 @@
 
 #include "SecMain.h"
 
+.text
+.align 3
+
 ASM_FUNC (_ModuleEntryPoint)
   /* Use Temp memory as the stack for calling to C code */
   li    a4, FixedPcdGet32 (PcdOvmfSecPeiTempRamBase)
