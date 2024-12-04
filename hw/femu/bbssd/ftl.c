@@ -241,10 +241,70 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
 	/* 3. Advancing Write Pointer */
 	/*****************/
 
+struct ssdparams *spp = &ssd->sp;
+    struct ru_mgmt *rum = &ssd->rums[rgid];
+    struct ruh *ruh = &ssd->ruhs[ruhid];
+    struct ru *ru = NULL;
 
+    // Process the current RU if assigned
+    int cur_ruid = ruh->cur_ruids[rgid];
+    if (cur_ruid != -1) {
+        ru = &rum->rus[cur_ruid];
 
+        // Move RU to appropriate list based on its state
+        if (ru->vpc == spp->pgs_per_ru) {
+            // RU is full, move to full list
+            QTAILQ_INSERT_TAIL(&rum->full_ru_list, ru, entry);
+            rum->full_ru_cnt++;
+        } else {
+            // RU is partially used, insert into victim queue
+            pqueue_insert(rum->victim_ru_pq, ru);
+            rum->victim_ru_cnt++;
+        }
 
+        // Remove current RU assignment
+        ruh->cur_ruids[rgid] = -1;
+    }
 
+    // Attempt to get a new free RU
+    ru = QTAILQ_FIRST(&rum->free_ru_list);
+    if (!ru) {
+        // No free RU available, trigger GC if not already in GC
+        if (!for_gc) {
+            if (do_gc(ssd, rgid, true, NULL) == -1) {
+                ftl_err("No free RUs available after GC\n");
+                return;
+            }
+            // Retry obtaining a free RU
+            ru = QTAILQ_FIRST(&rum->free_ru_list);
+            if (!ru) {
+                ftl_err("No free RUs available even after GC\n");
+                return;
+            }
+        } else {
+            ftl_err("No free RUs available during GC\n");
+            return;
+        }
+    }
+
+    // Remove the RU from the free list
+    QTAILQ_REMOVE(&rum->free_ru_list, ru, entry);
+    rum->free_ru_cnt--;
+
+    // Initialize the write pointer for the new RU
+    int start_lunidx = rgid * RG_DEGREE;
+    ru->wp.ch = start_lunidx / spp->luns_per_ch;
+    ru->wp.lun = start_lunidx % spp->luns_per_ch;
+    ru->wp.pl = 0;
+    ru->wp.blk = ru->id;
+    ru->wp.pg = 0;
+
+    // Assign the new RU to the RUH
+    ruh->cur_ruids[rgid] = ru->id;
+
+    // Reset RU's counters
+    ru->vpc = 0;
+    ru->ipc = 0;
 
 	/*****************/
 }																					
