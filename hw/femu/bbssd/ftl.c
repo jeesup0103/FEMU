@@ -236,8 +236,7 @@ static inline void check_addr(int a, int max)
     ftl_assert(a >= 0 && a < max);
 }
 
-static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, 
-		uint16_t ruhid, bool for_gc) 
+static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, bool for_gc) 
 {
 	/* 3. Advancing Write Pointer */
 	/*****************/
@@ -250,17 +249,59 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid,
 	/*****************/
 }																					
 
-static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, 
-		uint16_t ruhid, bool for_gc) 
+static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, bool for_gc) 
 {
 	/* 2. Getting Physical Page to Write */
-	/**************
-    struct ppa ppa; 
+	// /**************
+    struct ppa ppa;
 
-	...
+    struct ssdparams *spp = &ssd->sp;
+    struct ru_mgmt *rum = &ssd->rums[rgid];
+    struct ru *ru = NULL;
+    struct ruh *ruh = &ssd->ruhbtl[ruhid];
 
-	return ppa;
-	**************/
+    int ruid = ruh->cur_ruids[rgid]; // offset value within RG
+    ru = &rum->rus[ruid];
+
+    // Check if the RU is full
+    if (ru->wp.pg >= spp->pgs_per_ru){
+        // Move RU to full list or victim queue
+        if (ru->vpc == spp->pgs_per_ru){
+            // RU is full, move to full list
+            QTAILQ_INSERT_TAIL(&rum->full_ru_list, ru, entry);
+            rum->full_ru_cnt++;
+        }
+        else {
+            // RU is partially used, insert into victim queue
+            pqueue_insert(rum->victim_ru_pq, ru);
+            rum->victim_ru_cnt++;
+        }
+
+        // Reset current RU assignment
+        ruh->cur_ruids[rgid] = -1;
+
+        // Advance write pointer to get a new RU
+        ssd_advance_ru_write_pointer(ssd, rgid, ruhid, for_gc);
+        ruid = ruh->cur_ruids[rgid];
+        if (ruid == -1) {
+            // No free RU available
+            ppa.ppa = INVALID_PPA;
+            printf("No free RU available!\n");
+            return ppa;
+        }
+
+        ru = &rum->rus[ruid];
+    }
+    
+    ppa.g.ch = ru->wp.ch;
+    ppa.g.lun = ru->wp.lun;
+    ppa.g.pg = ru->wp.pg;
+    ppa.g.blk = ru->wp.blk;
+    ppa.g.pl = ru->wp.pl;
+    ftl_assert(ppa.g.pl == 0);
+
+    return ppa;
+	// **************/
 }																		
 
 static void ssd_init_params(struct ssdparams *spp, FemuCtrl *n)
@@ -876,15 +917,16 @@ static uint64_t ssd_write(struct ssd *ssd, NvmeRequest *req)
 	NvmeRwCmd *rw = (NvmeRwCmd*)&req->cmd;				
 
 	/* 1. DTYPE & PID parsing */
-	/******************************
-    uint8_t dtype = ;
-	uint16_t pid = ;
-	uint16_t rgif = ;
-	uint16_t rgid = ;
-	uint16_t ph = ;
-	*******************************/
+	// /******************************
+    uint8_t dtype = 0x02;
+	uint16_t pid = rw->dspec;                   // Placement ID -> specifies a RG and placement handle referencing a unique RU
+	uint16_t rgif = endgrp->fdp.rgif;           // RG id format
+    uint16_t ph_bits = 16 - rgif;
+    uint16_t rgid = rgid = pid >> ph_bits;      // RG id
+    uint16_t ph = pid & ((1 << ph_bits) - 1);   // Placement handler
+    // *******************************/
 
-	if (dtype != NVME_DIRECTIVE_DATA_PLACEMENT) {
+    if (dtype != NVME_DIRECTIVE_DATA_PLACEMENT) {
 		ph = 0;
 		rgid = 0;
 	}
