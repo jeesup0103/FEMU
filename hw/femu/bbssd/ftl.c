@@ -2,6 +2,7 @@
 
 //#define FEMU_DEBUG_FTL
 
+static int do_gc(struct ssd *ssd, uint16_t rgid, bool force, NvmeRequest *req);
 static void *ftl_thread(void *arg);
 
 static inline bool should_gc_high(struct ssd *ssd, uint16_t rg)
@@ -241,9 +242,9 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
 	/* 3. Advancing Write Pointer */
 	/*****************/
 
-struct ssdparams *spp = &ssd->sp;
+    struct ssdparams *spp = &ssd->sp;
     struct ru_mgmt *rum = &ssd->rums[rgid];
-    struct ruh *ruh = &ssd->ruhs[ruhid];
+    struct ruh *ruh = &ssd->ruhtbl[ruhid];
     struct ru *ru = NULL;
 
     // Process the current RU if assigned
@@ -318,7 +319,7 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
     struct ssdparams *spp = &ssd->sp;
     struct ru_mgmt *rum = &ssd->rums[rgid];
     struct ru *ru = NULL;
-    struct ruh *ruh = &ssd->ruhbtl[ruhid];
+    struct ruh *ruh = &ssd->ruhtbl[ruhid];
 
     int ruid = ruh->cur_ruids[rgid]; // offset value within RG
     ru = &rum->rus[ruid];

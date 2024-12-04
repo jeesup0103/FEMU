@@ -1010,10 +1010,10 @@ static uint16_t nvme_fdp_stats(FemuCtrl *n, NvmeCmd *cmd, uint32_t endgrpid,
     log.mbe[0] = cpu_to_le64(endgrp->fdp.mbe);
 
 	return dma_read_prp(n, (uint8_t *)&log + off, trans_len, prp1, prp2); 
-}																		
+}
 
-static uint16_t nvme_fdp_events(FemuCtrl *n, NvmeCmd *cmd, uint32_t endgrpid,
-                                uint32_t buf_len, uint64_t off)  
+// static uint16_t nvme_fdp_events(FemuCtrl *n, NvmeCmd *cmd, uint32_t endgrpid, uint32_t buf_len, uint64_t off)
+static void nvme_fdp_events(FemuCtrl *n, NvmeCmd *cmd, uint32_t endgrpid, uint32_t buf_len, uint64_t off)
 {
 	/* 5. FDP events log page return */
 	/******************************
