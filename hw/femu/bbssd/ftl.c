@@ -322,6 +322,74 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
     struct ruh *ruh = &ssd->ruhtbl[ruhid];
 
     int ruid = ruh->cur_ruids[rgid]; // offset value within RG
+
+    if (for_gc) {
+        // Use the GC RU for Initially Isolated data
+        ruid = rum->ii_gc_ruid;
+        ru = &rum->rus[ruid];
+
+        // Check if the RU is full
+        if (ru->wp.pg >= spp->pgs_per_ru) {
+            // RU is full
+            if (ru->vpc == spp->pgs_per_ru) {
+                // RU is full, move to full list
+                QTAILQ_INSERT_TAIL(&rum->full_ru_list, ru, entry);
+                rum->full_ru_cnt++;
+            }
+            else {
+                // RU is partially used, insert into victim queue
+                pqueue_insert(rum->victim_ru_pq, ru);
+                rum->victim_ru_cnt++;
+            }
+
+            // Reset ii_gc_ruid
+            rum->ii_gc_ruid = -1;
+
+            // Get a new RU from free_ru_list
+            ru = QTAILQ_FIRST(&rum->free_ru_list);
+            if (!ru) {
+                // No free RU available
+                ppa.ppa = INVALID_PPA;
+                printf("No free GC RU available after advancing!\n");
+                return ppa;
+            }
+
+            // Remove RU from free list
+            QTAILQ_REMOVE(&rum->free_ru_list, ru, entry);
+            rum->free_ru_cnt--;
+
+            // Initialize the write pointer
+            int start_lunidx = rgid * RG_DEGREE;
+            ru->wp.ch = start_lunidx / spp->luns_per_ch;
+            ru->wp.lun = start_lunidx % spp->luns_per_ch;
+            ru->wp.pl = 0;
+            ru->wp.blk = ru->id;
+            ru->wp.pg = 0;
+
+            // Reset RU's counters
+            ru->vpc = 0;
+            ru->ipc = 0;
+
+            // Assign the new RU ID to ii_gc_ruid
+            rum->ii_gc_ruid = ru->id;
+            ruid = ru->id;
+        }
+
+        // Construct the physical page address (PPA)
+        ppa.g.ch = ru->wp.ch;
+        ppa.g.lun = ru->wp.lun;
+        ppa.g.pl = ru->wp.pl;
+        ppa.g.blk = ru->wp.blk;
+        ppa.g.pg = ru->wp.pg;
+        ppa.g.sec = 0; // Assuming a full page write
+
+        // Advance the write pointer for the next page
+        ru->wp.pg++;
+        ru->vpc++;
+
+        return ppa;
+    }
+
     ru = &rum->rus[ruid];
 
     // Check if the RU is full
