@@ -1013,8 +1013,8 @@ static uint16_t nvme_fdp_stats(FemuCtrl *n, NvmeCmd *cmd, uint32_t endgrpid,
 }
 
 // static uint16_t nvme_fdp_events(FemuCtrl *n, NvmeCmd *cmd, uint32_t endgrpid, uint32_t buf_len, uint64_t off)
-static void nvme_fdp_events(FemuCtrl *n, NvmeCmd *cmd, uint32_t endgrpid, uint32_t buf_len, uint64_t off)
-{
+// static void nvme_fdp_events(FemuCtrl *n, NvmeCmd *cmd, uint32_t endgrpid, uint32_t buf_len, uint64_t off)
+// {
 	/* 5. FDP events log page return */
 	/******************************
     NvmeEnduranceGroup *endgrp;
@@ -1026,7 +1026,7 @@ static void nvme_fdp_events(FemuCtrl *n, NvmeCmd *cmd, uint32_t endgrpid, uint32
 
 	return dma_read_prp(n, (uint8_t *)elog + off, trans_len, prp1, prp2);
 	******************************/
-} 																			
+// } 																			
 
 static uint16_t nvme_get_log(FemuCtrl *n, NvmeCmd *cmd)
 {
@@ -1075,8 +1075,8 @@ static uint16_t nvme_get_log(FemuCtrl *n, NvmeCmd *cmd)
         return nvme_fdp_ruh_usage(n, cmd, lspi, dw10, dw12, len, off);
     case NVME_LOG_FDP_STATS:
         return nvme_fdp_stats(n, cmd, lspi, len, off);
-    case NVME_LOG_FDP_EVENTS:
-        return nvme_fdp_events(n, cmd, lspi, len, off); 				
+    // case NVME_LOG_FDP_EVENTS:
+        // return nvme_fdp_events(n, cmd, lspi, len, off); 				
     default:
         if (n->ext_ops.get_log) {
             return n->ext_ops.get_log(n, cmd);

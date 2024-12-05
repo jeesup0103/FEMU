@@ -983,7 +983,7 @@ static uint64_t ssd_write(struct ssd *ssd, NvmeRequest *req)
 	uint16_t pid = rw->dspec;                   // Placement ID -> specifies a RG and placement handle referencing a unique RU
 	uint16_t rgif = endgrp->fdp.rgif;           // RG id format
     uint16_t ph_bits = 16 - rgif;
-    uint16_t rgid = rgid = pid >> ph_bits;      // RG id
+    uint16_t rgid = pid >> ph_bits;      // RG id
     uint16_t ph = pid & ((1 << ph_bits) - 1);   // Placement handler
     // *******************************/
 
