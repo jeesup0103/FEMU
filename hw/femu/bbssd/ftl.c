@@ -247,68 +247,142 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
     struct ruh *ruh = &ssd->ruhtbl[ruhid];
     struct ru *ru = NULL;
 
-    // Process the current RU if assigned
-    int cur_ruid = ruh->cur_ruids[rgid];
-    if (cur_ruid != -1) {
+    int cur_ruid = -1;
+    if (for_gc)
+    {
+
+        cur_ruid = rum->ii_gc_ruid;
         ru = &rum->rus[cur_ruid];
 
-        // Move RU to appropriate list based on its state
-        if (ru->vpc == spp->pgs_per_ru) {
-            // RU is full, move to full list
-            QTAILQ_INSERT_TAIL(&rum->full_ru_list, ru, entry);
-            rum->full_ru_cnt++;
-        } else {
-            // RU is partially used, insert into victim queue
-            pqueue_insert(rum->victim_ru_pq, ru);
-            rum->victim_ru_cnt++;
-        }
+        struct write_pointer *wpp = ru->wp;
+        wpp->ch++;
+        if (wpp->ch == (rgid+1) * RG_DEGREE / spp->luns_per_ch)
+        {
+            wpp->ch = 0;
+            wpp->lun++;
+            if (wpp->lun == spp->luns_per_ch)
+            {
+                wpp->lun = 0;
+                wpp->pg++;
+                // RU is full
+                if (wpp.pg >= spp->pgs_per_ru)
+                {
+                    wpp->pg = 0;
+                    // All pages are valid
+                    if (ru->vpc == spp->pgs_per_ru)
+                    {
+                        // RU is full, move to full list
+                        QTAILQ_INSERT_TAIL(&rum->full_ru_list, ru, entry);
+                        rum->full_ru_cnt++;
+                    }
+                    else
+                    {
+                        // RU is partially used, insert into victim queue
+                        pqueue_insert(rum->victim_ru_pq, ru);
+                        rum->victim_ru_cnt++;
+                    }
 
-        // Remove current RU assignment
-        ruh->cur_ruids[rgid] = -1;
+                    // Reset ii_gc_ruid
+                    rum->ii_gc_ruid = -1;
+
+                    // Get a new RU from free_ru_list
+                    ru = QTAILQ_FIRST(&rum->free_ru_list);
+                    if (!ru)
+                    {
+                        // No free RU available
+                        ppa.ppa = INVALID_PPA;
+                        printf("No free GC RU available after advancing!\n");
+                        return ppa;
+                    }
+
+                    // Remove RU from free list
+                    QTAILQ_REMOVE(&rum->free_ru_list, ru, entry);
+                    rum->free_ru_cnt--;
+
+                    // Assign RU to GC RU
+                    rum->ii_gc_ruid = ru->id;
+
+                    // Initialize write pointer
+                    int start_lunidx = rgid * RG_DEGREE;
+                    ru->wp.ch = start_lunidx / spp->luns_per_ch;
+                    ru->wp.lun = start_lunidx % spp->luns_per_ch;
+                    ru->wp.pl = 0;
+                    ru->wp.blk = ru->id;
+                    ru->wp.pg = 0;
+
+                    // Reset RU's counters
+                    ru->vpc = 0;
+                    ru->ipc = 0;
+                }
+            }
+        }
+    }
+    else
+    {
+        // Normal operation
+        cur_ruid = ruh->cur_ruids[rgid];
+        ru = &rum->rus[cur_ruid];
+
+        struct write_pointer *wpp = ru->wp;
+        wpp->ch++;
+        if (wpp->ch == spp->nchs) // 이게 맞나?
+        {
+            wpp->ch = 0;
+            wpp->lun++;
+            if (wpp->lun == spp->luns_per_ch)
+            {
+                wpp->lun = 0;
+                wpp->pg++;
+                // RU is full
+                if (wpp.pg >= spp->pgs_per_ru)
+                {
+                    wpp->pg = 0;
+                    // All pages are valid
+                    if (ru->vpc == spp->pgs_per_ru)
+                    {
+                        // RU is full, move to full list
+                        QTAILQ_INSERT_TAIL(&rum->full_ru_list, ru, entry);
+                        rum->full_ru_cnt++;
+                    }
+                    else
+                    {
+                        // RU is partially used, insert into victim queue
+                        pqueue_insert(rum->victim_ru_pq, ru);
+                        rum->victim_ru_cnt++;
+                    }
+
+                    // Get a new RU from free_ru_list
+                    ru = QTAILQ_FIRST(&rum->free_ru_list);
+                    if (!ru)
+                    {
+                        // No free RU available
+                        ppa.ppa = INVALID_PPA;
+                        printf("No free GC RU available after advancing!\n");
+                        return ppa;
+                    }
+
+                    // Remove RU from free list
+                    QTAILQ_REMOVE(&rum->free_ru_list, ru, entry);
+                    rum->free_ru_cnt--;
+
+                    // Initialize write pointer / 0, 2, 4, 6,
+                    int start_lunidx = rgid * RG_DEGREE; // RG_DEGREE defined 16
+                    ru->wp.ch = start_lunidx / spp->luns_per_ch;  // ~/8
+                    ru->wp.lun = start_lunidx % spp->luns_per_ch;
+                    ru->wp.pl = 0;
+                    ru->wp.blk = ru->id;
+                    ru->wp.pg = 0;
+
+                    // Reset RU's counters
+                    ru->vpc = 0;
+                    ru->ipc = 0;
+                }
+            }
+        }
     }
 
-    // Attempt to get a new free RU
-    ru = QTAILQ_FIRST(&rum->free_ru_list);
-    if (!ru) {
-        // No free RU available, trigger GC if not already in GC
-        if (!for_gc) {
-            if (do_gc(ssd, rgid, true, NULL) == -1) {
-                ftl_err("No free RUs available after GC\n");
-                return;
-            }
-            // Retry obtaining a free RU
-            ru = QTAILQ_FIRST(&rum->free_ru_list);
-            if (!ru) {
-                ftl_err("No free RUs available even after GC\n");
-                return;
-            }
-        } else {
-            ftl_err("No free RUs available during GC\n");
-            return;
-        }
-    }
-
-    // Remove the RU from the free list
-    QTAILQ_REMOVE(&rum->free_ru_list, ru, entry);
-    rum->free_ru_cnt--;
-
-    // Initialize the write pointer for the new RU
-    int start_lunidx = rgid * RG_DEGREE;
-    ru->wp.ch = start_lunidx / spp->luns_per_ch;
-    ru->wp.lun = start_lunidx % spp->luns_per_ch;
-    ru->wp.pl = 0;
-    ru->wp.blk = ru->id;
-    ru->wp.pg = 0;
-
-    // Assign the new RU to the RUH
-    ruh->cur_ruids[rgid] = ru->id;
-
-    // Reset RU's counters
-    ru->vpc = 0;
-    ru->ipc = 0;
-
-	/*****************/
-}																					
+    /*****************/
+}																
 
 static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, bool for_gc) 
 {
@@ -328,53 +402,6 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
         ruid = rum->ii_gc_ruid;
         ru = &rum->rus[ruid];
 
-        // Check if the RU is full
-        if (ru->wp.pg >= spp->pgs_per_ru) {
-            // RU is full
-            if (ru->vpc == spp->pgs_per_ru) {
-                // RU is full, move to full list
-                QTAILQ_INSERT_TAIL(&rum->full_ru_list, ru, entry);
-                rum->full_ru_cnt++;
-            }
-            else {
-                // RU is partially used, insert into victim queue
-                pqueue_insert(rum->victim_ru_pq, ru);
-                rum->victim_ru_cnt++;
-            }
-
-            // Reset ii_gc_ruid
-            rum->ii_gc_ruid = -1;
-
-            // Get a new RU from free_ru_list
-            ru = QTAILQ_FIRST(&rum->free_ru_list);
-            if (!ru) {
-                // No free RU available
-                ppa.ppa = INVALID_PPA;
-                printf("No free GC RU available after advancing!\n");
-                return ppa;
-            }
-
-            // Remove RU from free list
-            QTAILQ_REMOVE(&rum->free_ru_list, ru, entry);
-            rum->free_ru_cnt--;
-
-            // Initialize the write pointer
-            int start_lunidx = rgid * RG_DEGREE;
-            ru->wp.ch = start_lunidx / spp->luns_per_ch;
-            ru->wp.lun = start_lunidx % spp->luns_per_ch;
-            ru->wp.pl = 0;
-            ru->wp.blk = ru->id;
-            ru->wp.pg = 0;
-
-            // Reset RU's counters
-            ru->vpc = 0;
-            ru->ipc = 0;
-
-            // Assign the new RU ID to ii_gc_ruid
-            rum->ii_gc_ruid = ru->id;
-            ruid = ru->id;
-        }
-
         // Construct the physical page address (PPA)
         ppa.g.ch = ru->wp.ch;
         ppa.g.lun = ru->wp.lun;
@@ -383,45 +410,11 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
         ppa.g.pg = ru->wp.pg;
         ppa.g.sec = 0; // Assuming a full page write
 
-        // Advance the write pointer for the next page
-        ru->wp.pg++;
-        ru->vpc++;
-
         return ppa;
     }
 
     ru = &rum->rus[ruid];
 
-    // Check if the RU is full
-    if (ru->wp.pg >= spp->pgs_per_ru){
-        // Move RU to full list or victim queue
-        if (ru->vpc == spp->pgs_per_ru){
-            // RU is full, move to full list
-            QTAILQ_INSERT_TAIL(&rum->full_ru_list, ru, entry);
-            rum->full_ru_cnt++;
-        }
-        else {
-            // RU is partially used, insert into victim queue
-            pqueue_insert(rum->victim_ru_pq, ru);
-            rum->victim_ru_cnt++;
-        }
-
-        // Reset current RU assignment
-        ruh->cur_ruids[rgid] = -1;
-
-        // Advance write pointer to get a new RU
-        ssd_advance_ru_write_pointer(ssd, rgid, ruhid, for_gc);
-        ruid = ruh->cur_ruids[rgid];
-        if (ruid == -1) {
-            // No free RU available
-            ppa.ppa = INVALID_PPA;
-            printf("No free RU available!\n");
-            return ppa;
-        }
-
-        ru = &rum->rus[ruid];
-    }
-    
     ppa.g.ch = ru->wp.ch;
     ppa.g.lun = ru->wp.lun;
     ppa.g.pg = ru->wp.pg;
