@@ -254,20 +254,19 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
         cur_ruid = rum->ii_gc_ruid;
         ru = &rum->rus[cur_ruid];
 
-        struct write_pointer *wpp = ru->wp;
-        wpp->ch++;
-        if (wpp->ch == (rgid+1) * RG_DEGREE / spp->luns_per_ch)
+        ru->wp->ch++;
+        if (ru->wp->ch == (rgid+1) * RG_DEGREE / spp->luns_per_ch)
         {
-            wpp->ch = 0;
-            wpp->lun++;
-            if (wpp->lun == spp->luns_per_ch)
+            ru->wp->ch = 0;
+            ru->wp->lun++;
+            if (ru->wp->lun == spp->luns_per_ch)
             {
-                wpp->lun = 0;
-                wpp->pg++;
+                ru->wp->lun = 0;
+                ru->wp->pg++;
                 // RU is full
-                if (wpp.pg >= spp->pgs_per_ru)
+                if (ru->wp->pg >= spp->pgs_per_ru)
                 {
-                    wpp->pg = 0;
+                    ru->wp->pg = 0;
                     // All pages are valid
                     if (ru->vpc == spp->pgs_per_ru)
                     {
@@ -287,13 +286,6 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
 
                     // Get a new RU from free_ru_list
                     ru = QTAILQ_FIRST(&rum->free_ru_list);
-                    if (!ru)
-                    {
-                        // No free RU available
-                        ppa.ppa = INVALID_PPA;
-                        printf("No free GC RU available after advancing!\n");
-                        return ppa;
-                    }
 
                     // Remove RU from free list
                     QTAILQ_REMOVE(&rum->free_ru_list, ru, entry);
@@ -323,20 +315,19 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
         cur_ruid = ruh->cur_ruids[rgid];
         ru = &rum->rus[cur_ruid];
 
-        struct write_pointer *wpp = ru->wp;
-        wpp->ch++;
-        if (wpp->ch == spp->nchs) // 이게 맞나?
+        ru->wp->ch++;
+        if (ru->wp->ch == spp->nchs) // 이게 맞나?
         {
-            wpp->ch = 0;
-            wpp->lun++;
-            if (wpp->lun == spp->luns_per_ch)
+            ru->wp->ch = 0;
+            ru->wp->lun++;
+            if (ru->wp->lun == spp->luns_per_ch)
             {
-                wpp->lun = 0;
-                wpp->pg++;
+                ru->wp->lun = 0;
+                ru->wp->pg++;
                 // RU is full
-                if (wpp.pg >= spp->pgs_per_ru)
+                if (ru->wp->pg >= spp->pgs_per_ru)
                 {
-                    wpp->pg = 0;
+                    ru->wp->pg = 0;
                     // All pages are valid
                     if (ru->vpc == spp->pgs_per_ru)
                     {
@@ -353,13 +344,6 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
 
                     // Get a new RU from free_ru_list
                     ru = QTAILQ_FIRST(&rum->free_ru_list);
-                    if (!ru)
-                    {
-                        // No free RU available
-                        ppa.ppa = INVALID_PPA;
-                        printf("No free GC RU available after advancing!\n");
-                        return ppa;
-                    }
 
                     // Remove RU from free list
                     QTAILQ_REMOVE(&rum->free_ru_list, ru, entry);
@@ -390,7 +374,7 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
 	// /**************
     struct ppa ppa;
 
-    struct ssdparams *spp = &ssd->sp;
+    // struct ssdparams *spp = &ssd->sp;
     struct ru_mgmt *rum = &ssd->rums[rgid];
     struct ru *ru = NULL;
     struct ruh *ruh = &ssd->ruhtbl[ruhid];
