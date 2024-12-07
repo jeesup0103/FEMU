@@ -254,19 +254,20 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
         cur_ruid = rum->ii_gc_ruid;
         ru = &rum->rus[cur_ruid];
 
-        ru->wp->ch++;
-        if (ru->wp->ch == (rgid+1) * RG_DEGREE / spp->luns_per_ch)
+
+        ru->wp.ch++;
+        if (ru->wp.ch == (rgid+1) * RG_DEGREE / spp->luns_per_ch)
         {
-            ru->wp->ch = 0;
-            ru->wp->lun++;
-            if (ru->wp->lun == spp->luns_per_ch)
+            ru->wp.ch = 0;
+            ru->wp.lun++;
+            if (ru->wp.lun == spp->luns_per_ch)
             {
-                ru->wp->lun = 0;
-                ru->wp->pg++;
+                ru->wp.lun = 0;
+                ru->wp.pg++;
                 // RU is full
-                if (ru->wp->pg >= spp->pgs_per_ru)
+                if (ru->wp.pg >= spp->pgs_per_ru)
                 {
-                    ru->wp->pg = 0;
+                    ru->wp.pg = 0;
                     // All pages are valid
                     if (ru->vpc == spp->pgs_per_ru)
                     {
@@ -315,19 +316,19 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
         cur_ruid = ruh->cur_ruids[rgid];
         ru = &rum->rus[cur_ruid];
 
-        ru->wp->ch++;
-        if (ru->wp->ch == spp->nchs) // 이게 맞나?
+        ru->wp.ch++;
+        if (ru->wp.ch == spp->nchs) // 이게 맞나?
         {
-            ru->wp->ch = 0;
-            ru->wp->lun++;
-            if (ru->wp->lun == spp->luns_per_ch)
+            ru->wp.ch = 0;
+            ru->wp.lun++;
+            if (ru->wp.lun == spp->luns_per_ch)
             {
-                ru->wp->lun = 0;
-                ru->wp->pg++;
+                ru->wp.lun = 0;
+                ru->wp.pg++;
                 // RU is full
-                if (ru->wp->pg >= spp->pgs_per_ru)
+                if (ru->wp.pg >= spp->pgs_per_ru)
                 {
-                    ru->wp->pg = 0;
+                    ru->wp.pg = 0;
                     // All pages are valid
                     if (ru->vpc == spp->pgs_per_ru)
                     {
