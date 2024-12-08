@@ -317,7 +317,7 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
         ru = &rum->rus[cur_ruid];
 
         ru->wp.ch++;
-        if (ru->wp.ch == (rgid + 1) * RG_DEGREE / spp->luns_per_ch) // 이게 맞나?
+        if (ru->wp.ch == spp->nchs) // 이게 맞나?
         {
             ru->wp.ch = 0;
             ru->wp.lun++;
@@ -1005,10 +1005,9 @@ static int do_gc(struct ssd *ssd, uint16_t rgid, bool force, NvmeRequest *req)
                 }
 
                 largest_contiguous_lba_start = max_start_lpn * spp->secs_per_pg;
-                nlbam = max_run * spp->secs_per_pg;
+                nlbam = (uint64_t)max_run * spp->secs_per_pg;
             }
             
-            // FDP LOG
             e->pid = largest_contiguous_lba_start;
             e->timestamp = nlbam;
 
