@@ -965,7 +965,8 @@ static int do_gc(struct ssd *ssd, uint16_t rgid, bool force, NvmeRequest *req)
 		/* 4. FDP Event logging */
 		// /*****************
 		NvmeFdpEvent *e = nvme_fdp_alloc_event(req->ns->ctrl, &ns->endgrp->fdp.ctrl_events);
-
+        uint16_t largest_contiguous_lba_start;
+        uint64_t nlbam;
         if (e)
         {
             // Set event fields
@@ -974,8 +975,7 @@ static int do_gc(struct ssd *ssd, uint16_t rgid, bool force, NvmeRequest *req)
             // Set PIV, NSIDV, LV
             e->flags = FDPEF_PIV | FDPEF_NSIDV | FDPEF_LV;
 
-            uint16_t largest_contiguous_lba_start;
-            uint64_t nlbam;
+            
 
             // largest_contiguous_lba_start and nlbam
             if (moved_count > 0) {
