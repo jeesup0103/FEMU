@@ -154,6 +154,15 @@ struct ssdparams {
     int tt_pls;       /* total # of planes in the SSD */
 
     int tt_luns;      /* total # of LUNs in the SSD */
+
+    /* Additional fields for CDFTL */
+    int cmt_size;     /* capacity of CMT */
+    int ctp_size;     /* capacity of CTP */
+    int gtd_size;     /* size of the GTD (max translation virtual pages) */
+
+    int cmt_bucket_size; /* Hash bucket size of CMT */
+    int ctp_bucket_size; /* Hast bucket size of CTP */
+
 };
 
 typedef struct line {
@@ -194,7 +203,88 @@ struct nand_cmd {
     int64_t stime; /* Coperd: request arrival time */
 };
 
-struct ssd {
+/* CDFTL */
+
+struct map_page {
+    struct ppa *dppn;
+};
+
+struct gtd_entry{
+    struct ppa tppn;
+    bool location;
+    bool dirty;
+};
+
+struct cmt_entry{
+    struct data{
+        uint64_t dlpn;  
+        struct ppa dppn;
+        bool dirty;
+    } data;
+    struct cmt_entry *prev;
+    struct cmt_entry *next;
+    struct cmt_entry *lru_prev;
+    struct cmt_entry *lru_next;
+};
+
+struct cmt_hash {
+    uint64_t hash_value;
+    struct cmt_entry *cmt_entries;
+    struct cmt_hash *hash_next;
+};
+
+struct ctp_entry{
+    uint64_t tvpn;
+    struct map_page *mp;
+    struct ppa tppn;
+    struct ctp_entry *prev;
+    struct ctp_entry *next;
+    struct ctp_entry *lru_prev;
+    struct ctp_entry *lru_next;
+    bool dirty;
+};
+
+struct ctp_hash {
+    uint64_t hash_value;
+    struct ctp_entry *ctp_entries;
+    struct ctp_hash *hash_next;
+};
+
+struct ctp {
+    struct ctp_hash *hash_table;       // Array of hash buckets
+    int hash_table_size;               // Number of buckets in the hash table
+    struct ctp_entry *lru_head;        // Points to the least recently used entry
+    struct ctp_entry *lru_tail;        // Points to the most recently used entry
+    int max_entries;                   // Maximum capacity of CTP
+    int current_size;                  // Current number of entries in CTP
+};
+
+struct cmt {
+    struct cmt_hash *hash_table;      // Array of hash buckets
+    int hash_table_size;              // Number of buckets in the hash table
+    struct cmt_entry *lru_head;       // Points to the least recently used entry
+    struct cmt_entry *lru_tail;       // Points to the most recently used entry
+    int max_entries;                  // Maximum capacity of CMT
+    int current_size;                 // Current number of entries in CMT
+};
+
+struct translation_page
+{
+    struct map_page *mp;
+    struct ppa tppn;
+    uint64_t tvpn;
+    bool is_valid;
+};
+
+struct translation_block
+{
+    struct translation_page pages[256];
+    int valid_pages; // Number of valid pages in the block
+    bool is_full;    // Indicates if the block is full
+};
+
+struct ssd
+{
     char *ssdname;
     struct ssdparams sp;
     struct ssd_channel *ch;
@@ -203,11 +293,26 @@ struct ssd {
     struct write_pointer wp;
     struct line_mgmt lm;
 
+    /* CDFTL structures */
+    struct gtd_entry *gtd; // Global Translation Directory array
+    struct cmt *cmt;       // Cached Mapping Table structure
+    struct ctp *ctp;       // Cached Translation Page structure
+
+    // Translation blocks
+    struct translation_block translation_blocks[16];
+    int free_translation_blocks;
+
     /* lockless ring for communication with NVMe IO thread */
     struct rte_ring **to_ftl;
     struct rte_ring **to_poller;
     bool *dataplane_started_ptr;
     QemuThread ftl_thread;
+
+    uint64_t cmt_hit;
+    uint64_t cmt_miss;
+    uint64_t ctp_hit;
+    uint64_t ctp_miss;
+
 };
 
 void ssd_init(FemuCtrl *n);
