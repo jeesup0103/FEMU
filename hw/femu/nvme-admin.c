@@ -1012,21 +1012,50 @@ static uint16_t nvme_fdp_stats(FemuCtrl *n, NvmeCmd *cmd, uint32_t endgrpid,
 	return dma_read_prp(n, (uint8_t *)&log + off, trans_len, prp1, prp2); 
 }
 
-// static uint16_t nvme_fdp_events(FemuCtrl *n, NvmeCmd *cmd, uint32_t endgrpid, uint32_t buf_len, uint64_t off)
-// static void nvme_fdp_events(FemuCtrl *n, NvmeCmd *cmd, uint32_t endgrpid, uint32_t buf_len, uint64_t off)
-// {
+static uint16_t nvme_fdp_events(FemuCtrl *n, NvmeCmd *cmd, uint32_t endgrpid, uint32_t buf_len, uint64_t off)
+{
 	/* 5. FDP events log page return */
-	/******************************
+	// /******************************
     NvmeEnduranceGroup *endgrp;
     NvmeFdpEventBuffer *ebuf;
     NvmeFdpEvent *event;
     g_autofree NvmeFdpEventsLog *elog = NULL;
 
-	...
+    // Validate endgrp ID
+    if (endgrpid != 1)
+    {
+        return NVME_INVALID_FIELD | NVME_DNR;
+    }
 
-	return dma_read_prp(n, (uint8_t *)elog + off, trans_len, prp1, prp2);
-	******************************/
-// } 																			
+    // Validate offset
+    if (off != 0)
+    {
+        return NVME_INVALID_FIELD | NVME_DNR;
+    }
+
+    endgrp = n->engrps[endgrpid - 1];
+    ebuf = endgrp->fdp.ctrl_events;
+
+    // Retrieve endurance group and FDP event buffer
+    NvmeFdpEventsLog elog;
+    memset(&elog, 0, sizeof(elog));
+
+    elog.num_events = ebuf->nelems;
+
+    size_t trans_len = sizeof(NvmeFdpEventsLog);
+    if (trans_len > buf_len)
+    {
+        // If host buffer smaller than expected, truncate to buf_len
+        trans_len = buf_len;
+    }
+
+    // Extract PRP pointers from NvmeCmd
+    uint64_t prp1 = cmd->dptr.prp1;
+    uint64_t prp2 = cmd->dptr.prp2;
+
+    return dma_read_prp(n, (uint8_t *)elog + off, trans_len, prp1, prp2);
+	// ******************************/
+} 
 
 static uint16_t nvme_get_log(FemuCtrl *n, NvmeCmd *cmd)
 {
@@ -1075,8 +1104,8 @@ static uint16_t nvme_get_log(FemuCtrl *n, NvmeCmd *cmd)
         return nvme_fdp_ruh_usage(n, cmd, lspi, dw10, dw12, len, off);
     case NVME_LOG_FDP_STATS:
         return nvme_fdp_stats(n, cmd, lspi, len, off);
-    // case NVME_LOG_FDP_EVENTS:1
-        // return nvme_fdp_events(n, cmd, lspi, len, off); 				
+    case NVME_LOG_FDP_EVENTS:1
+        return nvme_fdp_events(n, cmd, lspi, len, off); 				
     default:
         if (n->ext_ops.get_log) {
             return n->ext_ops.get_log(n, cmd);
