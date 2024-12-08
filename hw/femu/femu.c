@@ -565,6 +565,9 @@ static void femu_realize(PCIDevice *pci_dev, Error **errp)
 
     nvme_register_extensions(n);
 
+    n->bytes_written_host = 0;
+    n->bytes_written_gc = 0;
+
     if (n->ext_ops.init) {
         n->ext_ops.init(n, errp);
     }

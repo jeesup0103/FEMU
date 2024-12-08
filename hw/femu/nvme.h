@@ -653,6 +653,7 @@ enum LogIdentifier {
     NVME_LOG_SMART_INFO     = 0x02,
     NVME_LOG_FW_SLOT_INFO   = 0x03,
     NVME_LOG_CMD_EFFECTS    = 0x05,
+    NVME_LOG_WRITE_AMPLIFICATION = 0x17,
 };
 
 typedef struct NvmePSD {
@@ -1197,6 +1198,7 @@ typedef struct FemuExtCtrlOps {
 } FemuExtCtrlOps;
 
 typedef struct FemuCtrl {
+
     PCIDevice       parent_obj;
     MemoryRegion    iomem;
     MemoryRegion    ctrl_mem;
@@ -1359,6 +1361,11 @@ typedef struct FemuCtrl {
 
     /* Nand Flash Type: SLC/MLC/TLC/QLC/PLC */
     uint8_t         flash_type;
+
+
+    /* Write amplification waf  */
+    uint64_t bytes_written_host;
+    uint64_t bytes_written_gc;
 } FemuCtrl;
 
 typedef struct NvmePollerThreadArgument {
