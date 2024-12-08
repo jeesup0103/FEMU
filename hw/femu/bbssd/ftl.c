@@ -965,8 +965,8 @@ static int do_gc(struct ssd *ssd, uint16_t rgid, bool force, NvmeRequest *req)
 		/* 4. FDP Event logging */
 		// /*****************
 		NvmeFdpEvent *e = nvme_fdp_alloc_event(req->ns->ctrl, &ns->endgrp->fdp.ctrl_events);
-        uint16_t largest_contiguous_lba_start;
-        uint64_t nlbam;
+        uint16_t largest_contiguous_lba_start = 0;
+        uint64_t nlbam = 0;
         if (e)
         {
             // Set event fields
