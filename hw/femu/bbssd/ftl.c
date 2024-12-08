@@ -893,6 +893,7 @@ static int clean_one_block(struct ssd *ssd, struct ppa *ppa, uint16_t rgid, uint
         /* there shouldn't be any free page in victim blocks */
         ftl_assert(pg_iter->status != PG_FREE);
         if (pg_iter->status == PG_VALID) {
+            uint64_t lpn = get_rmap_ent(ssd, ppa);
             gc_read_page(ssd, ppa);
             /* delay the maptbl update until "write" happens */
             fdp_gc_write_page(ssd, ppa, rgid, ruhid);
@@ -918,7 +919,7 @@ static int do_gc(struct ssd *ssd, uint16_t rgid, bool force, NvmeRequest *req)
 	int start_lunidx = rgid * RG_DEGREE;
 	uint16_t ruhid;
 
-    int startLba = req->lba; // FDP LOG 
+    // int startLba = req->slba; // FDP LOG 
 
 	victim_ru = select_victim_ru(ssd, force, rgid);
 	if (!victim_ru) {
