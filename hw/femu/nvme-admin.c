@@ -1016,9 +1016,7 @@ static uint16_t nvme_fdp_events(FemuCtrl *n, NvmeCmd *cmd, uint32_t endgrpid, ui
 {
 	/* 5. FDP events log page return */
 	// /******************************
-    NvmeEnduranceGroup *endgrp;
-    NvmeFdpEventBuffer *ebuf;
-    NvmeFdpEvent *event;
+    
     g_autofree NvmeFdpEventsLog *elog = NULL;
 
     // Validate endgrp ID
@@ -1033,11 +1031,10 @@ static uint16_t nvme_fdp_events(FemuCtrl *n, NvmeCmd *cmd, uint32_t endgrpid, ui
         return NVME_INVALID_FIELD | NVME_DNR;
     }
 
-    endgrp = n->engrps[endgrpid - 1];
-    ebuf = endgrp->fdp.ctrl_events;
+    NvmeEnduranceGroup *endgrp = n->endgrps[endgrpid - 1];
+    NvmeFdpEventBuffer *ebuf = endgrp->fdp.ctrl_events;
 
     // Retrieve endurance group and FDP event buffer
-    NvmeFdpEventsLog elog;
     memset(&elog, 0, sizeof(elog));
 
     elog.num_events = ebuf->nelems;
@@ -1104,7 +1101,7 @@ static uint16_t nvme_get_log(FemuCtrl *n, NvmeCmd *cmd)
         return nvme_fdp_ruh_usage(n, cmd, lspi, dw10, dw12, len, off);
     case NVME_LOG_FDP_STATS:
         return nvme_fdp_stats(n, cmd, lspi, len, off);
-    case NVME_LOG_FDP_EVENTS:1
+    case NVME_LOG_FDP_EVENTS:
         return nvme_fdp_events(n, cmd, lspi, len, off); 				
     default:
         if (n->ext_ops.get_log) {
