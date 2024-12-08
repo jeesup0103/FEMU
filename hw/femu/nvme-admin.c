@@ -1031,13 +1031,13 @@ static uint16_t nvme_fdp_events(FemuCtrl *n, NvmeCmd *cmd, uint32_t endgrpid, ui
         return NVME_INVALID_FIELD | NVME_DNR;
     }
 
-    NvmeEnduranceGroup *endgrp = n->endgrps[endgrpid - 1];
-    NvmeFdpEventBuffer *ebuf = endgrp->fdp.ctrl_events;
+    NvmeEnduranceGroup *endgrp = &n->endgrps[endgrpid - 1];
+    NvmeFdpEventBuffer *ebuf = &endgrp->fdp.ctrl_events;
 
     // Retrieve endurance group and FDP event buffer
     memset(&elog, 0, sizeof(elog));
-
-    elog.num_events = ebuf->nelems;
+    
+    elog->num_events = ebuf->nelems;
 
     size_t trans_len = sizeof(NvmeFdpEventsLog);
     if (trans_len > buf_len)
