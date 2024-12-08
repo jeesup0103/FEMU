@@ -880,7 +880,8 @@ static struct ru *select_victim_ru(struct ssd *ssd, bool force, int rgid)
 }
 
 /* here ppa identifies the block we want to clean */
-static void clean_one_block(struct ssd *ssd, struct ppa *ppa, uint16_t rgid, uint16_t ruhid)
+static int clean_one_block(struct ssd *ssd, struct ppa *ppa, uint16_t rgid, uint16_t ruhid, uint64_t *moved_lpn_array,
+                           int *moved_count)
 {
     struct ssdparams *spp = &ssd->sp;
     struct nand_page *pg_iter = NULL;
@@ -896,10 +897,13 @@ static void clean_one_block(struct ssd *ssd, struct ppa *ppa, uint16_t rgid, uin
             /* delay the maptbl update until "write" happens */
             fdp_gc_write_page(ssd, ppa, rgid, ruhid);
             cnt++;
+            moved_lpn_array[*moved_count] = lpn;
+            (*moved_count)++;
         }
     }
 
     ftl_assert(get_blk(ssd, ppa)->vpc == cnt);
+    return cnt;
 }
 
 static int do_gc(struct ssd *ssd, uint16_t rgid, bool force, NvmeRequest *req)
@@ -914,6 +918,8 @@ static int do_gc(struct ssd *ssd, uint16_t rgid, bool force, NvmeRequest *req)
 	int start_lunidx = rgid * RG_DEGREE;
 	uint16_t ruhid;
 
+    int startLba = req->lba; // FDP LOG 
+
 	victim_ru = select_victim_ru(ssd, force, rgid);
 	if (!victim_ru) {
 		return -1;
@@ -925,15 +931,23 @@ static int do_gc(struct ssd *ssd, uint16_t rgid, bool force, NvmeRequest *req)
 
     ftl_debug("GC-ing line:%d,ipc=%d,victim=%d,full=%d,free=%d\n", ppa.g.blk,
               victim_line->ipc, ssd->lm.victim_line_cnt, ssd->lm.full_line_cnt,
-              ssd->lm.free_line_cnt); 
+              ssd->lm.free_line_cnt);
 
-	for (int lunidx = start_lunidx; lunidx < start_lunidx + RG_DEGREE; lunidx++) {
+    // FDP LOG
+    int max_entries = RG_DEGREE * spp->pgs_per_blk;
+    uint64_t *moved_lpn_array = calloc(max_entries, sizeof(uint64_t));
+    int moved_count = 0;
+
+    for (int lunidx = start_lunidx; lunidx < start_lunidx + RG_DEGREE; lunidx++) {
 		ppa.g.ch = lunidx / spp->luns_per_ch;
 		ppa.g.lun = lunidx % spp->luns_per_ch;
 		ppa.g.pl = 0;
 		lunp = get_lun(ssd, &ppa);
-		clean_one_block(ssd, &ppa, rgid, ruhid);
-		mark_block_free(ssd, &ppa);
+        int movedPages = clean_one_block(ssd, &ppa, rgid, ruhid, moved_lpn_array, &moved_count); // FDP LOG
+        uint64_t gc_bytes = ssd->sp.secs_per_pg * ssd->sp.secsz;  // size of one page
+        ns->endgrp->fdp.mbmw += gc_bytes * movedPages;
+
+        mark_block_free(ssd, &ppa);
 
 		if (spp->enable_gc_delay) {
 			struct nand_cmd gce;
@@ -948,13 +962,60 @@ static int do_gc(struct ssd *ssd, uint16_t rgid, bool force, NvmeRequest *req)
 
 	if (ruh->ruht == NVME_RUHT_INITIALLY_ISOLATED && log_event(ruh, FDP_EVT_MEDIA_REALLOC)) {
 		/* 4. FDP Event logging */
-		/*****************
+		// /*****************
 		NvmeFdpEvent *e = nvme_fdp_alloc_event(req->ns->ctrl, &ns->endgrp->fdp.ctrl_events);
 
+        if (e)
+        {
+            // Set event fields
+            e->type = FDP_EVT_MEDIA_REALLOC;
 
+            // Set PIV, NSIDV, LV
+            e->flags = FDPEF_PIV | FDPEF_NSIDV | FDPEF_LV;
 
+            uint16_t largest_contiguous_lba_start;
+            uint64_t nlbam;
 
-		*****************/
+            // largest_contiguous_lba_start and nlbam
+            if (moved_count > 0) {
+                int max_run = 1;
+                int current_run = 1;
+                uint64_t max_start_lpn = moved_lpn_array[0];
+                for (int i = 1; i < moved_count; i++)
+                {
+                    if (moved_lpn_array[i] == moved_lpn_array[i - 1] + 1)
+                    {
+                        current_run++;
+                    }
+                    else
+                    {
+                        if (current_run > max_run)
+                        {
+                            max_run = current_run;
+                            max_start_lpn = moved_lpn_array[i - current_run];
+                        }
+                        current_run = 1;
+                    }
+                }
+
+                if (current_run > max_run)
+                {
+                    max_run = current_run;
+                    max_start_lpn = moved_lpn_array[moved_count - current_run];
+                }
+
+                largest_contiguous_lba_start = max_start_lpn * spp->secs_per_pg;
+                nlbam = (uint64_t)max_run * spp->secs_per_pg;
+            }
+            
+            e->pid = largest_contiguous_lba_start;
+            e->timestamp = nlbam;
+
+            e->nsid = ns->id;
+            e->rgid = rgid;
+            e->ruhid = ruhid;
+        }
+        // *****************/
 	}
 
 	/* reset wp of victim ru */
@@ -1052,7 +1113,12 @@ static uint64_t ssd_write(struct ssd *ssd, NvmeRequest *req)
 			break;
 	}
 
-	for (lpn = start_lpn; lpn <= end_lpn; lpn++) {
+    // FDP LOG
+    uint64_t bytes_written = (uint64_t)len * ssd->sp.secsz;
+    ns->endgrp->fdp.hbmw += bytes_written;
+    ns->endgrp->fdp.mbmw += bytes_written;
+
+    for (lpn = start_lpn; lpn <= end_lpn; lpn++) {
         ppa = get_maptbl_ent(ssd, lpn);
         if (mapped_ppa(&ppa)) {
             /* update old page information first */
@@ -1115,7 +1181,7 @@ static void *ftl_thread(void *arg)
 
 			ftl_assert(req);
 			switch (req->cmd.opcode) {
-				case NVME_CMD_WRITE:
+			case NVME_CMD_WRITE:
                 lat = ssd_write(ssd, req);
                 break;
             case NVME_CMD_READ:

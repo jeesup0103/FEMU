@@ -1075,7 +1075,7 @@ static uint16_t nvme_get_log(FemuCtrl *n, NvmeCmd *cmd)
         return nvme_fdp_ruh_usage(n, cmd, lspi, dw10, dw12, len, off);
     case NVME_LOG_FDP_STATS:
         return nvme_fdp_stats(n, cmd, lspi, len, off);
-    // case NVME_LOG_FDP_EVENTS:
+    // case NVME_LOG_FDP_EVENTS:1
         // return nvme_fdp_events(n, cmd, lspi, len, off); 				
     default:
         if (n->ext_ops.get_log) {
