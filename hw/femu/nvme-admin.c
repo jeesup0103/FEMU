@@ -1036,7 +1036,7 @@ static uint16_t nvme_fdp_events(FemuCtrl *n, NvmeCmd *cmd, uint32_t endgrpid, ui
 
     // Retrieve endurance group and FDP event buffer
     memset(&elog, 0, sizeof(elog));
-    
+
     elog->num_events = ebuf->nelems;
 
     size_t trans_len = sizeof(NvmeFdpEventsLog);
@@ -1047,8 +1047,8 @@ static uint16_t nvme_fdp_events(FemuCtrl *n, NvmeCmd *cmd, uint32_t endgrpid, ui
     }
 
     // Extract PRP pointers from NvmeCmd
-    uint64_t prp1 = cmd->dptr.prp1;
-    uint64_t prp2 = cmd->dptr.prp2;
+    uint64_t prp1 = le64_to_cpu(cmd->dptr.prp1);
+    uint64_t prp2 = le64_to_cpu(cmd->dptr.prp2);
 
     return dma_read_prp(n, (uint8_t *)elog + off, trans_len, prp1, prp2);
 	// ******************************/
