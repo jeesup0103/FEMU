@@ -1045,7 +1045,6 @@ static uint16_t nvme_fdp_events(FemuCtrl *n, NvmeCmd *cmd, uint32_t endgrpid, ui
 
     memset(&elog, 0, sizeof(elog));
 
-
     size_t trans_len = sizeof(NvmeFdpEventsLog);
     if (trans_len > buf_len)
     {

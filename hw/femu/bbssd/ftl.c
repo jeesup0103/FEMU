@@ -250,7 +250,7 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
     int cur_ruid = -1;
     if (for_gc)
     {
-
+        printf("Advancing write pointer for ii_gc_ruid\n");
         cur_ruid = rum->ii_gc_ruid;
         ru = &rum->rus[cur_ruid];
 
@@ -386,6 +386,7 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
         // Use the GC RU for Initially Isolated data
         ruid = rum->ii_gc_ruid;
         ru = &rum->rus[ruid];
+        printf("Getting page for GC, ii_gc_ruid : %d\n", ruid);
 
         // Construct the physical page address (PPA)
         ppa.g.ch = ru->wp.ch;
@@ -932,9 +933,9 @@ static int do_gc(struct ssd *ssd, uint16_t rgid, bool force, NvmeRequest *req)
 	ruhid = victim_ru->ruhid; 
 	ruh = &ns->endgrp->fdp.ruhs[ruhid];	
 
-    ftl_debug("GC-ing line:%d,ipc=%d,victim=%d,full=%d,free=%d\n", ppa.g.blk,
-              victim_line->ipc, ssd->lm.victim_line_cnt, ssd->lm.full_line_cnt,
-              ssd->lm.free_line_cnt);
+    // ftl_debug("GC-ing line:%d,ipc=%d,victim=%d,full=%d,free=%d\n", ppa.g.blk,
+    //           victim_line->ipc, ssd->lm.victim_line_cnt, ssd->lm.full_line_cnt,
+    //           ssd->lm.free_line_cnt);
 
     // FDP LOG
     int max_entries = RG_DEGREE * spp->pgs_per_blk;
