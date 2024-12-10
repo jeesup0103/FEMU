@@ -1018,6 +1018,7 @@ static uint16_t nvme_fdp_events(FemuCtrl *n, NvmeCmd *cmd, uint32_t endgrpid, ui
 	// /******************************
     
     g_autofree NvmeFdpEventsLog *elog = NULL;
+   
 
     // Validate endgrp ID
     if (endgrpid != 1)
@@ -1033,17 +1034,34 @@ static uint16_t nvme_fdp_events(FemuCtrl *n, NvmeCmd *cmd, uint32_t endgrpid, ui
 
     NvmeEnduranceGroup *endgrp = &n->endgrps[endgrpid - 1];
     NvmeFdpEventBuffer *ebuf = &endgrp->fdp.ctrl_events;
+    NvmeFdpEvent *event;
+    uint32_t log_size;
 
-    // Retrieve endurance group and FDP event buffer
+    log_size = sizeof(NvmeFdpEventsLog) + ebuf->nelems * sizeof(NvmeFdpEvent);
+    elog = g_malloc0(log_size);
+    elog->num_events = cpu_to_le32(ebuf->nelems);
+
+    event = (NvmeFdpEvent *)(elog + 1);
+
     memset(&elog, 0, sizeof(elog));
 
-    elog->num_events = ebuf->nelems;
 
     size_t trans_len = sizeof(NvmeFdpEventsLog);
     if (trans_len > buf_len)
     {
-        // If host buffer smaller than expected, truncate to buf_len
         trans_len = buf_len;
+    }
+
+    if (ebuf->nelems && ebuf->start == ebuf->next)
+    {
+        unsigned int nelems = (NVME_FDP_MAX_EVENTS - ebuf->start);
+        /* wrap over, copy [start;NVME_FDP_MAX_EVENTS[ and [0; next[ */
+        memcpy(event, &ebuf->events[ebuf->start], sizeof(NvmeFdpEvent) * nelems);
+        memcpy(event + nelems, ebuf->events, sizeof(NvmeFdpEvent) * ebuf->next);
+    }
+    else if (ebuf->start < ebuf->next)
+    {
+        memcpy(event, &ebuf->events[ebuf->start], sizeof(NvmeFdpEvent) * (ebuf->next - ebuf->start));
     }
 
     // Extract PRP pointers from NvmeCmd

@@ -919,6 +919,8 @@ static int do_gc(struct ssd *ssd, uint16_t rgid, bool force, NvmeRequest *req)
 	int start_lunidx = rgid * RG_DEGREE;
 	uint16_t ruhid;
 
+    printf("Doing gc\n");
+
     // int startLba = req->slba; // FDP LOG 
 
 	victim_ru = select_victim_ru(ssd, force, rgid);
@@ -975,8 +977,6 @@ static int do_gc(struct ssd *ssd, uint16_t rgid, bool force, NvmeRequest *req)
             // Set PIV, NSIDV, LV
             e->flags = FDPEF_PIV | FDPEF_NSIDV | FDPEF_LV;
 
-            
-
             // largest_contiguous_lba_start and nlbam
             if (moved_count > 0) {
                 int max_run = 1;
@@ -1008,7 +1008,7 @@ static int do_gc(struct ssd *ssd, uint16_t rgid, bool force, NvmeRequest *req)
                 largest_contiguous_lba_start = max_start_lpn * spp->secs_per_pg;
                 nlbam = (uint64_t)max_run * spp->secs_per_pg;
             }
-            
+
             e->pid = largest_contiguous_lba_start;
             e->timestamp = nlbam;
 
