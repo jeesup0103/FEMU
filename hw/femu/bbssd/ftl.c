@@ -254,124 +254,70 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
         cur_ruid = rum->ii_gc_ruid;
         ru = &rum->rus[cur_ruid];
 
-
-        ru->wp.ch++;
-        if (ru->wp.ch == (rgid+1) * RG_DEGREE / spp->luns_per_ch)
-        {
-            int start_lunidx = rgid * RG_DEGREE; // RG_DEGREE defined 16
-            ru->wp.ch = start_lunidx / spp->luns_per_ch;
-            // ru->wp.ch = 0;
-            ru->wp.lun++;
-            if (ru->wp.lun == spp->luns_per_ch)
-            {
-                ru->wp.lun = start_lunidx % spp->luns_per_ch;
-                ru->wp.pg++;
-                // RU is full
-                if (ru->wp.pg >= spp->pgs_per_ru)
-                {
-                    ru->wp.pg = 0;
-
-                    
-                    // All pages are valid
-                    if (ru->vpc == spp->pgs_per_ru)
-                    {
-                        // RU is full, move to full list
-                        QTAILQ_INSERT_TAIL(&rum->full_ru_list, ru, entry);
-                        rum->full_ru_cnt++;
-                    }
-                    else
-                    {
-                        // RU is partially used, insert into victim queue
-                        pqueue_insert(rum->victim_ru_pq, ru);
-                        rum->victim_ru_cnt++;
-                    }
-
-                    // Reset ii_gc_ruid
-                    rum->ii_gc_ruid = -1;
-
-                    // Get a new RU from free_ru_list
-                    ru = QTAILQ_FIRST(&rum->free_ru_list);
-
-                    // Remove RU from free list
-                    QTAILQ_REMOVE(&rum->free_ru_list, ru, entry);
-                    rum->free_ru_cnt--;
-
-                    // Assign RU to GC RU
-                    rum->ii_gc_ruid = ru->id;
-
-                    // // Initialize write pointer
-                    // ru->wp.ch = start_lunidx / spp->luns_per_ch;
-                    // ru->wp.lun = start_lunidx % spp->luns_per_ch;
-                    // ru->wp.pl = 0;
-                    // ru->wp.blk = ru->id;
-                    // ru->wp.pg = 0;
-
-                    // Reset RU's counters
-                    ru->vpc = 0;
-                    ru->ipc = 0;
-
-                    // ru->pos = 0;
-                    // ru->ruhid = ru->id;
-                }
-            }
-        }
     }
     else
     {
         // Normal operation
         cur_ruid = ruh->cur_ruids[rgid];
         ru = &rum->rus[cur_ruid];
+    }
 
-        ru->wp.ch++;
-        if (ru->wp.ch == (rgid + 1) * RG_DEGREE / spp->luns_per_ch)
+    ru->wp.ch++;
+    if (ru->wp.ch == (rgid + 1) * RG_DEGREE / spp->luns_per_ch)
+    {
+        int start_lunidx = rgid * RG_DEGREE; // RG_DEGREE defined 16
+        ru->wp.ch = start_lunidx / spp->luns_per_ch;
+        // ru->wp.ch = 0;
+        ru->wp.lun++;
+        if (ru->wp.lun == spp->luns_per_ch)
         {
-            int start_lunidx = rgid * RG_DEGREE; // RG_DEGREE defined 16
-            ru->wp.ch = start_lunidx / spp->luns_per_ch;
-            ru->wp.lun++;
-            if (ru->wp.lun == spp->luns_per_ch)
+            ru->wp.lun = start_lunidx % spp->luns_per_ch;
+            ru->wp.pg++;
+            // RU is full
+            if (ru->wp.pg >= spp->pgs_per_ru)
             {
-                ru->wp.lun = start_lunidx % spp->luns_per_ch;
-                ru->wp.pg++;
-                // RU is full
-                if (ru->wp.pg >= spp->pgs_per_ru)
+                ru->wp.pg = 0;
+
+                // All pages are valid
+                if (ru->vpc == spp->pgs_per_ru)
                 {
-                    ru->wp.pg = 0;
-
-                    
-                    // All pages are valid
-                    if (ru->vpc == spp->pgs_per_ru)
-                    {
-                        // RU is full, move to full list
-                        QTAILQ_INSERT_TAIL(&rum->full_ru_list, ru, entry);
-                        rum->full_ru_cnt++;
-                    }
-                    else
-                    {
-                        // RU is partially used, insert into victim queue
-                        pqueue_insert(rum->victim_ru_pq, ru);
-                        rum->victim_ru_cnt++;
-                    }
-
-                    // Get a new RU from free_ru_list
-                    ru = QTAILQ_FIRST(&rum->free_ru_list);
-
-                    // Remove RU from free list
-                    QTAILQ_REMOVE(&rum->free_ru_list, ru, entry);
-                    rum->free_ru_cnt--;
-
-                    // // Initialize write pointer / 0, 2, 4, 6,
-                    // ru->wp.ch = start_lunidx / spp->luns_per_ch;  // ~/8
-                    // ru->wp.lun = start_lunidx % spp->luns_per_ch;
-                    // ru->wp.pl = 0;
-                    // ru->wp.blk = ru->id;
-                    // ru->wp.pg = 0;
-
-
-                    // Reset RU's counters
-                    ru->vpc = 0;
-                    ru->ipc = 0;
-
+                    // RU is full, move to full list
+                    QTAILQ_INSERT_TAIL(&rum->full_ru_list, ru, entry);
+                    rum->full_ru_cnt++;
                 }
+                else
+                {
+                    // RU is partially used, insert into victim queue
+                    pqueue_insert(rum->victim_ru_pq, ru);
+                    rum->victim_ru_cnt++;
+                }
+
+                // Get a new RU from free_ru_list
+                ru = QTAILQ_FIRST(&rum->free_ru_list);
+
+                // Remove RU from free list
+                QTAILQ_REMOVE(&rum->free_ru_list, ru, entry);
+                rum->free_ru_cnt--;
+
+                if (for_gc)
+                {
+                    // Assign RU to GC RU
+                    rum->ii_gc_ruid = ru->id;
+                }
+
+                // // Initialize write pointer
+                // ru->wp.ch = start_lunidx / spp->luns_per_ch;
+                // ru->wp.lun = start_lunidx % spp->luns_per_ch;
+                // ru->wp.pl = 0;
+                // ru->wp.blk = ru->id;
+                // ru->wp.pg = 0;
+
+                // Reset RU's counters
+                ru->vpc = 0;
+                ru->ipc = 0;
+
+                // ru->pos = 0;
+                // ru->ruhid = ru->id;
             }
         }
     }
