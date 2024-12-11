@@ -205,7 +205,7 @@ static int get_next_free_ruid(struct ssd *ssd, struct ru_mgmt *rum)
 	rum->free_ru_cnt--;
 
 	return retru->id; 
-}																		
+}
 
 static void ssd_init_fdp_ruhtbl(struct FemuCtrl *n, struct ssd *ssd) 
 {
@@ -270,7 +270,8 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                 {
                     ru->wp.pg = 0;
 
-                    
+                    int tmpId = ru->id;
+
                     // All pages are valid
                     if (ru->vpc == spp->pgs_per_ru)
                     {
@@ -296,20 +297,20 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                     rum->free_ru_cnt--;
 
                     // Assign RU to GC RU
-                    rum->ii_gc_ruid = ru->id;
+                    rum->ii_gc_ruid = tmpId;
 
                     // // Initialize write pointer
-                    // ru->wp.ch = start_lunidx / spp->luns_per_ch;
-                    // ru->wp.lun = start_lunidx % spp->luns_per_ch;
+                    ru->wp.ch = start_lunidx / spp->luns_per_ch;
+                    ru->wp.lun = start_lunidx % spp->luns_per_ch;
                     ru->wp.pl = 0;
-                    ru->wp.blk = ru->id;
-                    // ru->wp.pg = 0;
+                    ru->wp.blk = tmpId;
+                    ru->wp.pg = 0;
 
                     // Reset RU's counters
                     ru->vpc = 0;
                     ru->ipc = 0;
 
-                    rum->rus[ru->id] = &ru;
+                    rum->rus[tmpId] = *ru;
 
                     // ru->pos = 0;
                     // ru->ruhid = ru->id;
@@ -338,6 +339,8 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                 {
                     ru->wp.pg = 0;
 
+                    int tmpId = ru->id;
+
                     
                     // All pages are valid
                     if (ru->vpc == spp->pgs_per_ru)
@@ -360,17 +363,16 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                     QTAILQ_REMOVE(&rum->free_ru_list, ru, entry);
                     rum->free_ru_cnt--;
 
-                    ruh->cur_ruids[rgid] = ru->id;
+                    ruh->cur_ruids[rgid] = tmpId;
 
                     // Initialize write pointer / 0, 2, 4, 6,
-                    // ru->wp.ch = start_lunidx / spp->luns_per_ch;  // ~/8
-                    // ru->wp.lun = start_lunidx % spp->luns_per_ch;
+                    ru->wp.ch = start_lunidx / spp->luns_per_ch;  // ~/8
+                    ru->wp.lun = start_lunidx % spp->luns_per_ch;
                     ru->wp.pl = 0;
-                    ru->wp.blk = ru->id;
-
+                    ru->wp.blk = tmpId;
 
                     // new
-                    rum->rus[ru->id] = &ru;
+                    rum->rus[ru->id] = *ru;
 
                     // Reset RU's counters
                     ru->vpc = 0;
