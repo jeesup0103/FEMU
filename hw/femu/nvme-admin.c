@@ -1039,13 +1039,12 @@ static uint16_t nvme_fdp_events(FemuCtrl *n, NvmeCmd *cmd, uint32_t endgrpid, ui
 
     log_size = sizeof(NvmeFdpEventsLog) + ebuf->nelems * sizeof(NvmeFdpEvent);
     elog = g_malloc0(log_size);
-    memset(&elog, 0, sizeof(elog));
 
     elog->num_events = cpu_to_le32(ebuf->nelems);
 
     event = (NvmeFdpEvent *)(elog + 1);
 
-    size_t trans_len = sizeof(NvmeFdpEventsLog);
+    size_t trans_len = log_size;
     if (trans_len > buf_len)
     {
         trans_len = buf_len;
