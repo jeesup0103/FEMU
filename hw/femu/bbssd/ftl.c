@@ -312,8 +312,8 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                 // ru->wp.ch = start_lunidx / spp->luns_per_ch;
                 // ru->wp.lun = start_lunidx % spp->luns_per_ch;
                 // ru->wp.pl = 0;
-                // ru->wp.blk = ru->id;
-                // ru->wp.pg = 0;
+                ru->wp.blk = ru->id;
+                ru->wp.pg = 0;
 
                 // Reset RU's counters
                 ru->vpc = 0;
