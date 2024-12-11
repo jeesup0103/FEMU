@@ -306,6 +306,8 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                     ru->wp.blk = tmpId;
                     ru->wp.pg = 0;
 
+                    ru->id = tmpId;
+
                     // Reset RU's counters
                     ru->vpc = 0;
                     ru->ipc = 0;
@@ -371,8 +373,10 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                     ru->wp.pl = 0;
                     ru->wp.blk = tmpId;
 
+                    ru->id = tmpId;
+
                     // new
-                    rum->rus[ru->id] = *ru;
+                    rum->rus[tmpId] = *ru;
 
                     // Reset RU's counters
                     ru->vpc = 0;
