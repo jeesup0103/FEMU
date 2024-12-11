@@ -359,6 +359,8 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                     QTAILQ_REMOVE(&rum->free_ru_list, ru, entry);
                     rum->free_ru_cnt--;
 
+                    ruh->cur_ruids[rgid] = ru->id;
+
                     // // Initialize write pointer / 0, 2, 4, 6,
                     // ru->wp.ch = start_lunidx / spp->luns_per_ch;  // ~/8
                     // ru->wp.lun = start_lunidx % spp->luns_per_ch;
