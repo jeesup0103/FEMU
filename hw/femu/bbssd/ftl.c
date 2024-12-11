@@ -262,7 +262,7 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
             ru->wp.ch = start_lunidx / spp->luns_per_ch;
             // ru->wp.ch = 0;
             ru->wp.lun++;
-            if (ru->wp.lun == spp->luns_per_ch)
+            if (ru->wp.lun == (rgid + 1) * RG_DEGREE % spp->luns_per_ch)
             {
                 ru->wp.lun = start_lunidx % spp->luns_per_ch;
                 ru->wp.pg++;
@@ -327,7 +327,7 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
             int start_lunidx = rgid * RG_DEGREE; // RG_DEGREE defined 16
             ru->wp.ch = start_lunidx / spp->luns_per_ch;
             ru->wp.lun++;
-            if (ru->wp.lun == spp->luns_per_ch)
+            if (ru->wp.lun == (rgid + 1) * RG_DEGREE % spp->luns_per_ch)
             {
                 ru->wp.lun = start_lunidx % spp->luns_per_ch;
                 ru->wp.pg++;
