@@ -270,8 +270,6 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                 {
                     ru->wp.pg = 0;
 
-                    int tmpId = ru->id;
-
                     // All pages are valid
                     if (ru->vpc == spp->pgs_per_ru)
                     {
@@ -334,8 +332,6 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                 if (ru->wp.pg >= spp->pgs_per_ru)
                 {
                     ru->wp.pg = 0;
-
-                    int tmpId = ru->id;
 
                     
                     // All pages are valid
