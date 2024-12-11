@@ -264,12 +264,16 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
             ru->wp.lun++;
             if (ru->wp.lun == spp->luns_per_ch)
             {
-                ru->wp.lun = 0;
+                ru->wp.lun = start_lunidx % spp->luns_per_ch;
                 ru->wp.pg++;
                 // RU is full
                 if (ru->wp.pg >= spp->pgs_per_ru)
                 {
                     ru->wp.pg = 0;
+
+                    // Reset RU's counters
+                    ru->vpc = 0;
+                    ru->ipc = 0;
                     // All pages are valid
                     if (ru->vpc == spp->pgs_per_ru)
                     {
@@ -304,9 +308,6 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                     ru->wp.blk = ru->id;
                     ru->wp.pg = 0;
 
-                    // Reset RU's counters
-                    ru->vpc = 0;
-                    ru->ipc = 0;
 
                     ru->pos = 0;
                     ru->ruhid = ru->id;
@@ -328,12 +329,16 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
             ru->wp.lun++;
             if (ru->wp.lun == spp->luns_per_ch)
             {
-                ru->wp.lun = 0;
+                ru->wp.lun = start_lunidx % spp->luns_per_ch;
                 ru->wp.pg++;
                 // RU is full
                 if (ru->wp.pg >= spp->pgs_per_ru)
                 {
                     ru->wp.pg = 0;
+
+                    // Reset RU's counters
+                    ru->vpc = 0;
+                    ru->ipc = 0;
                     // All pages are valid
                     if (ru->vpc == spp->pgs_per_ru)
                     {
