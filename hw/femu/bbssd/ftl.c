@@ -330,7 +330,7 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
             ru->wp.lun++;
             if (ru->wp.lun == spp->luns_per_ch)
             {
-                ru->wp.lun == start_lunidx % spp->luns_per_ch;
+                ru->wp.lun = start_lunidx % spp->luns_per_ch;
                 ru->wp.pg++;
                 // RU is full
                 if (ru->wp.pg >= spp->pgs_per_ru)
