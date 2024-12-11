@@ -284,8 +284,8 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                         rum->victim_ru_cnt++;
                     }
 
-                    // Reset ii_gc_ruid
-                    rum->ii_gc_ruid = -1;
+                    // // Reset ii_gc_ruid
+                    // rum->ii_gc_ruid = -1;
 
                     // Get a new RU from free_ru_list
                     // ru = QTAILQ_FIRST(&rum->free_ru_list);
@@ -333,7 +333,6 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                 {
                     ru->wp.pg = 0;
 
-                    
                     // All pages are valid
                     if (ru->vpc == spp->pgs_per_ru)
                     {
@@ -361,14 +360,13 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                     ru->wp.ch = start_lunidx / spp->luns_per_ch;
                     ru->wp.lun = start_lunidx % spp->luns_per_ch;
                     ru->wp.pl = 0;
-                    ru->wp.blk = ru->id;
+                    ru->wp.blk = ruid;
                     ru->wp.pg = 0;
                     ru->vpc = 0;
                     ru->ipc = 0;
                     ru->pos = 0;
 
                     ruh->cur_ruids[rgid] = ru->id;
-                    rum->rus[ru->id] = *ru;
                 }
             }
         }
