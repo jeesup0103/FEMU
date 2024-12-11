@@ -284,16 +284,6 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                         rum->victim_ru_cnt++;
                     }
 
-                    // // Reset ii_gc_ruid
-                    // rum->ii_gc_ruid = -1;
-
-                    // Get a new RU from free_ru_list
-                    // ru = QTAILQ_FIRST(&rum->free_ru_list);
-
-                    // // Remove RU from free list
-                    // QTAILQ_REMOVE(&rum->free_ru_list, ru, entry);
-                    // rum->free_ru_cnt--;
-
                     int ruid = get_next_free_ruid(ssd, rum);
                     struct ru *new_ru = &rum->rus[ruid];
 
@@ -304,7 +294,6 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                     new_ru->wp.pg = 0;
                     new_ru->vpc = 0;
                     new_ru->ipc = 0;
-                    new_ru->pos = 0;
 
                     // Assign RU to GC RU
                     rum->ii_gc_ruid = new_ru->id;
@@ -347,13 +336,6 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                         rum->victim_ru_cnt++;
                     }
 
-                    // // Get a new RU from free_ru_list
-                    // ru = QTAILQ_FIRST(&rum->free_ru_list);
-
-                    // // Remove RU from free list
-                    // QTAILQ_REMOVE(&rum->free_ru_list, ru, entry);
-                    // rum->free_ru_cnt--;
-
                     int ruid = get_next_free_ruid(ssd, rum);
                     struct ru *new_ru = &rum->rus[ruid];
 
@@ -364,7 +346,6 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                     new_ru->wp.pg = 0;
                     new_ru->vpc = 0;
                     new_ru->ipc = 0;
-                    new_ru->pos = 0;
 
                     ruh->cur_ruids[rgid] = new_ru->id;
                 }
