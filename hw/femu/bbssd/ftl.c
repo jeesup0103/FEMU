@@ -362,7 +362,6 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                     ru->wp.blk = ru->id;
                     ru->wp.pg = 0;
 
-                    ru->ruhid
 
                     // Reset RU's counters
                     ru->vpc = 0;
