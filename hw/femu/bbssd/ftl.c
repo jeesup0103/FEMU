@@ -258,7 +258,9 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
         ru->wp.ch++;
         if (ru->wp.ch == (rgid+1) * RG_DEGREE / spp->luns_per_ch)
         {
-            ru->wp.ch = 0;
+            int start_lunidx = rgid * RG_DEGREE; // RG_DEGREE defined 16
+            ru->wp.ch = start_lunidx / spp->luns_per_ch;
+            // ru->wp.ch = 0;
             ru->wp.lun++;
             if (ru->wp.lun == spp->luns_per_ch)
             {
@@ -300,7 +302,7 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                     ru->wp.ch = start_lunidx / spp->luns_per_ch;
                     ru->wp.lun = start_lunidx % spp->luns_per_ch;
                     ru->wp.pl = 0;
-                    ru->wp.blk = ru->id;
+                    // ru->wp.blk = ru->id;
                     ru->wp.pg = 0;
 
                     // Reset RU's counters
@@ -317,9 +319,10 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
         ru = &rum->rus[cur_ruid];
 
         ru->wp.ch++;
-        if (ru->wp.ch == spp->nchs) // 이게 맞나?
+        if (ru->wp.ch == (rgid + 1) * RG_DEGREE / spp->luns_per_ch)
         {
-            ru->wp.ch = 0;
+            int start_lunidx = rgid * RG_DEGREE; // RG_DEGREE defined 16
+            ru->wp.ch = start_lunidx / spp->luns_per_ch;
             ru->wp.lun++;
             if (ru->wp.lun == spp->luns_per_ch)
             {
@@ -355,7 +358,7 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                     ru->wp.ch = start_lunidx / spp->luns_per_ch;  // ~/8
                     ru->wp.lun = start_lunidx % spp->luns_per_ch;
                     ru->wp.pl = 0;
-                    ru->wp.blk = ru->id;
+                    // ru->wp.blk = ru->id;
                     ru->wp.pg = 0;
 
                     // Reset RU's counters
@@ -888,7 +891,7 @@ static int clean_one_block(struct ssd *ssd, struct ppa *ppa, uint16_t rgid, uint
     struct nand_page *pg_iter = NULL;
     int cnt = 0;
 
-    printg("Cleaning B\n");
+    printf("Cleaning B\n");
 
     for (int pg = 0; pg < spp->pgs_per_blk; pg++) {
         ppa->g.pg = pg;
