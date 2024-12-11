@@ -888,6 +888,8 @@ static int clean_one_block(struct ssd *ssd, struct ppa *ppa, uint16_t rgid, uint
     struct nand_page *pg_iter = NULL;
     int cnt = 0;
 
+    printg("Cleaning B\n");
+
     for (int pg = 0; pg < spp->pgs_per_blk; pg++) {
         ppa->g.pg = pg;
         pg_iter = get_pg(ssd, ppa);
