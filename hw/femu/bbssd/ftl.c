@@ -250,7 +250,7 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
     int cur_ruid = -1;
     if (for_gc)
     {
-        printf("Advancing write pointer for ii_gc_ruid\n");
+        printf("AD\n");
         cur_ruid = rum->ii_gc_ruid;
         ru = &rum->rus[cur_ruid];
 
@@ -386,7 +386,7 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
         // Use the GC RU for Initially Isolated data
         ruid = rum->ii_gc_ruid;
         ru = &rum->rus[ruid];
-        printf("Getting page for GC, ii_gc_ruid : %d\n", ruid);
+        printf("GP\n");
 
         // Construct the physical page address (PPA)
         ppa.g.ch = ru->wp.ch;
@@ -1195,7 +1195,7 @@ static void *ftl_thread(void *arg)
                 lat = 0;
                 break;
             default:
-                ftl_err("FTL received unkown request type (opcode: %d), ERROR\n", req->cmd.opcode);
+                // ftl_err("FTL received unkown request type (opcode: %d), ERROR\n", req->cmd.opcode);
             }
 
             req->reqlat = lat;
