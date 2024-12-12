@@ -253,101 +253,57 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
         // printf("AD\n");
         cur_ruid = rum->ii_gc_ruid;
         ru = &rum->rus[cur_ruid];
-
-
-        ru->wp.ch++;
-        if (ru->wp.ch == (rgid + 1) * RG_DEGREE / spp->luns_per_ch)
-        {
-            int start_lunidx = rgid * RG_DEGREE; // RG_DEGREE defined 16
-            ru->wp.ch = start_lunidx / spp->luns_per_ch;
-            ru->wp.lun++;
-            if (ru->wp.lun == spp->luns_per_ch)
-            {
-                ru->wp.lun = start_lunidx % spp->luns_per_ch;
-                ru->wp.pg++;
-                // RU is full
-                if (ru->wp.pg >= spp->pgs_per_ru)
-                {
-                    ru->wp.pg = 0;
-
-                    // All pages are valid
-                    if (ru->vpc == spp->pgs_per_ru)
-                    {
-                        // RU is full, move to full list
-                        QTAILQ_INSERT_TAIL(&rum->full_ru_list, ru, entry);
-                        rum->full_ru_cnt++;
-                    }
-                    else
-                    {
-                        // RU is partially used, insert into victim queue
-                        pqueue_insert(rum->victim_ru_pq, ru);
-                        rum->victim_ru_cnt++;
-                    }
-
-                    int ruid = get_next_free_ruid(ssd, rum);
-                    struct ru *new_ru = &rum->rus[ruid];
-
-                    new_ru->wp.ch = start_lunidx / spp->luns_per_ch;
-                    new_ru->wp.lun = start_lunidx % spp->luns_per_ch;
-                    new_ru->wp.pl = 0;
-                    new_ru->wp.blk = new_ru->id;
-                    new_ru->wp.pg = 0;
-                    new_ru->vpc = 0;
-                    new_ru->ipc = 0;
-
-                    // Assign RU to GC RU
-                    rum->ii_gc_ruid = new_ru->id;
-                }
-            }
-        }
     }
     else
     {
         // Normal operation
         cur_ruid = ruh->cur_ruids[rgid];
         ru = &rum->rus[cur_ruid];
+    }
 
-        ru->wp.ch++;
-        if (ru->wp.ch == (rgid + 1) * RG_DEGREE / spp->luns_per_ch)
+    ru->wp.ch++;
+    if (ru->wp.ch == (rgid + 1) * RG_DEGREE / spp->luns_per_ch)
+    {
+        int start_lunidx = rgid * RG_DEGREE; // RG_DEGREE defined 16
+        ru->wp.ch = start_lunidx / spp->luns_per_ch;
+        ru->wp.lun++;
+        if (ru->wp.lun == spp->luns_per_ch)
         {
-            int start_lunidx = rgid * RG_DEGREE; // RG_DEGREE defined 16
-            ru->wp.ch = start_lunidx / spp->luns_per_ch;
-            ru->wp.lun++;
-            if (ru->wp.lun == spp->luns_per_ch)
+            ru->wp.lun = start_lunidx % spp->luns_per_ch;
+            ru->wp.pg++;
+            // RU is full
+            if (ru->wp.pg >= spp->pgs_per_ru)
             {
-                ru->wp.lun = start_lunidx % spp->luns_per_ch;
-                ru->wp.pg++;
-                // RU is full
-                if (ru->wp.pg >= spp->pgs_per_ru)
+                ru->wp.pg = 0;
+
+                // All pages are valid
+                if (ru->vpc == spp->pgs_per_ru)
                 {
-                    ru->wp.pg = 0;
+                    // RU is full, move to full list
+                    QTAILQ_INSERT_TAIL(&rum->full_ru_list, ru, entry);
+                    rum->full_ru_cnt++;
+                }
+                else
+                {
+                    // RU is partially used, insert into victim queue
+                    pqueue_insert(rum->victim_ru_pq, ru);
+                    rum->victim_ru_cnt++;
+                }
 
-                    // All pages are valid
-                    if (ru->vpc == spp->pgs_per_ru)
-                    {
-                        // RU is full, move to full list
-                        QTAILQ_INSERT_TAIL(&rum->full_ru_list, ru, entry);
-                        rum->full_ru_cnt++;
-                    }
-                    else
-                    {
-                        // RU is partially used, insert into victim queue
-                        pqueue_insert(rum->victim_ru_pq, ru);
-                        rum->victim_ru_cnt++;
-                    }
+                int ruid = get_next_free_ruid(ssd, rum);
+                struct ru *new_ru = &rum->rus[ruid];
 
-                    int ruid = get_next_free_ruid(ssd, rum);
-                    struct ru *new_ru = &rum->rus[ruid];
+                new_ru->wp.ch = start_lunidx / spp->luns_per_ch;
+                new_ru->wp.lun = start_lunidx % spp->luns_per_ch;
+                new_ru->wp.pl = 0;
+                new_ru->wp.blk = new_ru->id;
+                new_ru->wp.pg = 0;
+                new_ru->vpc = 0;
+                new_ru->ipc = 0;
 
-                    new_ru->wp.ch = start_lunidx / spp->luns_per_ch;
-                    new_ru->wp.lun = start_lunidx % spp->luns_per_ch;
-                    new_ru->wp.pl = 0;
-                    new_ru->wp.blk = new_ru->id;
-                    new_ru->wp.pg = 0;
-                    new_ru->vpc = 0;
-                    new_ru->ipc = 0;
-
-                    // ruh->cur_ruids[rgid] = new_ru->id;
+                if(for_gc){
+                    // Update GC RU
+                    rum->ii_gc_ruid = new_ru->id;
                 }
             }
         }
@@ -877,7 +833,7 @@ static int clean_one_block(struct ssd *ssd, struct ppa *ppa, uint16_t rgid, uint
     struct nand_page *pg_iter = NULL;
     int cnt = 0;
 
-    printf("Cleaning B\n");
+    // printf("Cleaning B\n");
 
     for (int pg = 0; pg < spp->pgs_per_blk; pg++) {
         ppa->g.pg = pg;
