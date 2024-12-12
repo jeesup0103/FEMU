@@ -298,9 +298,9 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                     // Update GC RU
                     rum->ii_gc_ruid = ruid;
                 }
-                else{
-                    ruh->cur_ruids[rgid] = ruid;
-                }
+                // else{
+                //     ruh->cur_ruids[rgid] = ruid;
+                // }
             }
         }
     }
