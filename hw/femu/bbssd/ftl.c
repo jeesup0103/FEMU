@@ -250,7 +250,7 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
     int cur_ruid = -1;
     if (for_gc)
     {
-        printf("AD\n");
+        // printf("AD\n");
         cur_ruid = rum->ii_gc_ruid;
         ru = &rum->rus[cur_ruid];
 
@@ -347,7 +347,7 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                     new_ru->vpc = 0;
                     new_ru->ipc = 0;
 
-                    ruh->cur_ruids[rgid] = new_ru->id;
+                    // ruh->cur_ruids[rgid] = new_ru->id;
                 }
             }
         }
@@ -373,7 +373,7 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
         // Use the GC RU for Initially Isolated data
         ruid = rum->ii_gc_ruid;
         ru = &rum->rus[ruid];
-        printf("GP\n");
+        // printf("GP\n");
 
         // Construct the physical page address (PPA)
         ppa.ppa = 0;
