@@ -261,6 +261,12 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
         ru = &rum->rus[cur_ruid];
     }
 
+
+    if(!ru){
+        printf("RU not assigned!\n");
+        exit(1);
+    }
+
     ru->wp.ch++;
     if (ru->wp.ch == (rgid + 1) * RG_DEGREE / spp->luns_per_ch)
     {
