@@ -297,8 +297,6 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                 }
 
                 int ruid = get_next_free_ruid(ssd, rum);
-                struct ru *new_ru = &rum->rus[ruid];
-                new_ru->wp.blk = ruid;
 
                 if (for_gc)
                 {
@@ -308,6 +306,10 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                 else{
                     if(ruid != cur_ruid){
                         printf("Not same\n");
+                        return;
+                    }
+                    else{
+                        printf("Same\n");
                     }
                     ruh->cur_ruids[rgid] = ruid;
                 }
