@@ -180,7 +180,7 @@ static void ssd_init_fdp_ru_mgmts(struct ssd *ssd)
 
 				ru->blks[k] = &ssd->ch[cur_ch].lun[cur_lun].pl[0].blk[blkoff]; 
 			} 
-
+            
 			/* initialize all the reclaim units as free reclaim units */
 			QTAILQ_INSERT_TAIL(&rum->free_ru_list, ru, entry);
 			rum->free_ru_cnt++;
@@ -279,45 +279,27 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                 // All pages are valid
                 if (ru->vpc == spp->pgs_per_ru)
                 {
-                    ru->wp.ch = start_lunidx / spp->luns_per_ch;
-                    ru->wp.lun = start_lunidx % spp->luns_per_ch;
-                    ru->wp.pl = 0;
-                    ru->wp.blk = ru->id;
-                    ru->wp.pg = 0;
-                    ru->vpc = 0;
-                    ru->ipc = 0;
                     // RU is full, move to full list
                     QTAILQ_INSERT_TAIL(&rum->full_ru_list, ru, entry);
                     rum->full_ru_cnt++;
                 }
                 else
                 {
-                    ru->wp.ch = start_lunidx / spp->luns_per_ch;
-                    ru->wp.lun = start_lunidx % spp->luns_per_ch;
-                    ru->wp.pl = 0;
-                    ru->wp.blk = ru->id;
-                    ru->wp.pg = 0;
-                    ru->vpc = 0;
-                    ru->ipc = 0;
                     // RU is partially used, insert into victim queue
                     pqueue_insert(rum->victim_ru_pq, ru);
                     rum->victim_ru_cnt++;
                 }
 
                 int ruid = get_next_free_ruid(ssd, rum);
-                struct ru *new_ru = &rum->rus[ruid];
+                // struct ru *new_ru = &rum->rus[ruid];
 
-                // new_ru->wp.ch = start_lunidx / spp->luns_per_ch;
-                // new_ru->wp.lun = start_lunidx % spp->luns_per_ch;
-                // new_ru->wp.pl = 0;
-                // new_ru->wp.blk = new_ru->id;
-                // new_ru->wp.pg = 0;
-                // new_ru->vpc = 0;
-                // new_ru->ipc = 0;
 
                 if(for_gc){
                     // Update GC RU
-                    rum->ii_gc_ruid = new_ru->id;
+                    rum->ii_gc_ruid = ruid;
+                }
+                else{
+                    ruh->cur_ruids[rgid] = ruid
                 }
             }
         }
