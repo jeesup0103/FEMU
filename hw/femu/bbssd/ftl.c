@@ -297,10 +297,11 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                 }
 
                 int ruid = get_next_free_ruid(ssd, rum);
-                // struct ru *new_ru = &rum->rus[ruid];
+                struct ru *new_ru = &rum->rus[ruid];
+                ru->wp.blk = ruid;
 
-
-                if(for_gc){
+                if (for_gc)
+                {
                     // Update GC RU
                     rum->ii_gc_ruid = ruid;
                 }
