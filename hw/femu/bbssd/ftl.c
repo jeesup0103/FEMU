@@ -334,7 +334,7 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
         ppa.g.pg = ru->wp.pg;
         ppa.g.pl = ru->wp.pl;
         ppa.g.blk = ru->wp.blk;
-        ppa.g.sec = 0;
+        // ppa.g.sec = 0;
 
         return ppa;
     }
