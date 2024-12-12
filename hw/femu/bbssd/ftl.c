@@ -332,8 +332,8 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
         ppa.g.ch = ru->wp.ch;
         ppa.g.lun = ru->wp.lun;
         ppa.g.pg = ru->wp.pg;
-        ppa.g.pl = ru->wp.pl;
         ppa.g.blk = ru->wp.blk;
+        ppa.g.pl = ru->wp.pl;
         // ppa.g.sec = 0;
 
         return ppa;
@@ -963,7 +963,9 @@ static int do_gc(struct ssd *ssd, uint16_t rgid, bool force, NvmeRequest *req)
         // *****************/
 	}
 
-	/* reset wp of victim ru */
+    free(moved_lpn_array); // FREE????
+
+    /* reset wp of victim ru */
 	victim_ru->wp.ch = start_lunidx / spp->luns_per_ch;
 	victim_ru->wp.lun = start_lunidx % spp->luns_per_ch;
 	victim_ru->wp.pl = 0;
