@@ -364,7 +364,7 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
 	// /**************
     struct ppa ppa;
 
-    // struct ssdparams *spp = &ssd->sp;
+    struct ssdparams *spp = &ssd->sp;
     struct ru_mgmt *rum = &ssd->rums[rgid];
     struct ru *ru = NULL;
     struct ruh *ruh = &ssd->ruhtbl[ruhid];
@@ -451,7 +451,7 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
         exit(1);
     }
 
-    
+
     ftl_assert(ppa.g.pl == 0);
 
     return ppa;
