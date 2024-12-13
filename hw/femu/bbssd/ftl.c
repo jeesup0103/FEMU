@@ -252,29 +252,12 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
     {
         // printf("AD\n");
         cur_ruid = rum->ii_gc_ruid;
-
-        if (cur_ruid < 0 || cur_ruid >= spp->blks_per_lun)
-        {
-            printf("ERROR: GC RU ID out of bounds (ruid=%d, spp->blks_per_lun=%d)\n", cur_ruid, spp->blks_per_lun);
-            exit(1);
-        }
-
-
         ru = &rum->rus[cur_ruid];
-
-        
     }
     else
     {
         // Normal operation
         cur_ruid = ruh->cur_ruids[rgid];
-
-        if (cur_ruid < 0 || cur_ruid >= spp->blks_per_lun)
-        {
-            printf("ERROR: Current RU ID out of bounds (ruid=%d, spp->blks_per_lun=%d)\n", cur_ruid, spp->blks_per_lun);
-            exit(1);
-        }
-        
         ru = &rum->rus[cur_ruid];
     }
 
@@ -286,14 +269,6 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
     int start_lunidx = rgid * RG_DEGREE; // RG_DEGREE defined 16
 
     // check_addr(ru->wp.ch, spp->nchs);
-
-    if (ru->wp.ch < 0 || ru->wp.ch >= spp->nchs)
-    {
-        printf("ERROR: Channel index out of bounds (ch=%d, nchs=%d)\n", ru->wp.ch, spp->nchs);
-        exit(1);
-    }
-
-
     ru->wp.ch++;
     if (ru->wp.ch == (rgid + 1) * RG_DEGREE / spp->luns_per_ch)
     {
@@ -301,14 +276,6 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
         ru->wp.ch = start_lunidx / spp->luns_per_ch;
 
         // check_addr(ru->wp.ch, spp->luns_per_ch);
-
-        if (ru->wp.lun < 0 || ru->wp.lun >= spp->luns_per_ch)
-        {
-            printf("ERROR: LUN index out of bounds (lun=%d, luns_per_ch=%d)\n", ru->wp.lun, spp->luns_per_ch);
-            exit(1);
-        }
-
-
         ru->wp.lun++;
         if (ru->wp.lun == spp->luns_per_ch)
         {
@@ -336,11 +303,6 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
 
                 int ruid = get_next_free_ruid(ssd, rum);
 
-                if (ruid < 0 || ruid >= spp->blks_per_lun)
-                {
-                    printf("ERROR: Next free RU ID out of bounds (ruid=%d, spp->blks_per_lun=%d)\n", ruid, spp->blks_per_lun);
-                    exit(1);
-                }
 
                 if (for_gc)
                 {
@@ -374,7 +336,6 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
     if (for_gc) {
         // Use the GC RU for Initially Isolated data
         ruid = rum->ii_gc_ruid;
-
         ru = &rum->rus[ruid];
         // printf("GP\n");
 
@@ -385,18 +346,12 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
         ppa.g.pg = ru->wp.pg;
         ppa.g.blk = ru->wp.blk;
         ppa.g.pl = ru->wp.pl;
-
         // ppa.g.sec = 0;
 
         return ppa;
     }
 
-
     ru = &rum->rus[ruid];
-
-    if(ru == NULL){
-        printf("NUL\n");
-    }
 
     ppa.ppa = 0;
     ppa.g.ch = ru->wp.ch;
@@ -404,9 +359,6 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
     ppa.g.pg = ru->wp.pg;
     ppa.g.blk = ru->wp.blk;
     ppa.g.pl = ru->wp.pl;
-
-
-
     ftl_assert(ppa.g.pl == 0);
 
     return ppa;
