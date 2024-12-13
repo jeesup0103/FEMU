@@ -304,13 +304,6 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                     rum->ii_gc_ruid = ruid;
                 }
                 else{
-                    if(ruid != cur_ruid){
-                        printf("Not same\n");
-                        return;
-                    }
-                    else{
-                        printf("Same\n");
-                    }
                     ruh->cur_ruids[rgid] = ruid;
                 }
             }
@@ -318,7 +311,7 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
     }
 
     /*****************/
-}																
+}
 
 static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, bool for_gc) 
 {
@@ -1048,8 +1041,10 @@ static uint64_t ssd_write(struct ssd *ssd, NvmeRequest *req)
     uint8_t dtype = 0x02;
 	uint16_t pid = rw->dspec;                   // Placement ID -> specifies a RG and placement handle referencing a unique RU
 	uint16_t rgif = endgrp->fdp.rgif;           // RG id format
-    uint16_t ph_bits = 16 - rgif;
-    uint16_t rgid = pid >> ph_bits;      // RG id
+    // uint16_t ph_bits = 16 - rgif;
+    // uint16_t rgid = pid >> ph_bits;      // RG id
+    uint16_t rgid = pid >> 16 - rgif;              // RG id
+    uint16_t ph_bits = MAX_RUHS;
     uint16_t ph = pid & ((1 << ph_bits) - 1);   // Placement handler
     // *******************************/
 
