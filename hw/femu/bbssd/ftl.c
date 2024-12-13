@@ -230,7 +230,7 @@ static void ssd_init_fdp_ruhtbl(struct FemuCtrl *n, struct ssd *ssd)
 		rum = &ssd->rums[i];
 		rum->ii_gc_ruid = get_next_free_ruid(ssd, rum);
 	}
-}																		
+}
 
 static inline void check_addr(int a, int max)
 {
@@ -242,6 +242,7 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
 	/* 3. Advancing Write Pointer */
 	/*****************/
 
+    printf("5\n");
     struct ssdparams *spp = &ssd->sp;
     struct ru_mgmt *rum = &ssd->rums[rgid];
     struct ruh *ruh = &ssd->ruhtbl[ruhid];
@@ -309,13 +310,15 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                     // Update GC RU
                     rum->ii_gc_ruid = ruid;
                 }
-                else{
+                else {
                     ruh->cur_ruids[rgid] = ruid; // 이건 맞아 해야됨
 
                 }
             }
         }
     }
+
+    printf("6\n");
 
     /*****************/
 }
@@ -324,6 +327,7 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
 {
 	/* 2. Getting Physical Page to Write */
 	// /**************
+    printf("3\n");
     struct ppa ppa;
 
     // struct ssdparams *spp = &ssd->sp;
@@ -331,27 +335,18 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
     struct ru *ru = NULL;
     struct ruh *ruh = &ssd->ruhtbl[ruhid];
 
-    int ruid = ruh->cur_ruids[rgid]; // offset value within RG
+
+    int ruid = 0; // offset value within RG
 
     if (for_gc) {
         // Use the GC RU for Initially Isolated data
         ruid = rum->ii_gc_ruid;
         ru = &rum->rus[ruid];
-        // printf("GP\n");
-
-        // Construct the physical page address (PPA)
-        ppa.ppa = 0;
-        ppa.g.ch = ru->wp.ch;
-        ppa.g.lun = ru->wp.lun;
-        ppa.g.pg = ru->wp.pg;
-        ppa.g.blk = ru->wp.blk;
-        ppa.g.pl = ru->wp.pl;
-        // ppa.g.sec = 0;
-
-        return ppa;
     }
-
-    ru = &rum->rus[ruid];
+    else {
+        ruid = ruh->cur_ruids[rgid];
+        ru = &rum->rus[ruid];
+    }
 
     ppa.ppa = 0;
     ppa.g.ch = ru->wp.ch;
@@ -360,6 +355,8 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
     ppa.g.blk = ru->wp.blk;
     ppa.g.pl = ru->wp.pl;
     ftl_assert(ppa.g.pl == 0);
+
+    printf("4\n");
 
     return ppa;
 	// **************/
@@ -1037,7 +1034,9 @@ static uint64_t ssd_write(struct ssd *ssd, NvmeRequest *req)
     uint64_t lpn;
     uint64_t curlat = 0, maxlat = 0;
     int r = 0;
-	uint16_t ruhid;										
+	uint16_t ruhid;
+
+    printf("1\n");
 
 	NvmeNamespace *ns = req->ns;
 	NvmeEnduranceGroup *endgrp = ns->endgrp;
@@ -1109,6 +1108,8 @@ static uint64_t ssd_write(struct ssd *ssd, NvmeRequest *req)
         curlat = ssd_advance_status(ssd, &ppa, &swr);
         maxlat = (curlat > maxlat) ? curlat : maxlat;
     }
+
+    printf("2\n");
 
     return maxlat;
 }
