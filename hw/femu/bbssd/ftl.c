@@ -253,9 +253,9 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
         // printf("AD\n");
         cur_ruid = rum->ii_gc_ruid;
 
-        if (cur_ruid < 0 || cur_ruid >= MAX_RUS)
+        if (cur_ruid < 0 || cur_ruid >= endgrp->fdp.nrg)
         {
-            printf("ERROR: GC RU ID out of bounds (ruid=%d, MAX_RUS=%d)\n", cur_ruid, MAX_RUS);
+            printf("ERROR: GC RU ID out of bounds (ruid=%d, endgrp->fdp.nrg=%d)\n", cur_ruid, endgrp->fdp.nrg);
             exit(1);
         }
 
@@ -269,9 +269,9 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
         // Normal operation
         cur_ruid = ruh->cur_ruids[rgid];
 
-        if (cur_ruid < 0 || cur_ruid >= MAX_RUS)
+        if (cur_ruid < 0 || cur_ruid >= endgrp->fdp.nrg)
         {
-            printf("ERROR: Current RU ID out of bounds (ruid=%d, MAX_RUS=%d)\n", cur_ruid, MAX_RUS);
+            printf("ERROR: Current RU ID out of bounds (ruid=%d, endgrp->fdp.nrg=%d)\n", cur_ruid, endgrp->fdp.nrg);
             exit(1);
         }
         
@@ -336,9 +336,9 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
 
                 int ruid = get_next_free_ruid(ssd, rum);
 
-                if (ruid < 0 || ruid >= MAX_RUS)
+                if (ruid < 0 || ruid >= endgrp->fdp.nrg)
                 {
-                    printf("ERROR: Next free RU ID out of bounds (ruid=%d, MAX_RUS=%d)\n", ruid, MAX_RUS);
+                    printf("ERROR: Next free RU ID out of bounds (ruid=%d, endgrp->fdp.nrg=%d)\n", ruid, endgrp->fdp.nrg);
                     exit(1);
                 }
 
@@ -375,9 +375,9 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
         // Use the GC RU for Initially Isolated data
         ruid = rum->ii_gc_ruid;
 
-        if (ruid < 0 || ruid >= MAX_RUS)
+        if (ruid < 0 || ruid >= MAX_RUHS)
         {
-            printf("ERROR: GC RU ID out of bounds (ruid=%d, MAX_RUS=%d)\n", ruid, MAX_RUS);
+            printf("ERROR: GC RU ID out of bounds (ruid=%d, endgrp->fdp.nrg=%d)\n", ruid, endgrp->fdp.nrg);
             exit(1);
         }
 
@@ -392,31 +392,14 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
         ppa.g.blk = ru->wp.blk;
         ppa.g.pl = ru->wp.pl;
 
-        if (ppa.g.ch < 0 || ppa.g.ch >= spp->nchs)
-        {
-            printf("ERROR: Channel index out of bounds (ch=%d, nchs=%d)\n", ppa.g.ch, spp->nchs);
-            exit(1);
-        }
-
-        if (ppa.g.lun < 0 || ppa.g.lun >= spp->luns_per_ch)
-        {
-            printf("ERROR: LUN index out of bounds (lun=%d, luns_per_ch=%d)\n", ppa.g.lun, spp->luns_per_ch);
-            exit(1);
-        }
-
-        if (ppa.g.pg < 0 || ppa.g.pg >= spp->pgs_per_ru)
-        {
-            printf("ERROR: Page index out of bounds (pg=%d, pgs_per_ru=%d)\n", ppa.g.pg, spp->pgs_per_ru);
-            exit(1);
-        }
         // ppa.g.sec = 0;
 
         return ppa;
     }
 
-    if (ruid < 0 || ruid >= MAX_RUS)
+    if (ruid < 0 || ruid >= endgrp->fdp.nrg)
     {
-        printf("ERROR: Current RU ID out of bounds (ruid=%d, MAX_RUS=%d)\n", ruid, MAX_RUS);
+        printf("ERROR: Current RU ID out of bounds (ruid=%d, endgrp->fdp.nrg=%d)\n", ruid, endgrp->fdp.nrg);
         exit(1);
     }
 
@@ -433,23 +416,6 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
     ppa.g.blk = ru->wp.blk;
     ppa.g.pl = ru->wp.pl;
 
-    if (ppa.g.ch < 0 || ppa.g.ch >= spp->nchs)
-    {
-        printf("ERROR: Channel index out of bounds (ch=%d, nchs=%d)\n", ppa.g.ch, spp->nchs);
-        exit(1);
-    }
-
-    if (ppa.g.lun < 0 || ppa.g.lun >= spp->luns_per_ch)
-    {
-        printf("ERROR: LUN index out of bounds (lun=%d, luns_per_ch=%d)\n", ppa.g.lun, spp->luns_per_ch);
-        exit(1);
-    }
-
-    if (ppa.g.pg < 0 || ppa.g.pg >= spp->pgs_per_ru)
-    {
-        printf("ERROR: Page index out of bounds (pg=%d, pgs_per_ru=%d)\n", ppa.g.pg, spp->pgs_per_ru);
-        exit(1);
-    }
 
 
     ftl_assert(ppa.g.pl == 0);
