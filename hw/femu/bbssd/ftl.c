@@ -242,7 +242,7 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
 	/* 3. Advancing Write Pointer */
 	/*****************/
 
-    printf("5\n");
+    // printf("5\n");
     struct ssdparams *spp = &ssd->sp;
     struct ru_mgmt *rum = &ssd->rums[rgid];
     struct ruh *ruh = &ssd->ruhtbl[ruhid];
@@ -284,12 +284,12 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
             // check_addr(ru->wp.pg, spp->pgs_per_blk);
             ru->wp.pg++;
             // RU is full
-            if (ru->wp.pg == spp->pgs_per_ru)
+            if (ru->wp.pg == spp->pgs_per_blk)
             {
                 ru->wp.pg = 0;
 
                 // All pages are valid
-                if (ru->vpc == spp->pgs_per_ru)
+                if (ru->vpc == spp->pgs_per_blk)
                 {
                     // RU is full, move to full list
                     QTAILQ_INSERT_TAIL(&rum->full_ru_list, ru, entry);
@@ -318,7 +318,7 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
         }
     }
 
-    printf("6\n");
+    // printf("6\n");
 
     /*****************/
 }
@@ -327,7 +327,7 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
 {
 	/* 2. Getting Physical Page to Write */
 	// /**************
-    printf("3\n");
+    // printf("3\n");
     struct ppa ppa;
 
     // struct ssdparams *spp = &ssd->sp;
@@ -356,7 +356,7 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
     ppa.g.pl = ru->wp.pl;
     ftl_assert(ppa.g.pl == 0);
 
-    printf("4\n");
+    // printf("4\n");
 
     return ppa;
 	// **************/
@@ -1036,7 +1036,7 @@ static uint64_t ssd_write(struct ssd *ssd, NvmeRequest *req)
     int r = 0;
 	uint16_t ruhid;
 
-    printf("1\n");
+    // printf("1\n");
 
 	NvmeNamespace *ns = req->ns;
 	NvmeEnduranceGroup *endgrp = ns->endgrp;
@@ -1109,7 +1109,7 @@ static uint64_t ssd_write(struct ssd *ssd, NvmeRequest *req)
         maxlat = (curlat > maxlat) ? curlat : maxlat;
     }
 
-    printf("2\n");
+    // printf("2\n");
 
     return maxlat;
 }
