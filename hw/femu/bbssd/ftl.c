@@ -266,20 +266,21 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
         printf("RU not assigned!\n");
         exit(1);
     }
+    int start_lunidx = rgid * RG_DEGREE; // RG_DEGREE defined 16
 
-    check_addr(ru->wp.ch, spp->nchs);
+    // check_addr(ru->wp.ch, spp->nchs);
     ru->wp.ch++;
     if (ru->wp.ch == (rgid + 1) * RG_DEGREE / spp->luns_per_ch)
     {
-        int start_lunidx = rgid * RG_DEGREE; // RG_DEGREE defined 16
+        
         ru->wp.ch = start_lunidx / spp->luns_per_ch;
 
-        check_addr(ru->wp.ch, spp->luns_per_ch);
+        // check_addr(ru->wp.ch, spp->luns_per_ch);
         ru->wp.lun++;
         if (ru->wp.lun == spp->luns_per_ch)
         {
             ru->wp.lun = start_lunidx % spp->luns_per_ch;
-            check_addr(ru->wp.pg, spp->pgs_per_blk);
+            // check_addr(ru->wp.pg, spp->pgs_per_blk);
             ru->wp.pg++;
             // RU is full
             if (ru->wp.pg == spp->pgs_per_ru)
@@ -302,6 +303,7 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
 
                 int ruid = get_next_free_ruid(ssd, rum);
 
+
                 if (for_gc)
                 {
                     // Update GC RU
@@ -309,6 +311,7 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                 }
                 else{
                     ruh->cur_ruids[rgid] = ruid; // 이건 맞아 해야됨
+
                 }
             }
         }
@@ -349,6 +352,10 @@ static struct ppa get_new_page(struct ssd *ssd, uint16_t rgid, uint16_t ruhid, b
     }
 
     ru = &rum->rus[ruid];
+
+    if(ru == NULL){
+        printf("NUL\n");
+    }
 
     ppa.ppa = 0;
     ppa.g.ch = ru->wp.ch;
