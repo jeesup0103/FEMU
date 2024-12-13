@@ -1044,7 +1044,7 @@ static uint64_t ssd_write(struct ssd *ssd, NvmeRequest *req)
     // uint16_t ph_bits = 16 - rgif;
     // uint16_t rgid = pid >> ph_bits;          // RG id
     uint16_t rgid = pid >> (16 - rgif);         // RG id
-    uint16_t ph_bits = log(NVME_FDP_MAXPIDS);
+    uint16_t ph_bits = 6;
     uint16_t ph = pid & ((1 << ph_bits) - 1);   // Placement handler
     // *******************************/
 
