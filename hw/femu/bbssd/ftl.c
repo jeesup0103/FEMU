@@ -860,6 +860,17 @@ static int clean_one_block(struct ssd *ssd, struct ppa *ppa, uint16_t rgid, uint
     return cnt;
 }
 
+static int compare_uint64_t(const void *a, const void *b)
+{
+    uint64_t x = *(uint64_t *)a;
+    uint64_t y = *(uint64_t *)b;
+    if (x < y)
+        return -1;
+    else if (x > y)
+        return 1;
+    return 0;
+}
+
 static int do_gc(struct ssd *ssd, uint16_t rgid, bool force, NvmeRequest *req)
 {
 	struct ru *victim_ru = NULL;
@@ -872,7 +883,7 @@ static int do_gc(struct ssd *ssd, uint16_t rgid, bool force, NvmeRequest *req)
 	int start_lunidx = rgid * RG_DEGREE;
 	uint16_t ruhid;
 
-    printf("Doing gc\n");
+    // printf("Doing gc\n");
 
     // int startLba = req->slba; // FDP LOG 
 
@@ -922,6 +933,7 @@ static int do_gc(struct ssd *ssd, uint16_t rgid, bool force, NvmeRequest *req)
 		NvmeFdpEvent *e = nvme_fdp_alloc_event(req->ns->ctrl, &ns->endgrp->fdp.ctrl_events);
         uint64_t largest_contiguous_lba_start = 0;
         uint64_t nlbam = 0;
+
         if (e)
         {
             // Set event fields
@@ -932,6 +944,8 @@ static int do_gc(struct ssd *ssd, uint16_t rgid, bool force, NvmeRequest *req)
 
             // largest_contiguous_lba_start and nlbam
             if (moved_count > 0) {
+                qsort(moved_lpn_array, moved_count, sizeof(uint64_t), compare_uint64_t);
+
                 int max_run = 1;
                 int current_run = 1;
                 uint64_t max_start_lpn = moved_lpn_array[0];
