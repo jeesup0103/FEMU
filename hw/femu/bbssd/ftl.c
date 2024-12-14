@@ -281,7 +281,7 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
         if (ru->wp.lun == spp->luns_per_ch)
         {
             ru->wp.lun = start_lunidx % spp->luns_per_ch;
-            // check_addr(ru->wp.pg, spp->pgs_per_blk);
+            // check_addr(ru->wp.pg, spp->luns_per_ch);
             ru->wp.pg++;
             // RU is full
             if (ru->wp.pg == spp->pgs_per_blk)
@@ -311,7 +311,7 @@ static void ssd_advance_ru_write_pointer(struct ssd *ssd, uint16_t rgid, uint16_
                     rum->ii_gc_ruid = ruid;
                 }
                 else {
-                    ruh->cur_ruids[rgid] = ruid; // 이건 맞아 해야됨
+                    ruh->cur_ruids[rgid] = ruid;
 
                 }
             }
@@ -860,17 +860,6 @@ static int clean_one_block(struct ssd *ssd, struct ppa *ppa, uint16_t rgid, uint
     return cnt;
 }
 
-static int compare_uint64_t(const void *a, const void *b)
-{
-    uint64_t x = *(uint64_t *)a;
-    uint64_t y = *(uint64_t *)b;
-    if (x < y)
-        return -1;
-    else if (x > y)
-        return 1;
-    return 0;
-}
-
 static int do_gc(struct ssd *ssd, uint16_t rgid, bool force, NvmeRequest *req)
 {
 	struct ru *victim_ru = NULL;
@@ -944,7 +933,6 @@ static int do_gc(struct ssd *ssd, uint16_t rgid, bool force, NvmeRequest *req)
 
             // largest_contiguous_lba_start and nlbam
             if (moved_count > 0) {
-                qsort(moved_lpn_array, moved_count, sizeof(uint64_t), compare_uint64_t);
 
                 int max_run = 1;
                 int current_run = 1;
@@ -986,7 +974,7 @@ static int do_gc(struct ssd *ssd, uint16_t rgid, bool force, NvmeRequest *req)
         // *****************/
 	}
 
-    free(moved_lpn_array); // FREE????
+    free(moved_lpn_array);
 
     /* reset wp of victim ru */
 	victim_ru->wp.ch = start_lunidx / spp->luns_per_ch;
@@ -1058,13 +1046,13 @@ static uint64_t ssd_write(struct ssd *ssd, NvmeRequest *req)
 
 	/* 1. DTYPE & PID parsing */
 	// /******************************
-    uint8_t dtype = 0x02;
-	uint16_t pid = rw->dspec;                   // Placement ID -> specifies a RG and placement handle referencing a unique RU
+    uint8_t dtype = NVME_DIRECTIVE_DATA_PLACEMENT;
+    uint16_t pid = rw->dspec;                   // Placement ID -> specifies a RG and placement handle referencing a unique RU
 	uint16_t rgif = endgrp->fdp.rgif;           // RG id format
     // uint16_t ph_bits = 16 - rgif;
     // uint16_t rgid = pid >> ph_bits;          // RG id
     uint16_t rgid = pid >> (16 - rgif);         // RG id
-    uint16_t ph_bits = 6;
+    uint16_t ph_bits = 16 - rgif;
     uint16_t ph = pid & ((1 << ph_bits) - 1);   // Placement handler
     // *******************************/
 
@@ -1073,7 +1061,7 @@ static uint64_t ssd_write(struct ssd *ssd, NvmeRequest *req)
 		rgid = 0;
 	}
 
-	ruhid = ns->fdp.phs[ph];						
+	ruhid = ns->fdp.phs[ph];
 
     if (end_lpn >= spp->tt_pgs) {
 		ftl_err("start_lpn=%"PRIu64",tt_pgs=%d\n", start_lpn, ssd->sp.tt_pgs);
